@@ -1,0 +1,38 @@
+{
+    "accountAssociation": {
+        "header": "",
+        "payload": "",
+        "signature": ""
+    },
+    "frame": {
+      "name": "PingGate 💬",
+      "version": "next",
+      "iconUrl": "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
+      "imageUrl": "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
+      "buttonTitle": "Launch PingGate",
+      "splashImageUrl": "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
+      "splashBackgroundColor": "#17101f",
+      "homeUrl": "https://pinggate.lopezonchain.xyz",
+      "webhookUrl": "https://pinggate.lopezonchain.xyz/api/webhook",
+      "subtitle": "All-in-one easy payments",
+      "description": "PingGate is a pay-to-message platform that lets experts, creators, and professionals monetize their time and attention. Users pay to start conversations, request services, book consultations, or simply start avoiding spam, all wallet-to-wallet, with built-in reviews and XMTP messaging",
+      "screenshotUrls": [
+        "https://pinggate.lopezonchain.xyz/screen_1.png",
+        "https://pinggate.lopezonchain.xyz/screen_2.png",
+        "https://pinggate.lopezonchain.xyz/screen_3.png"
+      ],
+      "primaryCategory": "finance",
+      "tags": [
+        "payments",
+        "crypto",
+        "airdrop",
+        "miniapp",
+        "tips"
+      ],
+      "heroImageUrl": "https://pinggate.lopezonchain.xyz/hero.png",
+      "tagline": "Your inbox. Your rules",
+      "ogTitle": "PingGate – Monetize your inbox",
+      "ogDescription": "Get paid to receive messages. Offer consulting, mentorship, or support through direct, wallet-based chats using XMTP (end to end encrypted)",
+      "ogImageUrl": "https://pinggate.lopezonchain.xyz/hero.png"
+    }
+  }
