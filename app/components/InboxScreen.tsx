@@ -190,7 +190,7 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
                   </div>
 
                   {isOpen && (
-                    <div className="px-4 pb-4 space-y-2">
+                    <div className="px-4 pb-4 space-y-2 max-h-[50%]">
                       {messages[conv.peerAddress]?.map((m, i) => (
                         <div
                           key={i}
