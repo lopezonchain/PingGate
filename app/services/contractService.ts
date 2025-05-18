@@ -1,20 +1,139 @@
+// src/services/contractService.ts
 
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { base } from 'viem/chains';
-import contractAbi from './contractAbi.json';
-import { resolveRecipient } from './nameResolver';
-import { WalletClient } from 'wagmi';
-import { publicClient } from '../viemClient';
+import { createPublicClient, http, WalletClient } from "viem";
+import { base } from "viem/chains";
+import contractAbi from "./contractAbi.json";
+import { resolveEnsName } from "./nameResolver";
+import { WarpcastService } from "./warpcastService";
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PING_GATE_CONTRACT as `0x${string}`;
+const CONTRACT_ADDRESS =
+  process.env.NEXT_PUBLIC_PING_GATE_CONTRACT! as `0x${string}`;
 
-export function getContractConfig() {
+// Public read‐only client
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(
+    process.env.NEXT_PUBLIC_ETH_RPC_URL || "https://eth.llamarpc.com"
+  ),
+});
+
+function getContractConfig() {
   return {
     address: CONTRACT_ADDRESS,
     abi: contractAbi,
-  };
+  } as const;
 }
 
+export interface Service {
+  id: bigint;
+  seller: `0x${string}`;
+  title: string;
+  description: string;
+  price: bigint;
+  duration: bigint;
+  active: boolean;
+}
+
+export interface PurchaseRecord {
+  serviceId: bigint;
+  buyer: `0x${string}`;
+  timestamp: bigint;
+}
+
+/**
+ * Resolve hex, ENS or Farcaster name → 0x…
+ */
+export async function resolveRecipient(
+  raw: string
+): Promise<`0x${string}`> {
+  const input = raw.trim();
+  if (input.startsWith("0x")) return input as `0x${string}`;
+  const name = input.replace(/^@/, "");
+  if (name.toLowerCase().endsWith(".eth")) {
+    return resolveEnsName(name);
+  }
+  const svc = new WarpcastService();
+  const fid = await svc.getFidByName(name);
+  const [res] = await svc.getPrimaryAddresses([fid], "ethereum");
+  if (!res.success || !res.address) {
+    throw new Error(`No address for "${raw}"`);
+  }
+  return res.address.address as `0x${string}`;
+}
+
+// ───────────────────────────────────────────────────────────────
+// READ (view) FUNCTIONS
+// ───────────────────────────────────────────────────────────────
+
+/** Fetch a single service by ID */
+export async function getService(
+  id: bigint
+): Promise<Service> {
+  return (await publicClient.readContract({
+    ...getContractConfig(),
+    functionName: "services",
+    args: [id],
+  })) as Service;
+}
+
+/** List all active services */
+export async function getActiveServices(): Promise<Service[]> {
+  return (await publicClient.readContract({
+    ...getContractConfig(),
+    functionName: "getActiveServices",
+  })) as Service[];
+}
+
+/** Get service IDs by seller */
+export async function getServicesBy(
+  seller: `0x${string}`
+): Promise<bigint[]> {
+  return (await publicClient.readContract({
+    ...getContractConfig(),
+    functionName: "getServicesBy",
+    args: [seller],
+  })) as bigint[];
+}
+
+/** Get purchased service IDs by buyer */
+export async function getPurchasesBy(
+  buyer: `0x${string}`
+): Promise<bigint[]> {
+  return (await publicClient.readContract({
+    ...getContractConfig(),
+    functionName: "getPurchasesBy",
+    args: [buyer],
+  })) as bigint[];
+}
+
+/** Get full sales records received by a seller */
+export async function getSalesBy(
+  seller: `0x${string}`
+): Promise<PurchaseRecord[]> {
+  return (await publicClient.readContract({
+    ...getContractConfig(),
+    functionName: "getSalesBy",
+    args: [seller],
+  })) as PurchaseRecord[];
+}
+
+/** Check if user purchased a given service */
+export async function hasPurchased(
+  serviceId: number,
+  user: `0x${string}`
+): Promise<boolean> {
+  return (await publicClient.readContract({
+    ...getContractConfig(),
+    functionName: "hasPurchased",
+    args: [BigInt(serviceId), user],
+  })) as boolean;
+}
+
+// ───────────────────────────────────────────────────────────────
+// WRITE (transaction) FUNCTIONS
+// ───────────────────────────────────────────────────────────────
+
+/** Create a new service (pay creationFee) */
 export async function createService(
   walletClient: WalletClient,
   title: string,
@@ -25,12 +144,13 @@ export async function createService(
 ) {
   return walletClient.writeContract({
     ...getContractConfig(),
-    functionName: 'createService',
+    functionName: "createService",
     args: [title, description, price, BigInt(duration)],
     value: fee,
   });
 }
 
+/** Edit an existing service (pay editFee) */
 export async function editService(
   walletClient: WalletClient,
   id: number,
@@ -41,29 +161,39 @@ export async function editService(
 ) {
   return walletClient.writeContract({
     ...getContractConfig(),
-    functionName: 'editService',
+    functionName: "editService",
     args: [BigInt(id), title, description, price],
     value: fee,
   });
 }
 
-export async function pauseService(walletClient: WalletClient, id: number) {
+/** Pause a service */
+export async function pauseService(
+  walletClient: WalletClient,
+  id: number
+) {
   return walletClient.writeContract({
     ...getContractConfig(),
-    functionName: 'pauseService',
+    functionName: "pauseService",
     args: [BigInt(id)],
   });
 }
 
-export async function purchaseService(walletClient: WalletClient, id: number, value: bigint) {
+/** Purchase a service (unlock contact) */
+export async function purchaseService(
+  walletClient: WalletClient,
+  id: number,
+  value: bigint
+) {
   return walletClient.writeContract({
     ...getContractConfig(),
-    functionName: 'purchaseService',
+    functionName: "purchaseService",
     args: [BigInt(id)],
     value,
   });
 }
 
+/** Submit or update a review (scores + comment) */
 export async function submitReview(
   walletClient: WalletClient,
   serviceId: number,
@@ -74,46 +204,13 @@ export async function submitReview(
 ) {
   return walletClient.writeContract({
     ...getContractConfig(),
-    functionName: 'submitReview',
-    args: [BigInt(serviceId), quality, communication, timeliness, comment],
-  });
-}
-
-export async function getActiveServices() {
-  return publicClient.readContract({
-    ...getContractConfig(),
-    functionName: 'getActiveServices',
-  });
-}
-
-export async function getServicesBy(seller: `0x${string}`) {
-  return publicClient.readContract({
-    ...getContractConfig(),
-    functionName: 'getServicesBy',
-    args: [seller],
-  });
-}
-
-export async function getPurchasesBy(buyer: `0x${string}`) {
-  return publicClient.readContract({
-    ...getContractConfig(),
-    functionName: 'getPurchasesBy',
-    args: [buyer],
-  });
-}
-
-export async function getSalesBy(seller: `0x${string}`) {
-  return publicClient.readContract({
-    ...getContractConfig(),
-    functionName: 'getSalesBy',
-    args: [seller],
-  });
-}
-
-export async function hasPurchased(serviceId: number, user: `0x${string}`) {
-  return publicClient.readContract({
-    ...getContractConfig(),
-    functionName: 'hasPurchased',
-    args: [BigInt(serviceId), user],
+    functionName: "submitReview",
+    args: [
+      BigInt(serviceId),
+      quality,
+      communication,
+      timeliness,
+      comment,
+    ],
   });
 }

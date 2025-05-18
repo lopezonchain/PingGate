@@ -20,47 +20,20 @@ import {
   Wallet,
   WalletDropdown,
   WalletDropdownDisconnect,
+  WalletModal,
 } from "@coinbase/onchainkit/wallet";
-import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Transition } from "@headlessui/react";
-import { Fragment } from "react";
-import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { sdk } from '@farcaster/frame-sdk';
 
-import {
-  mainnet, arbitrum, optimism, polygon, avalanche, fantom, gnosis, celo, base, abstract, aurora, bsc, dogechain,
-  linea, metis, moonbeam, neonMainnet, polygonZkEvm, sonic, tron, zksync,
-  baseSepolia, monadTestnet
-} from "wagmi/chains";
+import { base,baseSepolia, monadTestnet} from "wagmi/chains";
 import PingGateHome from "./components/PingGateHome";
 import InboxScreen from "./components/InboxScreen";
 
 export type WarpView = "home" | "inbox" | "myplans" | "explore" | "reviews" ;
 
 const chainOptions = [
-  //{ label: "Sepolia", chain: baseSepolia },
+  { label: "Sepolia", chain: baseSepolia },
   { label: "Base", chain: base },
-  { label: "Monad Testnet", chain: monadTestnet },
-  { label: "Ethereum", chain: mainnet },
-  { label: "Arbitrum", chain: arbitrum },
-  { label: "Sonic", chain: sonic },
-  { label: "Abstract", chain: abstract },
-  { label: "Optimism", chain: optimism },
-  { label: "Polygon", chain: polygon },
-  { label: "Avalanche", chain: avalanche },
-  { label: "Fantom", chain: fantom },
-  { label: "Gnosis", chain: gnosis },
-  { label: "Celo", chain: celo },
-  { label: "BSC", chain: bsc },
-  { label: "Polygon zkEVM", chain: polygonZkEvm },
-  { label: "zkSync", chain: zksync },
-  //{ label: "Scroll", chain: scroll },
-  { label: "Linea", chain: linea },
-  { label: "Metis", chain: metis },
-  { label: "Dogechain", chain: dogechain },
-  { label: "Tron", chain: tron },
-  { label: "Aurora", chain: aurora },
-  { label: "Moonbeam", chain: moonbeam },
-  { label: "Neon EVM", chain: neonMainnet },
+  { label: "Monad Testnet", chain: monadTestnet }
 ] as const;
 
 
@@ -313,24 +286,25 @@ export default function Page(): JSX.Element {
     <div className="flex flex-col bg-[#0f0d14] font-sans text-[var(--app-foreground)] mini-app-theme overflow-hidden">
       <div className="w-full max-w-md mx-auto px-4 py-3 h-screen flex flex-col">
         <header className="flex justify-between items-center mb-3 h-11">
-          <div className="flex items-end justify-between space-x-2 w-full">
+          <div className="flex justify-end space-x-2 w-full z-50">
 
-            <Wallet className="z-10">
+            <Wallet>
               <ConnectWallet>
-                <Name className="text-inherit" />
+                <Avatar className="h-6 w-6" />
+                <Name />
               </ConnectWallet>
               <WalletDropdown>
-                <Identity address={address} chain={selectedChain} className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
-                  <Avatar address={address} chain={selectedChain} />
-                  <Name address={address} chain={selectedChain} />
-                  <Address address={address} />
-                  <EthBalance address={address} />
+                <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+                  <Avatar />
+                  <Name />
+                  <Address />
+                  <EthBalance />
                 </Identity>
                 <WalletDropdownDisconnect />
               </WalletDropdown>
             </Wallet>
 
-            <div>{saveFrameButton}</div>
+            <div className="ml-4">{saveFrameButton}</div>
           </div>
           
         </header>
@@ -339,9 +313,11 @@ export default function Page(): JSX.Element {
           {warpView === "home" && <PingGateHome onAction={(view) => setWarpView(view)} />}
           {warpView === "inbox" && (<InboxScreen onBack={() => setWarpView("home")} />)}
 
-          
         </main>
       </div>
+       <WalletModal isOpen={false} onClose={function (): void {
+        throw new Error("Function not implemented.");
+      } } />
     </div>
   );
 }
