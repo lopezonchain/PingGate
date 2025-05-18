@@ -71,7 +71,7 @@ npm run dev
 
 - **Inbox**: View and reply to conversations.
 - **Pay-to-Ping**: Start conversations with experts by selecting a paid plan. Payment unlocks direct chat access.
-- **My Plans**: Create and manage your own service offerings (consulting, support, feedback).
+- **My Services**: Create and manage your own service offerings (consulting, support, feedback).
 - **Explore**: Browse other users' profiles and plans. Pay and start chatting instantly.
 - **Farcaster Identity**: Link your FID to build trust and visibility in the decentralized social space.
 

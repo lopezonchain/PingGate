@@ -39,7 +39,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
     },
     {
       icon: <FiPlusCircle />,
-      label: "My Plans",
+      label: "My Services",
       desc: "Create and manage your own paid DM or consultation offerings.",
       action: "myplans",
       enabled: true,
