@@ -13,7 +13,7 @@ const CONTRACT_ADDRESS =
 const publicClient = createPublicClient({
   chain: base,
   transport: http(
-    process.env.NEXT_PUBLIC_ETH_RPC_URL || "https://base.llamarpc.com"
+    "https://base.llamarpc.com"
   ),
 });
 
@@ -182,7 +182,7 @@ export async function createService(
 ) {
   return walletClient.writeContract({
     account: walletClient.account ?? null,
-    chain: walletClient.chain,
+    chain: base,               // ← forzamos Base aquí
     ...getContractConfig(),
     functionName: "createService",
     args: [title, description, price, BigInt(duration)],
@@ -193,48 +193,46 @@ export async function createService(
 /** Edit an existing service (pay editFee) */
 export async function editService(
   walletClient: WalletClient,
-  id: number,
+  id: bigint,
   title: string,
   description: string,
-  price: bigint,
-  fee: bigint
+  price: bigint
 ) {
   return walletClient.writeContract({
     account: walletClient.account ?? null,
-    chain: walletClient.chain,
+    chain: base,
     ...getContractConfig(),
     functionName: "editService",
-    args: [BigInt(id), title, description, price],
-    value: fee,
+    args: [id, title, description, price],
   });
 }
 
 /** Pause a service */
 export async function pauseService(
   walletClient: WalletClient,
-  id: number
+  id: bigint
 ) {
   return walletClient.writeContract({
     account: walletClient.account ?? null,
-    chain: walletClient.chain,
+    chain: base,
     ...getContractConfig(),
     functionName: "pauseService",
-    args: [BigInt(id)],
+    args: [id],
   });
 }
 
 /** Purchase a service (unlock contact) */
 export async function purchaseService(
   walletClient: WalletClient,
-  id: number,
+  id: bigint,
   value: bigint
 ) {
   return walletClient.writeContract({
     account: walletClient.account ?? null,
-    chain: walletClient.chain,
+    chain: base,
     ...getContractConfig(),
     functionName: "purchaseService",
-    args: [BigInt(id)],
+    args: [id],
     value,
   });
 }
@@ -242,7 +240,7 @@ export async function purchaseService(
 /** Submit or update a review (scores + comment) */
 export async function submitReview(
   walletClient: WalletClient,
-  serviceId: number,
+  serviceId: bigint,
   quality: number,
   communication: number,
   timeliness: number,
@@ -250,11 +248,11 @@ export async function submitReview(
 ) {
   return walletClient.writeContract({
     account: walletClient.account ?? null,
-    chain: walletClient.chain,
+    chain: base,
     ...getContractConfig(),
     functionName: "submitReview",
     args: [
-      BigInt(serviceId),
+      serviceId,
       quality,
       communication,
       timeliness,
@@ -270,6 +268,16 @@ export async function getCreationFee(): Promise<bigint> {
   return publicClient.readContract({
     ...getContractConfig(),
     functionName: "creationFee",
+  }) as Promise<bigint>;
+}
+
+/**
+ * Fetch the on-chain edit fee (in wei)
+ */
+export async function getEditFee(): Promise<bigint> {
+  return publicClient.readContract({
+    ...getContractConfig(),
+    functionName: "editFee",
   }) as Promise<bigint>;
 }
 

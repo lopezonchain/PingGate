@@ -197,7 +197,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
               }`}
           >
-            {t === "sales" ? "Clients" : t === "purchases" ? "Sellers" : "All"}
+            {t === "sales" ? "Clients" : t === "purchases" ? "Bought" : "All"}
           </button>
         ))}
       </div>
@@ -208,7 +208,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           Loading…
         </p>
       ) : (
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1">
           <div className="h-full overflow-y-auto space-y-4 px-2 pb-2">
             {filteredConversations.map((conv, idx) => {
               const isOpen = conv.peerAddress === expanded;

@@ -1,7 +1,17 @@
+// src/screens/MyServicesScreen.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useWalletClient } from "wagmi";
+import { useAccount, useWalletClient } from "wagmi";
+import {
+  FiArrowLeft,
+  FiEdit2,
+  FiPauseCircle,
+  FiChevronDown,
+  FiChevronUp,
+} from "react-icons/fi";
+import { ethers } from "ethers";
+import toast from "react-hot-toast";
 import {
   getServicesBy,
   getService,
@@ -13,11 +23,9 @@ import {
   createService,
   getCreationFee,
 } from "../services/contractService";
-import { FiArrowLeft, FiEdit2, FiPauseCircle, FiChevronDown, FiChevronUp } from "react-icons/fi";
-import { ethers } from "ethers";
-import toast from "react-hot-toast";
+import { base } from "viem/chains";
 
-interface MyPlansScreenProps {
+interface MyServicesScreenProps {
   onBack: () => void;
 }
 
@@ -37,9 +45,11 @@ interface SaleRecord {
   timestamp: bigint;
 }
 
-export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
+export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
+  const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
-  const address = walletClient?.account.address!;
+  const sellerAddress = address as `0x${string}`;
+
   const [services, setServices] = useState<ServiceDetails[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [expanded, setExpanded] = useState<bigint | null>(null);
@@ -47,7 +57,7 @@ export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
   const [reviews, setReviews] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
 
-  // For "Add Plan" modal
+  // Creation modal state
   const [showCreator, setShowCreator] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
@@ -57,33 +67,33 @@ export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>("");
 
-  // load my services & sales
+  // Load services & sales
   useEffect(() => {
-    if (!walletClient) return;
+    if (!sellerAddress) return;
     (async () => {
       setLoading(true);
       try {
-        const ids = await getServicesBy(address);
+        const ids = await getServicesBy(sellerAddress);
         const details = await Promise.all(ids.map((id) => getService(id)));
         setServices(details);
-        const salesRecs = await getSalesBy(address);
+
+        const salesRecs = await getSalesBy(sellerAddress);
         setSales(salesRecs);
       } catch (e: any) {
         console.error(e);
-        toast.error(e.message || "Failed to load plans");
+        toast.error(e.message || "Failed to load services");
       } finally {
         setLoading(false);
       }
     })();
-  }, [walletClient, address]);
+  }, [sellerAddress]);
 
-  // fetch creationFee once
+  // Fetch creationFee once
   useEffect(() => {
-    if (!walletClient) return;
     getCreationFee()
       .then((fee) => setCreationFee(fee))
       .catch((e) => console.error("Could not load creationFee", e));
-  }, [walletClient]);
+  }, []);
 
   const toggle = (id: bigint) => {
     const opening = expanded !== id;
@@ -93,6 +103,7 @@ export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
         try {
           const avg = await getAverageRating(id);
           setRatings((p) => ({ ...p, [id.toString()]: Number(avg) }));
+
           const recs = sales.filter((s) => s.serviceId === id);
           const list = await Promise.all(
             recs.map((s) =>
@@ -112,8 +123,16 @@ export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
 
   const onPause = async (id: bigint) => {
     if (!walletClient) return;
+    if (walletClient.chain?.id !== base.id) {
+      try {
+        await walletClient.switchChain({ id: base.id });
+      } catch {
+        toast.error("Please switch your wallet to Base network");
+        return;
+      }
+    }
     try {
-      await pauseService(walletClient, Number(id));
+      await pauseService(walletClient, id);
       setServices((p) =>
         p.map((s) => (s.id === id ? { ...s, active: false } : s))
       );
@@ -126,27 +145,30 @@ export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
 
   const onEdit = async (svc: ServiceDetails) => {
     if (!walletClient) return;
-    const newTitle = prompt("New title", svc.title) || svc.title;
-    const newDesc = prompt("New description", svc.description) || svc.description;
+    if (walletClient.chain?.id !== base.id) {
+      try {
+        await walletClient.switchChain({ id: base.id });
+      } catch {
+        toast.error("Please switch your wallet to Base network");
+        return;
+      }
+    }
+    const newTitleInput = prompt("New title", svc.title) || svc.title;
+    const newDescInput =
+      prompt("New description", svc.description) || svc.description;
     const newPrice = prompt(
       "New price (ETH)",
       ethers.formatEther(svc.price)
     );
     if (!newPrice) return;
     const priceWei = ethers.parseEther(newPrice);
+
     try {
-      await editService(
-        walletClient,
-        Number(svc.id),
-        newTitle,
-        newDesc,
-        priceWei,
-        BigInt(0) // fee is handled within the helper
-      );
+      await editService(walletClient, svc.id, newTitleInput, newDescInput, priceWei);
       setServices((p) =>
         p.map((s) =>
           s.id === svc.id
-            ? { ...s, title: newTitle, description: newDesc, price: priceWei }
+            ? { ...s, title: newTitleInput, description: newDescInput, price: priceWei }
             : s
         )
       );
@@ -161,6 +183,18 @@ export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
     if (!walletClient) return;
     setSending(true);
     setError("");
+
+    // ensure wallet on Base
+    if (walletClient.chain?.id !== base.id) {
+      try {
+        await walletClient.switchChain({ id: base.id });
+      } catch {
+        toast.error("Please switch your wallet to Base network");
+        setSending(false);
+        return;
+      }
+    }
+
     try {
       const priceWei = ethers.parseEther(newPriceEth || "0");
       const durationSecs = Number(newDuration);
@@ -174,11 +208,10 @@ export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
       );
       toast.success("Service created");
       // refresh list
-      const ids = await getServicesBy(address);
+      const ids = await getServicesBy(sellerAddress);
       const details = await Promise.all(ids.map((id) => getService(id)));
       setServices(details);
       setShowCreator(false);
-      // reset form
       setNewTitle("");
       setNewDesc("");
       setNewPriceEth("");
@@ -210,7 +243,7 @@ export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
         Back
       </button>
 
-      <h2 className="text-2xl font-bold mb-4 text-center">My Plans</h2>
+      <h2 className="text-2xl font-bold mb-4 text-center">My Services</h2>
 
       <div className="space-y-4 overflow-y-auto flex-1 px-2">
         {services.map((svc) => {
@@ -221,6 +254,7 @@ export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
           );
           const avg = ratings[key] ?? 0;
           const isOpen = expanded === svc.id;
+
           return (
             <div
               key={key}
@@ -251,10 +285,12 @@ export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
                   {(reviews[key] || []).map((r, i) => (
                     <div key={i} className="bg-[#2a2438] p-2 rounded">
                       <p className="text-sm">
-                        ⭐ Quality: {r.quality} · Communication: {r.communication} ·
-                        Timeliness: {r.timeliness}
+                        ⭐ Quality: {r.quality} · Communication:{" "}
+                        {r.communication} · Timeliness: {r.timeliness}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">{r.comment}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {r.comment}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -264,20 +300,20 @@ export default function MyPlansScreen({ onBack }: MyPlansScreenProps) {
         })}
       </div>
 
-      {/* Floating "+" button to add a plan */}
+      {/* Floating "+" button to add a service */}
       <button
         onClick={() => setShowCreator(true)}
         className="fixed bottom-6 right-6 z-50 bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
-        aria-label="Add Plan"
+        aria-label="Add Service"
       >
         +
       </button>
 
-      {/* Add Plan Modal */}
+      {/* Add Service Modal */}
       {showCreator && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-40 flex items-center justify-center">
           <div className="bg-[#1a1725] p-6 rounded-xl w-full max-w-md space-y-4">
-            <h3 className="text-lg font-bold text-white">Add New Plan</h3>
+            <h3 className="text-lg font-bold text-white">Add New Service</h3>
             {error && <p className="text-red-500">{error}</p>}
             <input
               type="text"

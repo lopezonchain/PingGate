@@ -27,9 +27,10 @@ import { sdk } from '@farcaster/frame-sdk';
 import { base,baseSepolia, monadTestnet} from "wagmi/chains";
 import PingGateHome from "./components/PingGateHome";
 import InboxScreen from "./components/InboxScreen";
-import MyPlansScreen from "./components/MyPlansScreen";
+import MyPlansScreen from "./components/MyServicesScreen";
 import ReviewsScreen from "./components/ReviewsScreen";
 import ExploreScreen from "./components/ExploreScreen";
+import MyServicesScreen from "./components/MyServicesScreen";
 
 export type WarpView = "home" | "inbox" | "myplans" | "explore" | "reviews" ;
 
@@ -286,7 +287,7 @@ export default function Page(): JSX.Element {
   const handleBack = () => setWarpView("home");
 
   return (
-    <div className="flex flex-col bg-[#0f0d14] font-sans text-[var(--app-foreground)] mini-app-theme overflow-hidden">
+    <div className="flex flex-col bg-[#0f0d14] font-sans text-[var(--app-foreground)] mini-app-theme">
       <div className="w-full max-w-md mx-auto px-4 py-3 h-screen flex flex-col">
         <header className="flex justify-between items-center mb-3 h-11">
           <div className="flex justify-end space-x-2 w-full z-50">
@@ -315,7 +316,7 @@ export default function Page(): JSX.Element {
         <main className="flex-1">
           {warpView === "home" && <PingGateHome onAction={(view) => setWarpView(view)} />}
           {warpView === "inbox" && (<InboxScreen onBack={() => setWarpView("home")} />)}
-          {warpView === "myplans" && (<MyPlansScreen onBack={() => setWarpView("home")} />)}
+          {warpView === "myplans" && (<MyServicesScreen onBack={() => setWarpView("home")} />)}
           {warpView === "explore" && (<ExploreScreen onBack={() => setWarpView("home")} />)}
           {warpView === "reviews" && (<ReviewsScreen onBack={() => setWarpView("home")} />)}
         </main>
