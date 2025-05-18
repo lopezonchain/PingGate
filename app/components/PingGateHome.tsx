@@ -80,7 +80,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
           className="w-12 h-12 ml-4 rounded-full animate-pulse"/>
       </div>
       <p className="text-sm text-gray-400 mb-6 text-center leading-snug">
-        Pay2message. Monetize your inbox or connect with experts.
+        Monetize your inbox or connect with experts
       </p>
 
       {/* Actions list */}
