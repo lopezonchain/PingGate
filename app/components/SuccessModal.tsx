@@ -53,7 +53,7 @@ const SuccessModal: React.FC<SuccessModalProps> = ({ onClose, onShare, onAdd }) 
                     className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition"
                 >
                     <FiShare2 size={20} />
-                    Share WarpPay
+                    Share PingGate
                 </button>
                 <button
                     onClick={onAdd}

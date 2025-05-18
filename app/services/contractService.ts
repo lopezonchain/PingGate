@@ -1,7 +1,7 @@
 // src/services/contractService.ts
 import { Chain } from "viem";
 import contractAbi from "./contractAbi.json";
-import { resolveEnsName } from "./ensResolver";
+import { resolveEnsName } from "./nameResolver";
 import { WarpcastService } from "./warpcastService";
 
 export const erc20Abi = [
@@ -65,17 +65,17 @@ export interface ScheduledPayment {
 }
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-const WARPPAY_CONTRACT_BASE = process.env.NEXT_PUBLIC_WARPPAY_BASE_CONTRACT!;
-const WARPPAY_CONTRACT_MONAD = process.env.NEXT_PUBLIC_WARPPAY_MONAD_CONTRACT!;
+const PINGGATE_CONTRACT_BASE = process.env.NEXT_PUBLIC_PINGGATE_BASE_CONTRACT!;
+const PINGGATE_CONTRACT_MONAD = process.env.NEXT_PUBLIC_PINGGATE_MONAD_CONTRACT!;
 
-export function getWarpPayContract(chainId: number): `0x${string}` {
+export function getPingGateContract(chainId: number): `0x${string}` {
   switch (chainId) {
     case 8453:
-      return WARPPAY_CONTRACT_BASE as `0x${string}`;
+      return PINGGATE_CONTRACT_BASE as `0x${string}`;
     case 10143:
-      return WARPPAY_CONTRACT_MONAD as `0x${string}`;
+      return PINGGATE_CONTRACT_MONAD as `0x${string}`;
     default:
-      throw new Error(`WarpPay no soportado en chainId ${chainId}`);
+      throw new Error(`PingGate no soportado en chainId ${chainId}`);
   }
 }
 
@@ -148,7 +148,7 @@ export async function sendTokens(
 }
 
 /**
- * Creates a mass airdrop via WarpPay.multisendEther or .multisendToken.
+ * Creates a mass airdrop via PingGate.multisendEther or .multisendToken.
  */
 export async function createAirdrop(
   walletClient: any,
@@ -160,7 +160,7 @@ export async function createAirdrop(
   if (!walletClient) throw new Error("No wallet client available");
 
   const chainId = walletClient.chain.id;
-  const warpPayContract = getWarpPayContract(chainId);
+  const pingGateContract = getPingGateContract(chainId);
 
   // Resuelve todos los destinatarios
   const toAddrs = await Promise.all(recipients.map(resolveRecipient));
@@ -174,12 +174,12 @@ export async function createAirdrop(
       address: tokenAddress,
       abi: erc20Abi,
       functionName: "approve",
-      args: [warpPayContract, BigInt(totalNet) + totalFee],
+      args: [pingGateContract, BigInt(totalNet) + totalFee],
     });
     await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
     txHash = await walletClient.writeContract({
-      address: warpPayContract,
+      address: pingGateContract,
       abi: contractAbi,
       functionName: "multisendToken",
       args: [tokenAddress, toAddrs, values],
@@ -189,7 +189,7 @@ export async function createAirdrop(
     const totalFee = (BigInt(totalNet) * BigInt(2)) / BigInt(100);
 
     txHash = await walletClient.writeContract({
-      address: warpPayContract,
+      address: pingGateContract,
       abi: contractAbi,
       functionName: "multisendEther",
       args: [toAddrs, values],
@@ -219,29 +219,29 @@ export async function schedulePayment(
 
   const recipient = await resolveRecipient(recipientRaw);
   const token = tokenAddressRaw ?? ZERO_ADDRESS;
-  const warpPay = getWarpPayContract(walletClient.chain.id);
+  const pingGate = getPingGateContract(walletClient.chain.id);
 
   const creationPaused = await publicClient.readContract({
-    address: warpPay,
+    address: pingGate,
     abi: [{ inputs: [], name: "creationPaused", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" }],
     functionName: "creationPaused"
   });
   if (creationPaused) throw new Error("Scheduling paused on-chain");
 
   const minEth = await publicClient.readContract({
-    address: warpPay,
+    address: pingGate,
     abi: [{ inputs: [], name: "minEthPayment", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" }],
     functionName: "minEthPayment"
   }) as bigint;
   if (value < minEth) throw new Error(`Value below minimum of ${minEth} wei`);
 
   const creationFeePct = await publicClient.readContract({
-    address: warpPay,
+    address: pingGate,
     abi: [{ inputs: [], name: "creationFeePercent", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" }],
     functionName: "creationFeePercent"
   }) as bigint;
   const execRewardPct = await publicClient.readContract({
-    address: warpPay,
+    address: pingGate,
     abi: [{ inputs: [], name: "executorRewardPercent", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" }],
     functionName: "executorRewardPercent"
   }) as bigint;
@@ -255,12 +255,12 @@ export async function schedulePayment(
       address: token,
       abi: erc20Abi,
       functionName: "approve",
-      args: [warpPay, value + fee + reward]
+      args: [pingGate, value + fee + reward]
     });
   }
 
   const txHash = await walletClient.writeContract({
-    address: warpPay,
+    address: pingGate,
     abi: contractAbi,
     functionName: "schedulePayment",
     args: [recipient, value, token, BigInt(executeTime)],
@@ -291,17 +291,17 @@ export async function scheduleCyclicPayment(
 
   const recipient = await resolveRecipient(recipientRaw);
   const token = tokenAddressRaw ?? ZERO_ADDRESS;
-  const warpPay = getWarpPayContract(walletClient.chain.id);
+  const pingGate = getPingGateContract(walletClient.chain.id);
 
   const creationPaused = await publicClient.readContract({
-    address: warpPay,
+    address: pingGate,
     abi: [{ inputs: [], name: "creationPaused", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" }],
     functionName: "creationPaused"
   });
   if (creationPaused) throw new Error("Scheduling paused on-chain");
 
   const minEth = await publicClient.readContract({
-    address: warpPay,
+    address: pingGate,
     abi: [{ inputs: [], name: "minEthPayment", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" }],
     functionName: "minEthPayment"
   }) as bigint;
@@ -309,12 +309,12 @@ export async function scheduleCyclicPayment(
   if (repetitions <= 0) throw new Error("Repetitions must be > 0");
 
   const creationFeePct = await publicClient.readContract({
-    address: warpPay,
+    address: pingGate,
     abi: [{ inputs: [], name: "creationFeePercent", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" }],
     functionName: "creationFeePercent"
   }) as bigint;
   const execRewardPct = await publicClient.readContract({
-    address: warpPay,
+    address: pingGate,
     abi: [{ inputs: [], name: "executorRewardPercent", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" }],
     functionName: "executorRewardPercent"
   }) as bigint;
@@ -329,12 +329,12 @@ export async function scheduleCyclicPayment(
       address: token,
       abi: erc20Abi,
       functionName: "approve",
-      args: [warpPay, totalNet + fee + reward]
+      args: [pingGate, totalNet + fee + reward]
     });
   }
 
   const txHash = await walletClient.writeContract({
-    address: warpPay,
+    address: pingGate,
     abi: contractAbi,
     functionName: "scheduleCyclicPayment",
     args: [
@@ -366,10 +366,10 @@ export async function cancelActivePayment(
   if (!walletClient) throw new Error("No wallet client available");
 
   const chainId: number = walletClient.chain.id;
-  const warpPayContract = getWarpPayContract(chainId);
+  const pingGateContract = getPingGateContract(chainId);
 
   const txHash = await walletClient.writeContract({
-    address: warpPayContract,
+    address: pingGateContract,
     abi: contractAbi,
     functionName: "cancelActivePayment",
     args: [paymentId],
@@ -392,10 +392,10 @@ export async function cancelCyclicPayment(
   if (!walletClient) throw new Error("No wallet client available");
 
   const chainId: number = walletClient.chain.id;
-  const warpPayContract = getWarpPayContract(chainId);
+  const pingGateContract = getPingGateContract(chainId);
 
   const txHash = await walletClient.writeContract({
-    address: warpPayContract,
+    address: pingGateContract,
     abi: contractAbi,
     functionName: "cancelCyclicPayment",
     args: [cyclicId],
@@ -418,10 +418,10 @@ export async function executeDuePaymentsBatch(
   if (!walletClient) throw new Error("No wallet client available");
 
   const chainId: number = walletClient.chain.id;
-  const warpPayContract = getWarpPayContract(chainId);
+  const pingGateContract = getPingGateContract(chainId);
 
   const txHash = await walletClient.writeContract({
-    address: warpPayContract,
+    address: pingGateContract,
     abi: contractAbi,
     functionName: "executeDuePaymentsBatch",
     args: [BigInt(limit)],
@@ -443,10 +443,10 @@ export async function executeSinglePayment(
   if (!walletClient) throw new Error("No wallet client available");
 
   const chainId: number = walletClient.chain.id;
-  const warpPayContract = getWarpPayContract(chainId);
+  const pingGateContract = getPingGateContract(chainId);
 
   const txHash = await walletClient.writeContract({
-    address: warpPayContract,
+    address: pingGateContract,
     abi: contractAbi,
     functionName: "executeSinglePayment",
     args: [],
@@ -468,10 +468,10 @@ export async function getDuePayments(
   if (!walletClient) throw new Error("No wallet client available");
 
   const chainId: number = walletClient.chain.id;
-  const warpPayContract = getWarpPayContract(chainId);
+  const pingGateContract = getPingGateContract(chainId);
 
   const [indexes, overdueTimes] = await walletClient.readContract({
-    address: warpPayContract,
+    address: pingGateContract,
     abi: contractAbi,
     functionName: "getDuePayments",
     args: [],
@@ -492,10 +492,10 @@ export async function getPaymentsByStatus(
   if (!walletClient) throw new Error("No wallet client available");
 
   const chainId: number = walletClient.chain.id;
-  const warpPayContract = getWarpPayContract(chainId);
+  const pingGateContract = getPingGateContract(chainId);
 
   const list = await publicClient.readContract({
-    address: warpPayContract,
+    address: pingGateContract,
     abi: contractAbi,
     functionName: "getPaymentsByStatus",
     args: [status, BigInt(offset), BigInt(limit)],

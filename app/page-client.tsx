@@ -21,11 +21,6 @@ import {
   WalletDropdown,
   WalletDropdownDisconnect,
 } from "@coinbase/onchainkit/wallet";
-import WarpPayHome from "./components/WarpPayHome";
-import SendScreen from "./components/SendScreen";
-import RequestScreen from "./components/RequestScreen";
-import AirdropScreen from "./components/AirdropScreen";
-import HistoryScreen from "./components/HistoryScreen";
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Transition } from "@headlessui/react";
 import { Fragment } from "react";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
@@ -36,10 +31,10 @@ import {
   linea, metis, moonbeam, neonMainnet, polygonZkEvm, sonic, tron, zksync,
   baseSepolia, monadTestnet
 } from "wagmi/chains";
-import ScheduleScreen from "./components/ScheduleScreen";
-import EarnScreen from "./components/EarnScreen";
+import PingGateHome from "./components/PingGateHome";
+import InboxScreen from "./components/InboxScreen";
 
-export type WarpView = "home" | "send" | "request" | "airdrop" | "schedule" | "history"  | "earn" ;
+export type WarpView = "home" | "inbox" | "myplans" | "explore" | "reviews" ;
 
 const chainOptions = [
   //{ label: "Sepolia", chain: baseSepolia },
@@ -263,7 +258,7 @@ export default function Page(): JSX.Element {
   useEffect(() => {
     const w = searchParams.get("wallet");
     const a = searchParams.get("amount");
-    if (w && a) setWarpView("send");
+    // TODO if (w && a) setWarpView("send");
   }, [searchParams]);
 
   const handleAddFrame = useCallback(async () => {
@@ -318,78 +313,7 @@ export default function Page(): JSX.Element {
     <div className="flex flex-col bg-[#0f0d14] font-sans text-[var(--app-foreground)] mini-app-theme">
       <div className="w-full max-w-md mx-auto px-4 py-3 min-h-screen">
         <header className="flex justify-between items-center mb-3 h-11">
-          <div className="flex items-center justify-between space-x-2 w-full">
-            {address && (
-              <Listbox value={selectedChain.id} onChange={(id: number) => handleChainChange(id)}>
-                <div className="relative w-48 text-base">
-                  <ListboxButton className="w-full flex justify-between items-center bg-[#1a1725] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600">
-                    <div className="flex items-center space-x-2">
-                      {selectedChain.id === 8453 && (
-                        <img
-                          src="https://github.com/base/brand-kit/blob/main/logo/symbol/Base_Symbol_Blue.png?raw=true"
-                          alt="Base logo"
-                          className="w-5 h-5"
-                        />
-                      )}
-                      {selectedChain.id === 10143 && (
-                        <img
-                          src="https://cdn.prod.website-files.com/667c57e6f9254a4b6d914440/667d7104644c621965495f6e_LogoMark.svg"
-                          alt="Monad Testnet logo"
-                          className="w-5 h-5"
-                        />
-                      )}
-                      <span>
-                        {chainOptions.find((o) => o.chain.id === selectedChain.id)?.label}
-                      </span>
-                    </div>
-                    <FiChevronDown className="ml-2" />
-                  </ListboxButton>
-
-                  <Transition
-                    as={Fragment}
-                    leave="transition ease-in duration-100"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                  >
-                    <ListboxOptions className="absolute z-10 mt-1 w-full bg-[#1a1725] rounded-lg shadow-lg max-h-60 overflow-auto focus:outline-none">
-                      {chainOptions.map((o) => (
-                        <ListboxOption
-                          key={o.chain.id}
-                          value={o.chain.id}
-                          className={({ active, selected }) =>
-                            `cursor-pointer select-none px-4 py-2 ${active ? "bg-purple-600 text-white" : "text-gray-300"
-                            } ${selected ? "font-semibold" : ""}`
-                          }
-                        >
-                          {({ selected }) => (
-                            <div className="flex justify-between items-center">
-                              <div className="flex items-center space-x-2">
-                                {o.chain.id === 8453 && (
-                                  <img
-                                    src="https://github.com/base/brand-kit/blob/main/logo/symbol/Base_Symbol_Blue.png?raw=true"
-                                    alt="Base logo"
-                                    className="w-4 h-4"
-                                  />
-                                )}
-                                {o.chain.id === 10143 && (
-                                  <img
-                                    src="https://cdn.prod.website-files.com/667c57e6f9254a4b6d914440/667d7104644c621965495f6e_LogoMark.svg"
-                                    alt="Monad Testnet logo"
-                                    className="w-5 h-5"
-                                  />
-                                )}
-                                <span>{o.label}</span>
-                              </div>
-                              {selected && <FiChevronUp className="text-purple-400" />}
-                            </div>
-                          )}
-                        </ListboxOption>
-                      ))}
-                    </ListboxOptions>
-                  </Transition>
-                </div>
-              </Listbox>
-            )}
+          <div className="flex items-end justify-between space-x-2 w-full">
 
             <Wallet className="z-10">
               <ConnectWallet>
@@ -412,15 +336,12 @@ export default function Page(): JSX.Element {
         </header>
 
         <main className="flex-1">
-          {warpView === "home" && <WarpPayHome onAction={(view) => setWarpView(view)} />}
-          {warpView === "send" && <SendScreen address={address} onBack={handleBack} />}
-          {warpView === "request" && <RequestScreen address={address} onBack={handleBack} />}
-          {warpView === "airdrop" && <AirdropScreen address={address} onBack={handleBack} />}
-          {warpView === "schedule" && <ScheduleScreen onBack={handleBack} />}
-          {warpView === "earn" && <EarnScreen onBack={handleBack} />}
+          {warpView === "home" && <PingGateHome onAction={(view) => setWarpView(view)} />}
+          {warpView === "inbox" && (<InboxScreen onBack={() => setWarpView("home")} />)}
+
+          
         </main>
       </div>
     </div>
   );
 }
-//{warpView === "history" && <HistoryScreen address={address} onBack={handleBack} />}
