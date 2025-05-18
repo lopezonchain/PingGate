@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { Conversation, DecodedMessage } from "@xmtp/xmtp-js";
+import { Conversation, DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
 import { FiArrowLeft, FiMessageCircle } from "react-icons/fi";
 import { motion } from "framer-motion";
@@ -12,11 +12,15 @@ interface InboxScreenProps {
   onBack: () => void;
 }
 
+interface ExtendedConversation extends Conversation {
+  updatedAt?: Date;
+}
+
 const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
   const { data: walletClient } = useWalletClient();
   const { xmtpClient, error: xmtpError } = useXmtpClient();
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<ExtendedConversation[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, DecodedMessage[]>>({});
   const [loading, setLoading] = useState(true);
@@ -27,7 +31,7 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
   const [sending, setSending] = useState(false);
   const [composeError, setComposeError] = useState<string | null>(null);
 
-  const hasLoadedRef = useRef(false); // 🧠 Prevent double fetch
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     const loadConversations = async () => {
@@ -35,9 +39,18 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
 
       try {
         const convos = await xmtpClient.conversations.list();
-        const sorted = convos.sort(
+
+        const convosWithUpdated = await Promise.all(
+          convos.map(async (c) => {
+            const msgs = await c.messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_DESCENDING });
+            return Object.assign(c, { updatedAt: msgs[0]?.sent });
+          })
+        );
+
+        const sorted = convosWithUpdated.sort(
           (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
         );
+
         setConversations(sorted);
       } catch (err) {
         console.error("❌ Failed to load conversations", err);
@@ -50,16 +63,21 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
     loadConversations();
   }, [xmtpClient]);
 
-  const toggleConversation = async (peer: string, convo: Conversation) => {
+  const toggleConversation = async (peer: string, convo: ExtendedConversation) => {
     if (expanded === peer) {
       setExpanded(null);
       return;
     }
 
     setExpanded(peer);
+
     if (!messages[peer]) {
-      const msgs = await convo.messages();
-      setMessages((prev) => ({ ...prev, [peer]: msgs }));
+      try {
+        const msgs = await convo.messages();
+        setMessages((prev) => ({ ...prev, [peer]: msgs }));
+      } catch (err) {
+        console.error("❌ Failed to fetch messages:", err);
+      }
     }
   };
 
@@ -76,6 +94,7 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
   const handleCreateMessage = async () => {
     setSending(true);
     setComposeError(null);
+
     try {
       if (!xmtpClient) throw new Error("XMTP not ready");
       if (!composeTo || !composeMessage) throw new Error("Fill all fields");
@@ -85,9 +104,17 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
       await convo.send(composeMessage);
 
       const convos = await xmtpClient.conversations.list();
-      const sorted = convos.sort(
+      const convosWithUpdated = await Promise.all(
+        convos.map(async (c) => {
+          const msgs = await c.messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_DESCENDING });
+          return Object.assign(c, { updatedAt: msgs[0]?.sent });
+        })
+      );
+
+      const sorted = convosWithUpdated.sort(
         (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
       );
+
       setConversations(sorted);
       setComposeTo("");
       setComposeMessage("");
@@ -116,11 +143,11 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
         <p className="text-center text-gray-400">Loading conversations...</p>
       ) : (
         <div className="space-y-4">
-          {conversations.map((c, idx) => {
-            const isOpen = expanded === c.peerAddress;
+          {conversations.map((conv, idx) => {
+            const isOpen = expanded === conv.peerAddress;
             return (
               <motion.div
-                key={c.peerAddress}
+                key={conv.peerAddress}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
@@ -128,12 +155,12 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
               >
                 <div
                   className="p-4 flex justify-between items-center hover:bg-[#231c32] cursor-pointer"
-                  onClick={() => toggleConversation(c.peerAddress, c)}
+                  onClick={() => toggleConversation(conv.peerAddress, conv)}
                 >
                   <div>
-                    <p className="font-semibold">{c.peerAddress}</p>
+                    <p className="font-semibold">{conv.peerAddress}</p>
                     <p className="text-xs text-gray-400">
-                      {c.updatedAt?.toLocaleString()}
+                      {conv.updatedAt?.toLocaleString() || "No messages"}
                     </p>
                   </div>
                   <FiMessageCircle className="text-lg" />
@@ -141,7 +168,7 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
 
                 {isOpen && (
                   <div className="px-4 pb-4 space-y-2">
-                    {messages[c.peerAddress]?.map((m, i) => (
+                    {messages[conv.peerAddress]?.map((m, i) => (
                       <div
                         key={i}
                         className={`text-sm max-w-[80%] p-2 rounded-lg ${
@@ -155,7 +182,7 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
                     ))}
 
                     <MessageInput
-                      onSend={(text) => handleSendMessage(c.peerAddress, text)}
+                      onSend={(text) => handleSendMessage(conv.peerAddress, text)}
                     />
                   </div>
                 )}
@@ -165,7 +192,6 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* Floating + button */}
       <button
         onClick={() => setShowComposer(!showComposer)}
         className="fixed bottom-6 right-6 z-50 bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
@@ -174,12 +200,10 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
         +
       </button>
 
-      {/* Composer modal */}
       {showComposer && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-40 flex items-center justify-center">
           <div className="bg-[#1a1725] p-6 rounded-xl w-full max-w-md">
             <h3 className="text-lg font-bold mb-4 text-white">New Message</h3>
-
             <input
               type="text"
               placeholder="ENS / Farcaster / Wallet"
@@ -194,10 +218,7 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
               value={composeMessage}
               onChange={(e) => setComposeMessage(e.target.value)}
             />
-            {composeError && (
-              <p className="text-red-500 text-sm mb-2">{composeError}</p>
-            )}
-
+            {composeError && <p className="text-red-500 text-sm mb-2">{composeError}</p>}
             <div className="flex justify-between">
               <button
                 onClick={() => setShowComposer(false)}
