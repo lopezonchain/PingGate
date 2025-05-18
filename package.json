@@ -15,11 +15,13 @@
     "@upstash/redis": "^1.34.4",
     "@xmtp/xmtp-js": "^13.0.4",
     "canvas-confetti": "^1.9.3",
+    "ethers": "^6.14.1",
     "framer-motion": "^12.12.1",
     "moralis": "^2.27.2",
     "next": "^14.2.15",
     "react": "^18",
     "react-dom": "^18",
+    "react-hot-toast": "^2.5.2",
     "react-icons": "^5.5.0",
     "viem": "^2.21.33",
     "wagmi": "^2.11.0"

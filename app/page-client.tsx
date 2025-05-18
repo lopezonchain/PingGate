@@ -27,6 +27,9 @@ import { sdk } from '@farcaster/frame-sdk';
 import { base,baseSepolia, monadTestnet} from "wagmi/chains";
 import PingGateHome from "./components/PingGateHome";
 import InboxScreen from "./components/InboxScreen";
+import MyPlansScreen from "./components/MyPlansScreen";
+import ReviewsScreen from "./components/ReviewsScreen";
+import ExploreScreen from "./components/ExploreScreen";
 
 export type WarpView = "home" | "inbox" | "myplans" | "explore" | "reviews" ;
 
@@ -312,7 +315,9 @@ export default function Page(): JSX.Element {
         <main className="flex-1">
           {warpView === "home" && <PingGateHome onAction={(view) => setWarpView(view)} />}
           {warpView === "inbox" && (<InboxScreen onBack={() => setWarpView("home")} />)}
-
+          {warpView === "myplans" && (<MyPlansScreen onBack={() => setWarpView("home")} />)}
+          {warpView === "explore" && (<ExploreScreen onBack={() => setWarpView("home")} />)}
+          {warpView === "reviews" && (<ReviewsScreen onBack={() => setWarpView("home")} />)}
         </main>
       </div>
        <WalletModal isOpen={false} onClose={function (): void {

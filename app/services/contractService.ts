@@ -1,6 +1,6 @@
 // src/services/contractService.ts
 
-import { createPublicClient, http, WalletClient } from "viem";
+import { createPublicClient, http, type WalletClient } from "viem";
 import { base } from "viem/chains";
 import contractAbi from "./contractAbi.json";
 import { resolveEnsName } from "./nameResolver";
@@ -13,7 +13,7 @@ const CONTRACT_ADDRESS =
 const publicClient = createPublicClient({
   chain: base,
   transport: http(
-    process.env.NEXT_PUBLIC_ETH_RPC_URL || "https://eth.llamarpc.com"
+    process.env.NEXT_PUBLIC_ETH_RPC_URL || "https://base.llamarpc.com"
   ),
 });
 
@@ -129,6 +129,44 @@ export async function hasPurchased(
   })) as boolean;
 }
 
+/** Fetch average rating (0–5) for a service */
+export async function getAverageRating(
+  serviceId: bigint
+): Promise<number> {
+  const r = await publicClient.readContract({
+    ...getContractConfig(),
+    functionName: "averageRating",
+    args: [serviceId],
+  });
+  return Number(r as bigint);
+}
+
+/** Fetch a single review for a service by buyer */
+export async function getReview(
+  serviceId: bigint,
+  buyer: `0x${string}`
+): Promise<{
+  quality: number;
+  communication: number;
+  timeliness: number;
+  comment: string;
+  timestamp: bigint;
+}> {
+  const res = (await publicClient.readContract({
+    ...getContractConfig(),
+    functionName: "reviews",
+    args: [serviceId, buyer],
+  })) as [bigint, bigint, bigint, string, bigint];
+  const [quality, communication, timeliness, comment, timestamp] = res;
+  return {
+    quality: Number(quality),
+    communication: Number(communication),
+    timeliness: Number(timeliness),
+    comment,
+    timestamp,
+  };
+}
+
 // ───────────────────────────────────────────────────────────────
 // WRITE (transaction) FUNCTIONS
 // ───────────────────────────────────────────────────────────────
@@ -143,6 +181,8 @@ export async function createService(
   fee: bigint
 ) {
   return walletClient.writeContract({
+    account: walletClient.account ?? null,
+    chain: walletClient.chain,
     ...getContractConfig(),
     functionName: "createService",
     args: [title, description, price, BigInt(duration)],
@@ -160,6 +200,8 @@ export async function editService(
   fee: bigint
 ) {
   return walletClient.writeContract({
+    account: walletClient.account ?? null,
+    chain: walletClient.chain,
     ...getContractConfig(),
     functionName: "editService",
     args: [BigInt(id), title, description, price],
@@ -173,6 +215,8 @@ export async function pauseService(
   id: number
 ) {
   return walletClient.writeContract({
+    account: walletClient.account ?? null,
+    chain: walletClient.chain,
     ...getContractConfig(),
     functionName: "pauseService",
     args: [BigInt(id)],
@@ -186,6 +230,8 @@ export async function purchaseService(
   value: bigint
 ) {
   return walletClient.writeContract({
+    account: walletClient.account ?? null,
+    chain: walletClient.chain,
     ...getContractConfig(),
     functionName: "purchaseService",
     args: [BigInt(id)],
@@ -203,6 +249,8 @@ export async function submitReview(
   comment: string
 ) {
   return walletClient.writeContract({
+    account: walletClient.account ?? null,
+    chain: walletClient.chain,
     ...getContractConfig(),
     functionName: "submitReview",
     args: [
@@ -214,3 +262,14 @@ export async function submitReview(
     ],
   });
 }
+
+/**
+ * Fetch the on-chain creation fee (in wei)
+ */
+export async function getCreationFee(): Promise<bigint> {
+  return publicClient.readContract({
+    ...getContractConfig(),
+    functionName: "creationFee",
+  }) as Promise<bigint>;
+}
+

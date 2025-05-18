@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Conversation, DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
-import { FiArrowLeft, FiMessageCircle } from "react-icons/fi";
+import { FiArrowLeft, FiMessageCircle, FiPlus } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { useXmtpClient } from "../hooks/useXmtpClient";
 import { resolveRecipient } from "../services/nameResolver";
@@ -287,18 +287,17 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         </div>
       )}
 
-      {/* New message */}
+      {/* New message */}      
       <button
         onClick={() => setShowComposer(true)}
         className="fixed bottom-6 right-6 z-50 
-             bg-purple-600 hover:bg-purple-700 
-             text-white text-3xl w-12 h-12 
-             rounded-full shadow-lg 
-             flex items-center justify-center 
-             p-0 leading-none"
+                  bg-purple-600 hover:bg-purple-700 
+                  text-white text-3xl w-12 h-12 
+                  rounded-full shadow-lg 
+                  flex items-center justify-center p-0"
         aria-label="New Message"
       >
-        +
+        <FiPlus />
       </button>
 
       {/* Composer Modal */}
