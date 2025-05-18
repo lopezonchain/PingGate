@@ -310,7 +310,7 @@ export default function Page(): JSX.Element {
   const handleBack = () => setWarpView("home");
 
   return (
-    <div className="flex flex-col bg-[#0f0d14] font-sans text-[var(--app-foreground)] mini-app-theme">
+    <div className="flex flex-col bg-[#0f0d14] font-sans text-[var(--app-foreground)] mini-app-theme overflow-hidden">
       <div className="w-full max-w-md mx-auto px-4 py-3 h-screen flex flex-col">
         <header className="flex justify-between items-center mb-3 h-11">
           <div className="flex items-end justify-between space-x-2 w-full">

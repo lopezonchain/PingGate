@@ -137,7 +137,7 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#0f0d14] text-white relative">
+    <div className="h-[90%] flex flex-col bg-[#0f0d14] text-white relative">
       <button
         onClick={onBack}
         className="mb-4 flex items-center text-purple-400 text-lg px-4 py-2 bg-[#1a1725] rounded-lg max-w-[200px]"
@@ -152,8 +152,8 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
       {loading ? (
         <p className="text-center text-gray-400 flex-1 flex items-center justify-center">Loading conversations...</p>
       ) : (
-        <div className="flex-1 overflow-hidden">
-          <div className="space-y-4 overflow-y-auto h-full pr-2">
+        <div className="flex-1 h-full overflow-hidden">
+  <div className="overflow-y-auto h-full space-y-4 pr-2">
             {conversations.map((conv, idx) => {
               const isOpen = expanded === conv.peerAddress;
               return (
@@ -194,7 +194,7 @@ const InboxScreen: React.FC<InboxScreenProps> = ({ onBack }) => {
                       {messages[conv.peerAddress]?.map((m, i) => (
                         <div
                           key={i}
-                          className={`text-sm max-w-[80%] p-2 rounded-lg ${
+                          className={`text-sm max-w-[90%] p-2 rounded-lg ${
                             m.senderAddress.toLowerCase() === walletClient?.account.address.toLowerCase()
                               ? "bg-purple-600 text-right ml-auto"
                               : "bg-gray-700"
