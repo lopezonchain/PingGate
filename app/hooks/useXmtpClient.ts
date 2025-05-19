@@ -1,53 +1,81 @@
 // hooks/useXmtpClient.ts
+"use client";
+
 import { useState, useEffect } from "react";
 import { Client } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
 
-let cachedClient: Client | null = null;
-let clientPromise: Promise<Client> | null = null;
+// We cache the XMTP client so that once initialized it survives across renders.
+let _cachedClient: Client | null = null;
+let _clientPromise: Promise<Client> | null = null;
 
+/** If XMTP’s IndexedDB identity is corrupt we clear it and reload the page */
 async function clearXmtpStorage(): Promise<void> {
   try {
-    const request = indexedDB.deleteDatabase("xmtp.org");
-    request.onsuccess = () => {
+    const req = indexedDB.deleteDatabase("xmtp.org");
+    req.onsuccess = () => {
       console.log("✅ XMTP identity storage cleared.");
       window.location.reload();
     };
-    request.onerror = () => {
+    req.onerror = () => {
       console.warn("⚠️ Failed to clear XMTP identity storage.");
     };
-    request.onblocked = () => {
+    req.onblocked = () => {
       console.warn("⚠️ XMTP identity deletion blocked (still open elsewhere).");
     };
-  } catch (e) {
-    console.error("❌ Error clearing XMTP storage:", e);
+  } catch (err) {
+    console.error("❌ Error clearing XMTP storage:", err);
   }
 }
 
+/**
+ * React hook that returns an initialized XMTP client (or an error).
+ * It uses wagmi’s Viem `walletClient` under the hood by adapting it to an
+ * ethers-style "signer" object with getAddress() and signMessage().
+ */
 export function useXmtpClient() {
   const { data: walletClient } = useWalletClient();
-  const [client, setClient] = useState<Client | null>(cachedClient);
+  const [xmtpClient, setXmtpClient] = useState<Client | null>(_cachedClient);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    const init = async () => {
+    async function init() {
       if (!walletClient) return;
 
-      if (cachedClient) {
-        setClient(cachedClient);
+      // Already have a working XMTP client in cache?
+      if (_cachedClient) {
+        setXmtpClient(_cachedClient);
         return;
       }
 
-      if (!clientPromise) {
-        clientPromise = Client.create(walletClient, { env: "production" })
+      // Otherwise, if initialization is in flight, reuse that promise.
+      if (!_clientPromise) {
+        // Build an ethers-like signer wrapper around the Viem walletClient
+        const signer = {
+          getAddress: async () => {
+            // Viem WalletClient.account.address is always defined here
+            return walletClient.account.address;
+          },
+          signMessage: async (message: string | Uint8Array) => {
+            // XMTP passes either a string or Uint8Array; convert to string
+            const text =
+              typeof message === "string"
+                ? message
+                : new TextDecoder().decode(message);
+            // Viem's signMessage expects { message } (string or Uint8Array)
+            return walletClient.signMessage({ message: text });
+          },
+        };
+
+        _clientPromise = Client.create(signer, { env: "production" })
           .then((client) => {
-            cachedClient = client;
+            _cachedClient = client;
             return client;
           })
           .catch(async (err: any) => {
-            const msg = err?.message?.toLowerCase() || "";
+            const msg = (err?.message || "").toLowerCase();
             if (msg.includes("signature validation failed")) {
               console.warn("⚠️ Corrupt XMTP identity. Clearing...");
               await clearXmtpStorage();
@@ -59,20 +87,20 @@ export function useXmtpClient() {
             throw err;
           })
           .finally(() => {
-            clientPromise = null;
+            _clientPromise = null;
           });
       }
 
       try {
-        const result = await clientPromise;
+        const client = await _clientPromise;
         if (!cancelled) {
-          setClient(result);
+          setXmtpClient(client);
         }
       } catch (err: any) {
         console.error("XMTP init error:", err);
-        if (!cancelled) setError(err.message);
+        if (!cancelled) setError(err.message || "XMTP initialization failed");
       }
-    };
+    }
 
     init();
 
@@ -81,5 +109,5 @@ export function useXmtpClient() {
     };
   }, [walletClient]);
 
-  return { xmtpClient: client, error };
+  return { xmtpClient, error };
 }
