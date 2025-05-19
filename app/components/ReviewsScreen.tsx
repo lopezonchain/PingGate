@@ -92,7 +92,7 @@ export default function ReviewsScreen({ onBack }: ReviewsScreenProps) {
         const f = form[id.toString()];
         await submitReview(
             walletClient,
-            Number(id),
+            BigInt(id),
             f.q,
             f.c,
             f.t,
