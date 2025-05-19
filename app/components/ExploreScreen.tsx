@@ -46,7 +46,7 @@ export default function ExploreScreen({ onBack }: ExploreScreenProps) {
             return;
         }
         try {
-            await purchaseService(walletClient, Number(id), price);
+            await purchaseService(walletClient, BigInt(id), price);
             toast.success("Purchased!");
         } catch (e: any) {
             console.error(e);
