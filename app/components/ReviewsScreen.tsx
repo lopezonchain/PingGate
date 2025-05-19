@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 import { FiArrowLeft, FiEdit2, FiCheckCircle } from "react-icons/fi";
-import { useWalletClient } from "wagmi";
+import { useAccount, useWalletClient } from "wagmi";
 import {
     getPurchasesBy,
     getService,
@@ -34,29 +34,33 @@ interface ReviewsScreenProps {
 }
 
 export default function ReviewsScreen({ onBack }: ReviewsScreenProps) {
+    const { address } = useAccount();
     const { data: walletClient } = useWalletClient();
-    const address = walletClient?.account.address!;
+
     const [pending, setPending] = useState<bigint[]>([]);
     const [completed, setCompleted] = useState<bigint[]>([]);
     const [services, setServices] = useState<Record<string, ServiceDetails>>({});
-    const [reviews, setReviews] = useState<Record<string, ReturnType<typeof getReview>>>({});
+    const [reviews, setReviews] = useState<
+        Record<string, Awaited<ReturnType<typeof getReview>>>
+    >({});
     const [averages, setAverages] = useState<Record<string, number>>({});
     const [form, setForm] = useState<Record<string, ReviewForm>>({});
 
     useEffect(() => {
+        if (!address) return;
         (async () => {
             const ids = await getPurchasesBy(address);
             const pend: bigint[] = [];
             const comp: bigint[] = [];
 
             for (const id of ids) {
-                // 1️⃣ Traer datos del servicio
+                // 1️⃣ Fetch service details
                 const svc = await getService(id);
                 setServices((p) => ({ ...p, [id.toString()]: svc }));
 
-                // 2️⃣ Leer review on‐chain
+                // 2️⃣ Fetch existing review
                 const rev = await getReview(id, address);
-                // 3️⃣ Inicializar form con datos existentes
+                // 3️⃣ Initialize form with existing data
                 setForm((p) => ({
                     ...p,
                     [id.toString()]: {
@@ -72,7 +76,7 @@ export default function ReviewsScreen({ onBack }: ReviewsScreenProps) {
                 } else {
                     comp.push(id);
                     setReviews((p) => ({ ...p, [id.toString()]: rev }));
-                    // 4️⃣ Leer nota media de ese servicio
+                    // 4️⃣ Fetch average rating for reviewed services
                     const avg = await getAverageRating(id);
                     setAverages((a) => ({ ...a, [id.toString()]: avg }));
                 }
@@ -81,19 +85,20 @@ export default function ReviewsScreen({ onBack }: ReviewsScreenProps) {
             setPending(pend);
             setCompleted(comp);
         })();
-    }, [walletClient]);
+    }, [address, walletClient]);
 
     const onSubmit = async (id: bigint) => {
+        if (!walletClient || !address) return;
         const f = form[id.toString()];
         await submitReview(
-            walletClient!,
+            walletClient,
             Number(id),
             f.q,
             f.c,
             f.t,
             f.comment
         );
-        // actualizar estados locales
+        // update local states
         setPending((p) => p.filter((x) => x !== id));
         setCompleted((c) => [id, ...c]);
         setReviews((r) => ({
@@ -106,7 +111,7 @@ export default function ReviewsScreen({ onBack }: ReviewsScreenProps) {
                 timestamp: BigInt(Math.floor(Date.now() / 1000)),
             },
         }));
-        // recalc nota media tras review
+        // recalculate average
         const newAvg = await getAverageRating(id);
         setAverages((a) => ({ ...a, [id.toString()]: newAvg }));
     };
@@ -130,8 +135,9 @@ export default function ReviewsScreen({ onBack }: ReviewsScreenProps) {
                     <p className="text-gray-400">No pending reviews</p>
                 )}
                 {pending.map((id) => {
-                    const svc = services[id.toString()]!;
+                    const svc = services[id.toString()];
                     const f = form[id.toString()];
+                    if (!svc || !f) return null;
                     return (
                         <div
                             key={id.toString()}
@@ -139,7 +145,7 @@ export default function ReviewsScreen({ onBack }: ReviewsScreenProps) {
                         >
                             <p className="font-semibold">{svc.title}</p>
                             <div className="mt-2 space-y-2">
-                                {/** Campos de puntuación */}
+                                {/* Scoring fields */}
                                 <div>
                                     <label>Quality 0–5</label>
                                     <input
@@ -198,7 +204,7 @@ export default function ReviewsScreen({ onBack }: ReviewsScreenProps) {
                                     />
                                 </div>
 
-                                {/** Comentario */}
+                                {/* Comment */}
                                 <textarea
                                     rows={2}
                                     placeholder="Comment"
@@ -215,7 +221,7 @@ export default function ReviewsScreen({ onBack }: ReviewsScreenProps) {
                                     className="w-full bg-[#2a2438] p-2 rounded"
                                 />
 
-                                {/** Botón enviar */}
+                                {/* Submit button */}
                                 <button
                                     onClick={() => onSubmit(id)}
                                     className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded"
@@ -235,9 +241,10 @@ export default function ReviewsScreen({ onBack }: ReviewsScreenProps) {
                     <p className="text-gray-400">No reviews yet</p>
                 )}
                 {completed.map((id) => {
-                    const svc = services[id.toString()]!;
-                    const rev = reviews[id.toString()]!;
+                    const svc = services[id.toString()];
+                    const rev = reviews[id.toString()];
                     const avg = averages[id.toString()];
+                    if (!svc || !rev) return null;
                     return (
                         <div
                             key={id.toString()}
@@ -254,7 +261,7 @@ export default function ReviewsScreen({ onBack }: ReviewsScreenProps) {
                                 </span>
                                 <button
                                     onClick={() => {
-                                        /* aquí podrías reusar el mismo formulario para editar */
+                                        // aquí podrías reusar el mismo formulario para editar
                                     }}
                                     className="text-yellow-400"
                                 >
