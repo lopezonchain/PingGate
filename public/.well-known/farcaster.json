@@ -1,8 +1,8 @@
 {
     "accountAssociation": {
-        "header": "",
-        "payload": "",
-        "signature": ""
+      "header": "eyJmaWQiOjgwMjA5MCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDExQTQxNjJjRjg4MWNEMWI5RTFiNDcwRjdjQ0ZGZjdhNkQ3MTg3ZDcifQ",
+      "payload": "eyJkb21haW4iOiJwaW5nZ2F0ZS5sb3Blem9uY2hhaW4ueHl6In0",
+      "signature": "MHhjY2Y5MTI3YzhkZjU3NTcwOGZkZTQ3ZjIzOTNkMTFhN2E1MWFjMGQwZmVjNmJjNGQ3NmY5ZmUxZjYyOGFhMDkyMzk3Yzc5ZGVhZmZjNDVlMjEwODNjZWM5ODZlZmQ0ZmYwZjRlMmQyNGI4Mjc0ZWM1MDQ5NDY1Njg2MDRmZjBmZjFj"
     },
     "frame": {
       "name": "PingGate 💬",
