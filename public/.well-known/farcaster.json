@@ -1,38 +1,38 @@
 {
-    "accountAssociation": {
-      "header": "eyJmaWQiOjgwMjA5MCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDExQTQxNjJjRjg4MWNEMWI5RTFiNDcwRjdjQ0ZGZjdhNkQ3MTg3ZDcifQ",
-      "payload": "eyJkb21haW4iOiJwaW5nZ2F0ZS5sb3Blem9uY2hhaW4ueHl6In0",
-      "signature": "MHhjY2Y5MTI3YzhkZjU3NTcwOGZkZTQ3ZjIzOTNkMTFhN2E1MWFjMGQwZmVjNmJjNGQ3NmY5ZmUxZjYyOGFhMDkyMzk3Yzc5ZGVhZmZjNDVlMjEwODNjZWM5ODZlZmQ0ZmYwZjRlMmQyNGI4Mjc0ZWM1MDQ5NDY1Njg2MDRmZjBmZjFj"
-    },
-    "frame": {
-      "name": "PingGate 💬",
-      "version": "next",
-      "iconUrl": "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
-      "imageUrl": "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
-      "buttonTitle": "Launch PingGate",
-      "splashImageUrl": "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
-      "splashBackgroundColor": "#17101f",
-      "homeUrl": "https://pinggate.lopezonchain.xyz",
-      "webhookUrl": "https://pinggate.lopezonchain.xyz/api/webhook",
-      "subtitle": "All-in-one easy payments",
-      "description": "PingGate is a pay-to-message platform that lets experts, creators, or anyone monetize their time and attention, or anyone else securely chatting or finding experts.",
-      "screenshotUrls": [
-        "https://pinggate.lopezonchain.xyz/screen_1.png",
-        "https://pinggate.lopezonchain.xyz/screen_2.png",
-        "https://pinggate.lopezonchain.xyz/screen_3.png"
-      ],
-      "primaryCategory": "social",
-      "tags": [
-        "messaging",
-        "chat",
-        "services",
-        "consulting",
-        "monetization"
-      ],
-      "heroImageUrl": "https://pinggate.lopezonchain.xyz/hero.png",
-      "tagline": "Your inbox. Your rules",
-      "ogTitle": "PingGate – Monetize your inbox",
-      "ogDescription": "Chat securely. Or start offering a chat service. Wallet to wallet messages with Farcaster support",
-      "ogImageUrl": "https://pinggate.lopezonchain.xyz/hero.png"
-    }
+  "accountAssociation": {
+    "header": "eyJmaWQiOjgwMjA5MCwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweGM2YWU4NGZiYjFCMkQ4NDg4NWRiRmViYUJhN2Q0N2E5OTU0NjA3YjEifQ",
+    "payload": "eyJkb21haW4iOiJwaW5nZ2F0ZS5sb3Blem9uY2hhaW4ueHl6In0",
+    "signature": "MHgwOTVlOGY4YjJkNjkzMGY5ZDVhYzUwMjRmZGNjNzk3NjIwNzFkNzA4Yzg2NDVlZmZhYjhmYTZjNDdjZDcxNTRjN2NmZmFhMTk4ZGM0NTAzNTI3ZWQ4NzE3M2Y4MzhlYmMwY2VjMGFjZTdiMjQ5MjRjMDk0NGEyM2ZhOGFiNTU4NzFi"
+  },
+  "frame": {
+    "name": "PingGate 💬",
+    "version": "next",
+    "iconUrl": "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
+    "imageUrl": "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
+    "buttonTitle": "Launch PingGate",
+    "splashImageUrl": "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
+    "splashBackgroundColor": "#17101f",
+    "homeUrl": "https://pinggate.lopezonchain.xyz",
+    "webhookUrl": "https://pinggate.lopezonchain.xyz/api/webhook",
+    "subtitle": "All-in-one easy payments",
+    "description": "PingGate is a pay-to-message platform that lets experts, creators, or anyone monetize their time and attention, or anyone else securely chatting or finding experts.",
+    "screenshotUrls": [
+      "https://pinggate.lopezonchain.xyz/screen_1.png",
+      "https://pinggate.lopezonchain.xyz/screen_2.png",
+      "https://pinggate.lopezonchain.xyz/screen_3.png"
+    ],
+    "primaryCategory": "social",
+    "tags": [
+      "messaging",
+      "chat",
+      "services",
+      "consulting",
+      "monetization"
+    ],
+    "heroImageUrl": "https://pinggate.lopezonchain.xyz/hero.png",
+    "tagline": "Your inbox. Your rules",
+    "ogTitle": "PingGate – Monetize your inbox",
+    "ogDescription": "Chat securely. Or start offering a chat service. Wallet to wallet messages with Farcaster support",
+    "ogImageUrl": "https://pinggate.lopezonchain.xyz/hero.png"
   }
+}
