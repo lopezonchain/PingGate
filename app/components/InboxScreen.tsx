@@ -12,7 +12,7 @@ import {
   getPurchasesBy as fetchPurchasedServiceIds,
   getSalesBy as fetchSalesRecords,
   getService as fetchServiceDetails,
-} from "../services/contractService"; // You need to implement these
+} from "../services/contractService";
 
 interface InboxScreenProps {
   onBack: () => void;
@@ -48,7 +48,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
   const hasLoadedRef = useRef(false);
 
-  // Load XMTP conversations
+  // ─── Load XMTP conversations once ─────────────────────────────────────────
   useEffect(() => {
     const loadConversations = async () => {
       if (!xmtpClient || hasLoadedRef.current || !myAddress) return;
@@ -56,23 +56,21 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         const convos = await xmtpClient.conversations.list();
         const withMeta = await Promise.all(
           convos.map(async (c) => {
-            // get last message for timestamp and unread flag
             const msgs = await c.messages({
               limit: 1,
               direction: SortDirection.SORT_DIRECTION_DESCENDING,
             });
             const last = msgs[0];
-            return Object.assign(c, {
+            return Object.assign<Conversation, Partial<ExtendedConversation>>(c, {
               updatedAt: last?.sent,
               hasUnread: !!last && last.senderAddress.toLowerCase() !== myAddress,
             });
           })
         );
-        // sort descending
         withMeta.sort(
           (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
         );
-        // fetch display labels for new peers
+        // resolve labels
         const newLabels: Record<string, string> = {};
         await Promise.all(
           withMeta.map(async (c) => {
@@ -93,21 +91,19 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     loadConversations();
   }, [xmtpClient, myAddress, nameLabels]);
 
-  // Load contract-based sales/purchases
+  // ─── Load on-chain peers sets ──────────────────────────────────────────────
   useEffect(() => {
     if (!walletClient) return;
     (async () => {
       try {
-        // 1️⃣ Purchases: fetch serviceIds buyer has bought, then map to seller addresses
-        const serviceIds = await fetchPurchasedServiceIds(walletClient.account.address);
+        const purchaseIds = await fetchPurchasedServiceIds(walletClient.account.address);
         const pPeers = new Set<string>();
-        for (const id of serviceIds) {
+        for (const id of purchaseIds) {
           const svc = await fetchServiceDetails(id);
           pPeers.add(svc.seller.toLowerCase());
         }
         setPurchasedPeers(pPeers);
 
-        // 2️⃣ Sales: fetch purchase records for me as seller
         const sales = await fetchSalesRecords(walletClient.account.address);
         const sPeers = new Set<string>();
         for (const rec of sales) {
@@ -115,26 +111,41 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         }
         setSoldPeers(sPeers);
       } catch (e) {
-        console.error("Failed to load contract sales/purchases", e);
+        console.error("Failed to load on-chain data", e);
       }
     })();
   }, [walletClient]);
+
+  // ─── Polling for messages in the open conversation ────────────────────────
+  useEffect(() => {
+    if (!expanded || !xmtpClient) return;
+    const peer = expanded;
+    const interval = setInterval(async () => {
+      try {
+        const convo = conversations.find((c) => c.peerAddress === peer);
+        if (convo) {
+          const msgs = await convo.messages();
+          setMessages((prev) => ({ ...prev, [peer]: msgs }));
+        }
+      } catch (e) {
+        console.error("Polling fetch failed", e);
+      }
+    }, 5000); // every 5s
+
+    return () => clearInterval(interval);
+  }, [expanded, xmtpClient, conversations]);
 
   const filteredConversations = conversations.filter((c) =>
     tab === "all"
       ? true
       : tab === "sales"
-        ? soldPeers.has(c.peerAddress.toLowerCase())
-        : purchasedPeers.has(c.peerAddress.toLowerCase())
+      ? soldPeers.has(c.peerAddress.toLowerCase())
+      : purchasedPeers.has(c.peerAddress.toLowerCase())
   );
 
   const toggleConversation = async (peer: string, convo: ExtendedConversation) => {
-    // expand/collapse
-    setMessages((prev) => {
-      if (prev[peer]) return prev; // already loaded
-      return prev;
-    });
-    if (!messages[peer]) {
+    // if opening for the first time, load messages immediately
+    if (expanded !== peer && !messages[peer]) {
       try {
         const msgs = await convo.messages();
         setMessages((prev) => ({ ...prev, [peer]: msgs }));
@@ -142,15 +153,15 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         console.error("Failed to fetch messages", e);
       }
     }
-    // toggle expanded
     setExpanded((curr) => (curr === peer ? null : peer));
   };
 
   const handleSendMessage = async (peer: string, text: string) => {
     if (!xmtpClient) return;
     const convo = conversations.find((c) => c.peerAddress === peer);
-    if (!convo) return;
+    if (!convo || !text.trim()) return;
     await convo.send(text);
+    // refresh immediately
     const msgs = await convo.messages();
     setMessages((prev) => ({ ...prev, [peer]: msgs }));
   };
@@ -167,8 +178,8 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       setComposeTo("");
       setComposeMessage("");
       setShowComposer(false);
-    } catch (e: any) {
-      setComposeError(e.message);
+    } catch (err: any) {
+      setComposeError(err.message);
     } finally {
       setSending(false);
     }
@@ -176,28 +187,33 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
   return (
     <div className="h-[90%] flex flex-col bg-[#0f0d14] text-white relative">
+      {/* Back */}
       <button
         onClick={onBack}
-        className="mb-4 flex items-center justify-center text-purple-400 text-lg px-4 py-2 bg-[#1a1725] rounded-lg max-w-[200px]"
+        className="mb-4 inline-flex items-center text-purple-400 text-lg px-4 py-2 bg-[#1a1725] rounded-lg"
       >
-        <FiArrowLeft className="w-5 h-5 mr-2" />
-        Back
+        <FiArrowLeft className="w-5 h-5 mr-2" /> Back
       </button>
 
       <h2 className="text-2xl font-bold mb-4 text-center">Inbox</h2>
 
       {/* Tabs */}
-      <div className="flex justify-center space-x-1 mb-4">
+      <div className="flex justify-center space-x-4 mb-4">
         {(["all", "purchases", "sales"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-6 py-2 rounded ${tab === t
-              ? "bg-purple-600 text-white"
-              : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
-              }`}
+            className={`px-4 py-2 rounded ${
+              tab === t
+                ? "bg-purple-600 text-white"
+                : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
+            }`}
           >
-            {t === "sales" ? "Clients" : t === "purchases" ? "Bought" : "All"}
+            {t === "sales"
+              ? "Clients"
+              : t === "purchases"
+              ? "Bought"
+              : "All"}
           </button>
         ))}
       </div>
@@ -208,24 +224,27 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           Loading…
         </p>
       ) : (
-        <div className="flex-1">
+        <div className="flex-1 overflow-hidden">
           <div className="h-full overflow-y-auto space-y-4 px-2 pb-2">
             {filteredConversations.map((conv, idx) => {
-              const isOpen = conv.peerAddress === expanded;
-              const peer = conv.peerAddress.toLowerCase();
+              const peer = conv.peerAddress;
+              const isOpen = peer === expanded;
+              const lower = peer.toLowerCase();
               const isSale = tab === "sales";
               const isPurchase = tab === "purchases";
-
-              // summary: count & total – you can enhance by fetching exact amounts
               const count = isSale
-                ? Array.from(soldPeers).filter((p) => p === peer).length
+                ? soldPeers.has(lower)
+                  ? 1
+                  : 0
                 : isPurchase
-                  ? Array.from(purchasedPeers).filter((p) => p === peer).length
-                  : 0;
+                ? purchasedPeers.has(lower)
+                  ? 1
+                  : 0
+                : 0;
 
               return (
                 <motion.div
-                  key={conv.peerAddress}
+                  key={peer}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
@@ -233,22 +252,22 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                 >
                   <div
                     className="p-4 flex justify-between items-center hover:bg-[#231c32] cursor-pointer"
-                    onClick={() => toggleConversation(conv.peerAddress, conv)}
+                    onClick={() => toggleConversation(peer, conv)}
                   >
                     <div>
                       <p className="font-semibold flex items-center space-x-2">
                         <a
-                          href={`https://basescan.org/address/${conv.peerAddress}`}
+                          href={`https://basescan.org/address/${peer}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="hover:underline"
                         >
-                          {nameLabels[conv.peerAddress] || conv.peerAddress}
+                          {nameLabels[peer] || peer}
                         </a>
                         {conv.hasUnread && (
                           <span
-                            title="You haven't replied"
-                            className="text-yellow-400 ml-4"  // <-- aquí ajustas el 4 por el espaciado que quieras
+                            title="New from peer"
+                            className="text-yellow-400 ml-2"
                           >
                             📩
                           </span>
@@ -257,26 +276,31 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                       <p className="text-xs text-gray-400">
                         {conv.updatedAt?.toLocaleString() || "No messages"}
                       </p>
+                      {(isSale || isPurchase) && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {isSale ? `Sold: ${count}` : `Bought: ${count}`}
+                        </p>
+                      )}
                     </div>
                     <FiMessageCircle className="text-lg" />
                   </div>
 
                   {isOpen && (
-                    <div className="px-4 pb-4 space-y-2 max-h-[50%]">
-                      {messages[conv.peerAddress]?.map((m, i) => (
+                    <div className="px-4 pb-4 space-y-2 max-h-[50%] overflow-y-auto">
+                      {messages[peer]?.map((m, i) => (
                         <div
                           key={i}
-                          className={`text-sm max-w-[90%] p-2 rounded-lg ${m.senderAddress.toLowerCase() === walletClient?.account.address.toLowerCase()
-                            ? "bg-purple-600 text-right ml-auto"
-                            : "bg-gray-700"
-                            }`}
+                          className={`text-sm max-w-[90%] p-2 rounded-lg ${
+                            m.senderAddress.toLowerCase() === myAddress
+                              ? "bg-purple-600 text-right ml-auto"
+                              : "bg-gray-700"
+                          }`}
                         >
                           {m.content}
                         </div>
                       ))}
-
                       <MessageInput
-                        onSend={(text) => handleSendMessage(conv.peerAddress, text)}
+                        onSend={(text) => handleSendMessage(peer, text)}
                       />
                     </div>
                   )}
@@ -287,14 +311,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         </div>
       )}
 
-      {/* New message */}      
+      {/* New Message */}
       <button
         onClick={() => setShowComposer(true)}
-        className="fixed bottom-6 right-6 z-50 
-                  bg-purple-600 hover:bg-purple-700 
-                  text-white text-3xl w-12 h-12 
-                  rounded-full shadow-lg 
-                  flex items-center justify-center p-0"
+        className="fixed bottom-6 right-6 z-50 bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
         aria-label="New Message"
       >
         <FiPlus />
@@ -325,14 +345,14 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             <div className="flex justify-between">
               <button
                 onClick={() => setShowComposer(false)}
-                className="px-4 py-2 rounded-lg bg-gray-600 text-white hover:bg-gray-500"
+                className="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 text-white"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateMessage}
                 disabled={sending}
-                className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-bold"
+                className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold"
               >
                 {sending ? "Sending..." : "Send"}
               </button>
@@ -344,17 +364,14 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   );
 }
 
-
 const MessageInput = ({ onSend }: { onSend: (text: string) => void }) => {
   const [text, setText] = useState("");
-
   const handleSubmit = () => {
     if (text.trim()) {
       onSend(text);
       setText("");
     }
   };
-
   return (
     <div className="mt-3 flex space-x-2">
       <input
