@@ -7,14 +7,12 @@ import ConversationScreen from "../../components/ConversationScreen";
 export default function ConversationPage() {
   const router = useRouter();
   const params = useParams();
-  let { peer } = params; // aquí peer: string | string[] | undefined
-
-  // Si viniera en array, toma el primer elemento
+  let { peer } = params;
+  
   if (Array.isArray(peer)) {
     peer = peer[0];
   }
 
-  // si sigue sin existir, no pintamos nada
   if (!peer) return null;
 
   return (
