@@ -146,7 +146,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     pollingRef.current = window.setInterval(async () => {
       const convo = await xmtpClient!.conversations.newConversation(peer);
       const msgs = await convo.messages({
-        limit: 10,
+        limit: 6,
         direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
       setMessages((m) => ({ ...m, [peer]: msgs }));
@@ -192,7 +192,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
     if (!messages[peer]) {
       convo
-        .messages({ limit: 10, direction: SortDirection.SORT_DIRECTION_DESCENDING })
+        .messages({ limit: 6, direction: SortDirection.SORT_DIRECTION_DESCENDING })
         .then((lastTen) =>
           setMessages((m) => ({ ...m, [peer]: lastTen }))
         )
@@ -214,7 +214,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     const convo = await xmtpClient.conversations.newConversation(peer);
     await convo.send(text);
     const msgs = await convo.messages({
-      limit: 10,
+      limit: 6,
       direction: SortDirection.SORT_DIRECTION_DESCENDING,
     });
     setMessages((m) => ({ ...m, [peer]: msgs }));
@@ -364,7 +364,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                           className={`
                             flex flex-col
                             text-sm text-center max-w-[80%]
-                            p-2 rounded-lg
+                            py-1 px-3 rounded-lg
                             whitespace-normal break-words
                             ${isMe ? 'bg-purple-600 ml-auto' : 'bg-gray-700'}
                           `}
