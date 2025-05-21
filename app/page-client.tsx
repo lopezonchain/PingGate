@@ -313,7 +313,7 @@ export default function Page(): JSX.Element {
           
         </header>
 
-        <main className="flex-1">
+        <main className="flex-1 overflow-hidden">
           {warpView === "home" && <PingGateHome onAction={(view) => setWarpView(view)} />}
           {warpView === "inbox" && (<InboxScreen onBack={() => setWarpView("home")} />)}
           {warpView === "myplans" && (<MyServicesScreen onBack={() => setWarpView("home")} />)}
