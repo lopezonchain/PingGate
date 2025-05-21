@@ -3,7 +3,6 @@
 
 import React, {
   useEffect,
-  useLayoutEffect,
   useState,
   useRef,
 } from "react";
@@ -63,51 +62,56 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const hasLoadedList = useRef(false);
-  const threadRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const pollingRef = useRef<number | null>(null);
 
-  /// 1️⃣ Carga inicial
+  // 🔄 Carga, enriquece y ordena la lista de conversaciones
   useEffect(() => {
-    if (!xmtpClient || hasLoadedList.current) return;
-    xmtpClient.conversations.list().then(list => {
-      setConversations(list);
-      setLoadingList(false);
-      hasLoadedList.current = true;
-    });
-  }, [xmtpClient]);
+    if (!xmtpClient) return;
 
-  // 2️⃣ Enriquecer UNA vez, cuando loadingList pase de true a false
-  useEffect(() => {
-    if (!xmtpClient || loadingList) return;
-    ;(async () => {
+    let active = true;
+    (async () => {
+      setLoadingList(true);
+
+      // 1) Obtener lista
+      const list = await xmtpClient.conversations.list();
+
+      // 2) Traer el último mensaje de cada conversación
       const metas = await Promise.all(
-        conversations.map(c =>
+        list.map(c =>
           c.messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_DESCENDING })
         )
       );
-      // Actualizas solo updatedAt/hasUnread y etiquetas, ¡pero no vuelvas a tocar conversations!  
-      // Mejor: calcula un arreglo nuevo y setConversations con él _una sola vez_.
-      const enriched = conversations.map((c, i) => ({
+
+      // 3) Enriquecer
+      const enriched: ExtendedConversation[] = list.map((c, i) => ({
         ...c,
         updatedAt: metas[i][0]?.sent ?? null,
         hasUnread: metas[i][0]?.senderAddress.toLowerCase() !== myAddr,
       }));
-      // Ordena y setealo
-      enriched.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
-      setConversations(enriched);
 
-      // Etiquetas
+      // 4) Ordenar por updatedAt descendente
+      enriched.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
+
+      if (!active) return;
+
+      // 5) Generar labels
       const labels: Record<string, string> = {};
       enriched.forEach(c => {
-        if (!nameLabels[c.peerAddress]) {
-          labels[c.peerAddress] = abbreviateAddress(c.peerAddress);
-        }
+        labels[c.peerAddress] = nameLabels[c.peerAddress] || abbreviateAddress(c.peerAddress);
       });
-      setNameLabels(labels);
-    })();
-  }, [loadingList]);
 
-  // 3️⃣ carga de peers on-chain en background
+      // 6) Setear estados
+      setConversations(enriched);
+      setNameLabels(labels);
+      setLoadingList(false);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [xmtpClient, myAddr]);
+
+  // Carga de peers on-chain en background
   useEffect(() => {
     if (!walletClient) return;
     (async () => {
@@ -118,37 +122,33 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         pSet.add(svc.seller.toLowerCase());
       }
       setPurchasedPeers(pSet);
+
       const sales = await fetchSalesRecords(walletClient.account.address);
-      setSoldPeers(new Set(sales.map((r) => r.buyer.toLowerCase())));
+      setSoldPeers(new Set(sales.map(r => r.buyer.toLowerCase())));
     })();
   }, [walletClient]);
 
   // Filtrado según pestaña
   const [tab, setTab] = useState<Tab>("all");
-  const filtered = conversations.filter((c) =>
+  const filtered = conversations.filter(c =>
     tab === "all"
       ? true
       : tab === "sales"
-        ? soldPeers.has(c.peerAddress.toLowerCase())
-        : purchasedPeers.has(c.peerAddress.toLowerCase())
+      ? soldPeers.has(c.peerAddress.toLowerCase())
+      : purchasedPeers.has(c.peerAddress.toLowerCase())
   );
 
-  // Polling ref
-  const pollingRef = useRef<number | null>(null);
-
   function startPolling(peer: string) {
-    // ya haces stopPolling() al inicio, así no acumulas intervalos
     stopPolling();
     pollingRef.current = window.setInterval(async () => {
       const convo = await xmtpClient!.conversations.newConversation(peer);
-      const msgs  = await convo.messages({
+      const msgs = await convo.messages({
         limit: 6,
-        direction: SortDirection.SORT_DIRECTION_DESCENDING,
+        direction: SortDirection.SORT_DIRECTION_ASCENDING,
       });
       setMessages(m => ({ ...m, [peer]: msgs }));
     }, 3000);
   }
-
 
   function stopPolling() {
     if (pollingRef.current !== null) {
@@ -157,91 +157,51 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   }
 
-  // Auto-scroll al final
-  useLayoutEffect(() => {
-    if (expanded) {
-      const el = threadRefs.current[expanded];
-      if (el) {
-        el.scrollTop = el.scrollHeight;
-      }
-    }
-  }, [messages, expanded]);
-
-  // ─── Aquí arranca/parar polling según expanded ────────────────────────────
+  // Carga hilo al expandir
   useEffect(() => {
-    // Si no hay conversación abierta, limpia y listo
-    if (!expanded) {
+    if (!expanded || !xmtpClient) {
       stopPolling();
       return;
     }
-    // Arranca polling para _este_ peer
-    startPolling(expanded);
+    let active = true;
 
-    // Cuando cambie expanded, limpia el anterior antes de arrancar el nuevo
-    return () => stopPolling();
-  }, [expanded]);  // <-- ¡quita xmtpClient de aquí!
+    (async () => {
+      const convo = await xmtpClient.conversations.newConversation(expanded);
+      const msgs = await convo.messages({
+        limit: 50,
+        direction: SortDirection.SORT_DIRECTION_ASCENDING,
+      });
+      if (active) {
+        setMessages(m => ({ ...m, [expanded]: msgs }));
+        if (msgs[0]) {
+          setFirstMessage(fm => ({ ...fm, [expanded]: msgs[0] }));
+        }
+      }
+      startPolling(expanded);
+    })();
 
-  // 4️⃣ togglear conversación
-  // 4️⃣ togglear conversación
-const toggle = async (peer: string) => {
-  const opening = expanded !== peer;
-  setExpanded(opening ? peer : null);
+    return () => {
+      active = false;
+      stopPolling();
+    };
+  }, [expanded, xmtpClient]);
 
-  if (!opening) {
-    stopPolling();
-    return;
-  }
+  const warpcast = new WarpcastService();
 
-  // Creamos la instancia real de XMTP Conversation
-  const convo = await xmtpClient!.conversations.newConversation(peer);
+  const handleSend = async (peer: string, text: string) => {
+    if (!xmtpClient || !text.trim()) return;
 
-  // Carga primer bloque de mensajes
-  if (!messages[peer]) {
-    const lastTen = await convo.messages({
-      limit: 6,
-      direction: SortDirection.SORT_DIRECTION_DESCENDING,
-    });
-    setMessages((m) => ({ ...m, [peer]: lastTen }));
-  }
+    const convo = await xmtpClient.conversations.newConversation(peer);
+    await convo.send(text);
 
-  // Carga primer mensaje
-  if (!firstMessage[peer]) {
-    const [first] = await convo.messages({
-      limit: 1,
-      direction: SortDirection.SORT_DIRECTION_DESCENDING,
-    });
-    if (first) {
-      setFirstMessage((m) => ({ ...m, [peer]: first }));
+    let fid: number;
+    try {
+      fid = await warpcast.getFidByName(peer);
+    } catch {
+      fid = 802090;
     }
-  }
 
-  // Arranca polling sobre esta misma instancia
-  startPolling(peer);
-};
-
-
-const warpcast = new WarpcastService();
-
-const handleSend = async (peer: string, text: string) => {
-  if (!xmtpClient || !text.trim()) return;
-
-  // 1️⃣ Enviar por XMTP
-  const convo = await xmtpClient.conversations.newConversation(peer);
-  await convo.send(text);
-
-  // 2️⃣ Resolver el FID del peer (fname o wallet)
-  let fid: number;
-  try {
-    // Si peer es un fname tipo "@alice", funcionará getFidByName
-    fid = 802090;//await warpcast.getFidByName(peer);
-  } catch {
-    // Si no, asumimos que es una wallet
-    fid = 802090;//await warpcast.getFidByAddress(peer);
-  }
-
-  // 3️⃣ Disparar la notificación en tu API
-  try {
-    const res = await fetch("/api/notify", {
+    fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -249,31 +209,18 @@ const handleSend = async (peer: string, text: string) => {
         notification: {
           title: `New message from ${myAddr.slice(0, 6)}…`,
           body: text,
-          notificationDetails: null,            // importante: null
+          notificationDetails: null,
         },
       }),
+    }).catch(console.error);
+
+    const msgs = await convo.messages({
+      limit: 6,
+      direction: SortDirection.SORT_DIRECTION_ASCENDING,
     });
+    setMessages(m => ({ ...m, [peer]: msgs }));
+  };
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("Notify API error:", res.status, errText);
-    }
-  } catch (err) {
-    console.error("Error enviando notificación:", err);
-  }
-
-  // 4️⃣ Refrescar el hilo
-  const msgs = await convo.messages({
-    limit: 10,
-    direction: SortDirection.SORT_DIRECTION_DESCENDING,
-  });
-  setMessages((m) => ({ ...m, [peer]: msgs.reverse() }));
-};
-
-
-
-
-  // crear nueva conversación
   const handleCreate = async () => {
     setSending(true);
     setErr(null);
@@ -306,7 +253,7 @@ const handleSend = async (peer: string, text: string) => {
       {/* Back + Title */}
       <button
         onClick={onBack}
-        className="mb-4 flex items-center  justify-center text-purple-400 px-4 py-2 bg-[#1a1725] rounded-lg max-w-[200px]"
+        className="mb-4 flex items-center justify-center text-purple-400 px-4 py-2 bg-[#1a1725] rounded-lg max-w-[200px]"
       >
         <FiArrowLeft className="w-5 h-5 mr-2" /> Back
       </button>
@@ -314,32 +261,24 @@ const handleSend = async (peer: string, text: string) => {
 
       {/* Tabs */}
       <div className="flex justify-center space-x-4 mb-4 px-2">
-        {(["all", "purchases", "sales"] as Tab[]).map((t) => (
+        {(["all", "purchases", "sales"] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded ${tab === t
-              ? "bg-purple-600 text-white"
-              : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
-              }`}
+            className={`px-4 py-2 rounded ${
+              tab === t
+                ? "bg-purple-600 text-white"
+                : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
+            }`}
           >
-            {t === "sales"
-              ? "Clients"
-              : t === "purchases"
-                ? "Bought"
-                : "All"}
+            {t === "sales" ? "Clients" : t === "purchases" ? "Bought" : "All"}
           </button>
         ))}
       </div>
-      {xmtpError && (
-        <p className="text-red-500 text-center mb-2">{xmtpError}</p>
-      )}
+      {xmtpError && <p className="text-red-500 text-center mb-2">{xmtpError}</p>}
 
       {/* Lista scrollable */}
-      <div className="
-          flex-1 overflow-y-auto px-2 space-y-4
-          scrollbar-thin scrollbar-track-[#1a1725]
-          scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+      <div className="flex-1 overflow-y-auto px-2 space-y-4 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
         {filtered.map((conv, idx) => {
           const peer = conv.peerAddress;
           const isOpen = expanded === peer;
@@ -351,10 +290,10 @@ const handleSend = async (peer: string, text: string) => {
               ? 1
               : 0
             : isPurchase
-              ? purchasedPeers.has(lower)
-                ? 1
-                : 0
-              : 0;
+            ? purchasedPeers.has(lower)
+              ? 1
+              : 0
+            : 0;
 
           return (
             <motion.div
@@ -366,7 +305,7 @@ const handleSend = async (peer: string, text: string) => {
             >
               <div
                 className="p-4 flex justify-between items-center hover:bg-[#231c32] cursor-pointer"
-                onClick={() => toggle(peer)}
+                onClick={() => setExpanded(isOpen ? null : peer)}
               >
                 <div>
                   <p className="font-semibold flex items-center space-x-2">
@@ -402,39 +341,27 @@ const handleSend = async (peer: string, text: string) => {
                       Open full conversation
                     </div>
                   )}
-                  {(messages[peer] || [])
-                    .slice()
-                    .reverse()
-                    .map((m, i) => {
-                      const time = m.sent
-                        ? m.sent.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : '';
-                      const isMe = m.senderAddress.toLowerCase() === myAddr;
+                  {(messages[peer] || []).map((m, i) => {
+                    const time = m.sent
+                      ? m.sent.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                      : "";
+                    const isMe = m.senderAddress.toLowerCase() === myAddr;
 
-                      return (
-                        <div
-                          key={i}
-                          className={`
-                            flex flex-col
-                            text-sm text-center max-w-[80%]
-                            py-1 px-3 rounded-lg
-                            whitespace-normal break-words
-                            ${isMe ? 'bg-purple-600 ml-auto' : 'bg-gray-700'}
-                          `}
-                          style={{ hyphens: 'auto' }}
-                        >
-                          <div>
-                            {m.content}
-                          </div>
+                    return (
+                      <div
+                        key={i}
+                        className={`flex flex-col text-sm text-center max-w-[80%] py-1 px-3 rounded-lg whitespace-normal break-words ${
+                          isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"
+                        }`}
+                        style={{ hyphens: "auto" }}
+                      >
+                        <div>{m.content}</div>
+                        <span className="text-[10px] text-gray-300 text-right">{time}</span>
+                      </div>
+                    );
+                  })}
 
-                          <span className="text-[10px] text-gray-300 text-right">
-                            {time}
-                          </span>
-                        </div>
-                      );
-                    })}
-
-                  <MessageInput onSend={(t) => handleSend(peer, t)} />
+                  <MessageInput onSend={t => handleSend(peer, t)} />
                 </div>
               )}
             </motion.div>
@@ -455,22 +382,20 @@ const handleSend = async (peer: string, text: string) => {
       {showComposer && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-40 flex items-center justify-center">
           <div className="bg-[#1a1725] p-6 rounded-xl w-full max-w-md space-y-4">
-            <h3 className="text-lg font-bold text-white">
-              New Conversation
-            </h3>
+            <h3 className="text-lg font-bold text-white">New Conversation</h3>
             {err && <p className="text-red-400">{err}</p>}
             <input
               type="text"
               placeholder="ENS / Basename / Wallet"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={e => setTo(e.target.value)}
               className="w-full p-3 bg-[#2a2438] text-white rounded-lg"
             />
             <textarea
               rows={3}
               placeholder="Message"
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={e => setBody(e.target.value)}
               className="w-full p-3 bg-[#2a2438] text-white rounded-lg"
             />
             <div className="flex justify-end space-x-2">
