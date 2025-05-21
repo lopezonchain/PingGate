@@ -42,7 +42,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
       label: "My Services",
       desc: "Create and manage your own paid DM or consultation offerings.",
       action: "myplans",
-      enabled: true,
+      enabled: false,
       fee: 0,
     },
     {
@@ -50,7 +50,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
       label: "Explore",
       desc: "Browse other users' profiles and plans. Pay to message and start chatting.",
       action: "explore",
-      enabled: true,
+      enabled: false,
       fee: 0,
     },
     {
@@ -58,7 +58,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
       label: "Reviews",
       desc: "Check feedback from users or leave reviews after your own interactions.",
       action: "reviews",
-      enabled: true,
+      enabled: false,
       fee: 0,
     },
   ];
