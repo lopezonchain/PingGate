@@ -89,7 +89,7 @@ export async function POST(request: Request) {
         await sendFrameNotification({
           fid,
           title: `Welcome to ${appName}`,
-          body: `Make onchain payments simple and seamless with this Farcaster/Coinbase Miniapp, or directly from the browser. Start creating your own 100% FREE payment links today!`,
+          body: `PingGate is a pay-to-message platform that lets experts, creators, or anyone monetize their time and attention, or anyone else securely chatting or finding experts!`,
         });
       } else {
         await deleteUserNotificationDetails(fid);
@@ -98,6 +98,12 @@ export async function POST(request: Request) {
       break;
     case "frame_removed": {
       console.log("frame_removed");
+      await setUserNotificationDetails(fid, event.notificationDetails);
+      await sendFrameNotification({
+        fid,
+        title: `Miniapp removed`,
+        body: `You removed ${appName} successfully. Please tell me how I can improve your experience. @lopezonchain.xyz`,
+      });
       await deleteUserNotificationDetails(fid);
       break;
     }
@@ -114,6 +120,12 @@ export async function POST(request: Request) {
     }
     case "notifications_disabled": {
       console.log("notifications_disabled");
+      await setUserNotificationDetails(fid, event.notificationDetails);
+      await sendFrameNotification({
+        fid,
+        title: `Notifications disabled`,
+        body: `You removed ${appName} successfully. Please tell me how I can improve your experience. @lopezonchain.xyz`,
+      });
       await deleteUserNotificationDetails(fid);
 
       break;
