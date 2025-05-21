@@ -134,6 +134,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             limit: 1,
             direction: SortDirection.SORT_DIRECTION_ASCENDING,
           });
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
           first && setFirstMessage((p) => ({ ...p, [peer]: first }));
         } catch {}
       }
