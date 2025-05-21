@@ -45,46 +45,51 @@ export default function MessageInput({
       </div>
 
       {/* modal fullscreen */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black bg-opacity-75">
-          {/* cabecera con cerrar */}
-          <div className="max-w-md p-4 flex justify-end">
-            <button
-              onClick={() => setModalOpen(false)}
-              className="text-white text-2xl"
-            >
-              <FiX />
-            </button>
-          </div>
+{modalOpen && (
+  <div className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-75">
+    {/* este wrapper controla el ancho y el alto completo */}
+    <div className="w-full max-w-md h-full bg-[#0f0d14] rounded-lg overflow-hidden flex flex-col">
+      
+      {/* cabecera con cerrar */}
+      <div className="flex justify-end p-4">
+        <button
+          onClick={() => setModalOpen(false)}
+          className="text-white text-2xl"
+        >
+          <FiX />
+        </button>
+      </div>
 
-          {/* textarea auto-creciente */}
-          <div className="flex-1 max-w-md px-4 pb-4">
-            <textarea
-              ref={textareaRef}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              className={`
-                w-full h-full resize-none
-                bg-[#1a1725] text-white p-4 rounded-lg
-                scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600
-                focus:outline-none
-              `}
-              placeholder="Type your message..."
-            />
-          </div>
+      {/* input que ocupa todo el espacio entre cabecera y pie */}
+      <div className="flex-1 px-4 pb-4">
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          className="
+            w-full h-full
+            bg-[#1a1725] text-white p-4 rounded-lg
+            scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600
+            focus:outline-none
+          "
+          placeholder="Type your message..."
+        />
+      </div>
 
-          {/* botón fijo abajo */}
-          <div className="p-4 max-w-md border-t border-gray-700 bg-[#0f0d14]">
-            <button
-              onClick={submit}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-bold"
-            >
-              <FiSend />
-              <span>Send</span>
-            </button>
-          </div>
-        </div>
-      )}
+      {/* botón fijo abajo */}
+      <div className="p-4 border-t border-gray-700">
+        <button
+          onClick={submit}
+          className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-bold"
+        >
+          <FiSend />
+          <span>Send</span>
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </>
   );
 }

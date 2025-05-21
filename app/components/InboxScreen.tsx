@@ -344,21 +344,26 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                   {firstMessage[peer] && (
                     <div
                       onClick={() => router.push(`/conversation/${peer}`)}
-                      className="cursor-pointer italic text-sm p-2 rounded-lg bg-[#2a2438] hover:bg-[#3a3345]"
+                      className="cursor-pointer italic text-sm p-2 rounded-lg bg-[#2a2438] hover:bg-[#3a3345] flex justify-center"
                     >
-                      Click to open full conversation
+                      Open full conversation
                     </div>
                   )}
                   {(messages[peer] || [])
-                    .slice()
-                    .reverse()
-                    .map((m, i) => (
+                  .slice()
+                  .reverse()
+                  .map((m, i) => (
                     <div
                       key={i}
-                      className={`text-sm max-w-[90%] p-2 rounded-lg ${m.senderAddress.toLowerCase() === myAddr
-                          ? "bg-purple-600 text-right ml-auto"
+                      className={`
+                        text-sm w-auto max-w-[70%]
+                        p-2 rounded-lg text-center whitespace-normal break-words
+                        ${m.senderAddress.toLowerCase() === myAddr
+                          ? "bg-purple-600 ml-auto"
                           : "bg-gray-700"
-                        }`}
+                        }
+                      `}
+                      style={{ hyphens: "auto" }}
                     >
                       {m.content}
                     </div>
@@ -374,7 +379,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       {/* FAB nuevo chat */}
       <button
         onClick={() => setShowComposer(true)}
-        className="fixed bottom-6 right-6 z-50 bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
+        className="fixed bottom-6 right-6 z-25 bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
         aria-label="New Conversation"
       >
         <FiPlus />
