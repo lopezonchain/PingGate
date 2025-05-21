@@ -341,7 +341,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                   )}
                   {(messages[peer] || [])
                     .slice()
-                    .reverse()
                     .map((m, i) => (
                     <div
                       key={i}
