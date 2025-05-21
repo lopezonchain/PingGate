@@ -190,7 +190,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     // primer mensaje
     if (!firstMessage[peer]) {
       convo
-        .messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_DESCENDING })
+        .messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_ASCENDING })
         .then(([first]) => {
           if (first) setFirstMessage((m) => ({ ...m, [peer]: first }));
         })
