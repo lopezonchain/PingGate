@@ -1,7 +1,12 @@
 // src/components/InboxScreen.tsx
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+} from "react";
 import { Conversation, DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
 import { FiArrowLeft, FiMessageCircle, FiPlus } from "react-icons/fi";
@@ -58,6 +63,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const [err, setErr] = useState<string | null>(null);
 
   const hasLoadedList = useRef(false);
+  const threadRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // 1️⃣ carga inicial rápida de la lista
   useEffect(() => {
@@ -97,13 +103,11 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         return arr;
       });
       const newLabels: Record<string, string> = {};
-      await Promise.all(
-        conversations.map(async (c) => {
-          if (!nameLabels[c.peerAddress]) {
-            newLabels[c.peerAddress] = abbreviateAddress(c.peerAddress);
-          }
-        })
-      );
+      conversations.forEach((c) => {
+        if (!nameLabels[c.peerAddress]) {
+          newLabels[c.peerAddress] = abbreviateAddress(c.peerAddress);
+        }
+      });
       setNameLabels((p) => ({ ...p, ...newLabels }));
     })();
   }, [conversations, xmtpClient, loadingList, myAddr, nameLabels]);
@@ -130,8 +134,8 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     tab === "all"
       ? true
       : tab === "sales"
-        ? soldPeers.has(c.peerAddress.toLowerCase())
-        : purchasedPeers.has(c.peerAddress.toLowerCase())
+      ? soldPeers.has(c.peerAddress.toLowerCase())
+      : purchasedPeers.has(c.peerAddress.toLowerCase())
   );
 
   // Polling ref
@@ -141,11 +145,11 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     stopPolling();
     pollingRef.current = window.setInterval(async () => {
       const convo = await xmtpClient!.conversations.newConversation(peer);
-      const msgs  = await convo.messages({
+      const msgs = await convo.messages({
         limit: 10,
         direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
-      setMessages(m => ({ ...m, [peer]: msgs.reverse() }));
+      setMessages((m) => ({ ...m, [peer]: msgs }));
     }, 3000);
   }
 
@@ -155,6 +159,16 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       pollingRef.current = null;
     }
   }
+
+  // Auto-scroll al final
+  useLayoutEffect(() => {
+    if (expanded) {
+      const el = threadRefs.current[expanded];
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    }
+  }, [messages, expanded]);
 
   // ─── Aquí arranca/parar polling según expanded ────────────────────────────
   useEffect(() => {
@@ -166,48 +180,44 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     return stopPolling;
   }, [expanded, xmtpClient]);
 
-
   // 4️⃣ togglear conversación
   const toggle = (peer: string, convo: ExtendedConversation) => {
     const opening = expanded !== peer;
     setExpanded(opening ? peer : null);
 
     if (!opening) {
-      // al cerrar, detén el polling (el useEffect también lo haría)
       stopPolling();
       return;
     }
 
-    // carga inmediata de histórico
     if (!messages[peer]) {
       convo
         .messages({ limit: 10, direction: SortDirection.SORT_DIRECTION_DESCENDING })
         .then((lastTen) =>
-          setMessages((m) => ({ ...m, [peer]: lastTen.reverse() }))
+          setMessages((m) => ({ ...m, [peer]: lastTen }))
         )
-        .catch(() => { });
+        .catch(() => {});
     }
-    // primer mensaje
     if (!firstMessage[peer]) {
       convo
-        .messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_ASCENDING })
+        .messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_DESCENDING })
         .then(([first]) => {
           if (first) setFirstMessage((m) => ({ ...m, [peer]: first }));
         })
-        .catch(() => { });
+        .catch(() => {});
     }
   };
 
   // envío de mensaje
   const handleSend = async (peer: string, text: string) => {
     if (!xmtpClient || !text.trim()) return;
-    const convo = conversations.find((c) => c.peerAddress === peer)!;
+    const convo = await xmtpClient.conversations.newConversation(peer);
     await convo.send(text);
     const msgs = await convo.messages({
       limit: 10,
       direction: SortDirection.SORT_DIRECTION_DESCENDING,
     });
-    setMessages((m) => ({ ...m, [peer]: msgs.reverse() }));
+    setMessages((m) => ({ ...m, [peer]: msgs }));
   };
 
   // crear nueva conversación
@@ -341,6 +351,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                   )}
                   {(messages[peer] || [])
                     .slice()
+                    .reverse()
                     .map((m, i) => (
                     <div
                       key={i}
