@@ -62,7 +62,7 @@ export default function ConversationScreen({
       <div className="flex items-center px-4 py-2 border-b border-gray-700">
         <button
           onClick={onBack}
-          className="flex items-center text-purple-400 text-lg px-4 py-2 bg-[#1a1725] rounded-lg"
+          className="flex items-center justify-center text-purple-400 text-lg px-4 py-2 bg-[#1a1725] rounded-lg"
         >
           <FiArrowLeft className="w-5 h-5 mr-2" />
           Back

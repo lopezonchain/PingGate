@@ -64,7 +64,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
   ];
 
   const handleShare = useCallback(() => {
-    const text = `Try PingGate 💬 Monetize your inbox or message experts onchain! Powered by @xmtp_, Base & Farcaster ✨ https://pinggate.lopezonchain.xyz`;
+    const text = `Try PingGate 💬 Monetize your inbox or message experts onchain! Powered by @xmtp @base & @farcaster and created by @lopezonchain.eth ✨ https://pinggate.lopezonchain.xyz`;
     const url = `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank");
   }, []);
@@ -80,7 +80,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
           className="w-12 h-12 ml-4 rounded-full animate-pulse"/>
       </div>
       <p className="text-sm text-gray-400 mb-6 text-center leading-snug">
-        Monetize your inbox or connect with experts
+        Monetize your inbox, connect with experts or just chat
       </p>
 
       {/* Actions list */}
