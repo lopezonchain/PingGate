@@ -19,7 +19,7 @@ export default function ConversationScreen({
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
   const myAddress = walletClient?.account.address.toLowerCase();
 
-  // Ref al contenedor de mensajes para hacer scroll
+  // Ref al contenedor de mensajes para scroll
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Función para cargar mensajes
@@ -33,23 +33,22 @@ export default function ConversationScreen({
   // Carga inicial + polling cada 3s
   useEffect(() => {
     if (!xmtpClient) return;
-    loadMessages(); // primera carga
-
+    loadMessages();
     const id = window.setInterval(loadMessages, 3000);
     return () => window.clearInterval(id);
   }, [xmtpClient, peerAddress]);
 
-  // Cada vez que cambian los mensajes, forzamos el scroll al final
+  // Scroll automático al final
   useEffect(() => {
     const c = scrollContainerRef.current;
     if (c) {
-      // espera un tick para que React pinte el contenido
       requestAnimationFrame(() => {
         c.scrollTop = c.scrollHeight;
       });
     }
   }, [messages]);
 
+  // Envío de mensaje
   const handleSend = async (text: string) => {
     if (!xmtpClient || !text.trim()) return;
     const convo = await xmtpClient.conversations.newConversation(peerAddress);
@@ -78,22 +77,28 @@ export default function ConversationScreen({
         {/* Contenedor scrollable */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto p-4 space-y-2
-                     scrollbar-thin scrollbar-track-[#1a1725]
-                     scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500"
+          className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500"
         >
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={`max-w-[80%] break-words p-2 rounded-lg ${
-                m.senderAddress.toLowerCase() === myAddress
-                  ? "bg-purple-600 text-right ml-auto"
-                  : "bg-gray-700"
-              }`}
-            >
-              {m.content}
-            </div>
-          ))}
+          {messages.map((m, i) => {
+            const isMe = m.senderAddress.toLowerCase() === myAddress;
+            const time = m.sent
+              ? m.sent.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : "";
+            return (
+              <div
+                key={i}
+                className={`flex flex-col text-sm text-center max-w-[80%] p-2 rounded-lg whitespace-normal break-words ${
+                  isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"
+                }`}
+                style={{ hyphens: "auto" }}
+              >
+                <div>{m.content}</div>
+                <span className="text-[10px] text-gray-300 text-right">
+                  {time}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Input fijo abajo */}

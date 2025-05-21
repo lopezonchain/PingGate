@@ -134,8 +134,8 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     tab === "all"
       ? true
       : tab === "sales"
-      ? soldPeers.has(c.peerAddress.toLowerCase())
-      : purchasedPeers.has(c.peerAddress.toLowerCase())
+        ? soldPeers.has(c.peerAddress.toLowerCase())
+        : purchasedPeers.has(c.peerAddress.toLowerCase())
   );
 
   // Polling ref
@@ -196,7 +196,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         .then((lastTen) =>
           setMessages((m) => ({ ...m, [peer]: lastTen }))
         )
-        .catch(() => {});
+        .catch(() => { });
     }
     if (!firstMessage[peer]) {
       convo
@@ -204,7 +204,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         .then(([first]) => {
           if (first) setFirstMessage((m) => ({ ...m, [peer]: first }));
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   };
 
@@ -266,8 +266,8 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 rounded ${tab === t
-                ? "bg-purple-600 text-white"
-                : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
+              ? "bg-purple-600 text-white"
+              : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
               }`}
           >
             {t === "sales"
@@ -350,24 +350,37 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                     </div>
                   )}
                   {(messages[peer] || [])
-                  .slice()
-                  .reverse()
-                  .map((m, i) => (
-                    <div
-                      key={i}
-                      className={`
-                        text-sm w-auto max-w-[70%]
-                        p-2 rounded-lg text-center whitespace-normal break-words
-                        ${m.senderAddress.toLowerCase() === myAddr
-                          ? "bg-purple-600 ml-auto"
-                          : "bg-gray-700"
-                        }
-                      `}
-                      style={{ hyphens: "auto" }}
-                    >
-                      {m.content}
-                    </div>
-                  ))}
+                    .slice()
+                    .reverse()
+                    .map((m, i) => {
+                      const time = m.sent
+                        ? m.sent.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : '';
+                      const isMe = m.senderAddress.toLowerCase() === myAddr;
+
+                      return (
+                        <div
+                          key={i}
+                          className={`
+                            flex flex-col
+                            text-sm text-center max-w-[80%]
+                            p-2 rounded-lg
+                            whitespace-normal break-words
+                            ${isMe ? 'bg-purple-600 ml-auto' : 'bg-gray-700'}
+                          `}
+                          style={{ hyphens: 'auto' }}
+                        >
+                          <div>
+                            {m.content}
+                          </div>
+
+                          <span className="text-[10px] text-gray-300 text-right">
+                            {time}
+                          </span>
+                        </div>
+                      );
+                    })}
+
                   <MessageInput onSend={(t) => handleSend(peer, t)} />
                 </div>
               )}
