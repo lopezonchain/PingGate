@@ -89,7 +89,7 @@ export async function POST(request: Request) {
         await sendFrameNotification({
           fid,
           title: `Welcome to ${appName}`,
-          body: `PingGate is a pay-to-message platform that lets experts, creators, or anyone monetize their time and attention, or anyone else securely chatting or finding experts!`,
+          body: `Chat securely. Or start offering a chat service and monetize your inbox. Wallet to wallet messages with Farcaster notifications`,
         });
       } else {
         await deleteUserNotificationDetails(fid);
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       await sendFrameNotification({
         fid,
         title: `Notifications enabled!`,
-        body: `Thank you for enabling notifications for ${appName}`,
+        body: `Thank you for enabling ${appName} notifications`,
       });
 
       break;
@@ -123,8 +123,8 @@ export async function POST(request: Request) {
       await setUserNotificationDetails(fid, event.notificationDetails);
       await sendFrameNotification({
         fid,
-        title: `Notifications disabled`,
-        body: `You removed ${appName} successfully. Please tell me how I can improve your experience. @lopezonchain.xyz`,
+        title: `Notifications disabled successfully on ${appName}`,
+        body: `Please tell me how I can improve your experience. @lopezonchain.xyz`,
       });
       await deleteUserNotificationDetails(fid);
 
