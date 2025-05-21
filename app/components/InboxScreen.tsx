@@ -88,22 +88,18 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         })
       );
       setConversations((prev) => {
-        // clona el array para disparar render, pero no las instancias
         const arr = prev.slice();
         for (const c of arr) {
           const m = metas.find((x) => x.peerAddress === c.peerAddress);
           if (m) Object.assign(c, { updatedAt: m.updatedAt, hasUnread: m.hasUnread });
         }
-        // Ahora reordena de más reciente a más antiguo
         arr.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
         return arr;
       });
-      // etiquetas ENS/Basename (si quieres)
       const newLabels: Record<string, string> = {};
       await Promise.all(
         conversations.map(async (c) => {
           if (!nameLabels[c.peerAddress]) {
-            // usa tu resolver de nombre aquí
             newLabels[c.peerAddress] = abbreviateAddress(c.peerAddress);
           }
         })
@@ -116,16 +112,13 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   useEffect(() => {
     if (!walletClient) return;
     (async () => {
-      const buyerIds = await fetchPurchasedServiceIds(
-        walletClient.account.address
-      );
+      const buyerIds = await fetchPurchasedServiceIds(walletClient.account.address);
       const pSet = new Set<string>();
       for (const id of buyerIds) {
         const svc = await fetchServiceDetails(id);
         pSet.add(svc.seller.toLowerCase());
       }
       setPurchasedPeers(pSet);
-
       const sales = await fetchSalesRecords(walletClient.account.address);
       setSoldPeers(new Set(sales.map((r) => r.buyer.toLowerCase())));
     })();
@@ -144,56 +137,64 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   // Polling ref
   const pollingRef = useRef<number | null>(null);
 
-  function startPolling(peer: string, convo: Conversation) {
+  async function startPolling(peer: string) {
     stopPolling();
-    // usa window.setInterval para que el tipo sea número
     pollingRef.current = window.setInterval(async () => {
-      const msgs = await convo.messages({
+      const convo = await xmtpClient!.conversations.newConversation(peer);
+      const msgs  = await convo.messages({
         limit: 10,
         direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
-      setMessages((m) => ({ ...m, [peer]: msgs.reverse() }));
+      setMessages(m => ({ ...m, [peer]: msgs.reverse() }));
     }, 3000);
   }
 
   function stopPolling() {
     if (pollingRef.current !== null) {
-      // y aquí window.clearInterval acepta número
       window.clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
   }
 
+  // ─── Aquí arranca/parar polling según expanded ────────────────────────────
+  useEffect(() => {
+    if (expanded === null) {
+      stopPolling();
+      return;
+    }
+    startPolling(expanded);
+    return stopPolling;
+  }, [expanded, xmtpClient]);
+
+
   // 4️⃣ togglear conversación
   const toggle = (peer: string, convo: ExtendedConversation) => {
     const opening = expanded !== peer;
     setExpanded(opening ? peer : null);
-    if (opening) {
-      startPolling(peer, convo);
-      if (!messages[peer]) {
-        convo
-          .messages({
-            limit: 10,
-            direction: SortDirection.SORT_DIRECTION_DESCENDING,
-          })
-          .then((lastTen) =>
-            setMessages((m) => ({ ...m, [peer]: lastTen.reverse() }))
-          )
-          .catch(() => { });
-      }
-      if (!firstMessage[peer]) {
-        convo
-          .messages({
-            limit: 1,
-            direction: SortDirection.SORT_DIRECTION_DESCENDING,
-          })
-          .then(([first]) => {
-            if (first) setFirstMessage((m) => ({ ...m, [peer]: first }));
-          })
-          .catch(() => { });
-      }
-    } else {
+
+    if (!opening) {
+      // al cerrar, detén el polling (el useEffect también lo haría)
       stopPolling();
+      return;
+    }
+
+    // carga inmediata de histórico
+    if (!messages[peer]) {
+      convo
+        .messages({ limit: 10, direction: SortDirection.SORT_DIRECTION_DESCENDING })
+        .then((lastTen) =>
+          setMessages((m) => ({ ...m, [peer]: lastTen.reverse() }))
+        )
+        .catch(() => { });
+    }
+    // primer mensaje
+    if (!firstMessage[peer]) {
+      convo
+        .messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_DESCENDING })
+        .then(([first]) => {
+          if (first) setFirstMessage((m) => ({ ...m, [peer]: first }));
+        })
+        .catch(() => { });
     }
   };
 
@@ -272,13 +273,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       )}
 
       {/* Lista scrollable */}
-      <div
-        className="
+      <div className="
           flex-1 overflow-y-auto px-2 space-y-4
           scrollbar-thin scrollbar-track-[#1a1725]
-          scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500
-        "
-      >
+          scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
         {filtered.map((conv, idx) => {
           const peer = conv.peerAddress;
           const isOpen = expanded === peer;
@@ -341,7 +339,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                       Click to open full conversation
                     </div>
                   )}
-                  {(messages[peer] || []).map((m, i) => (
+                  {(messages[peer] || [])
+                    .slice()
+                    .reverse()
+                    .map((m, i) => (
                     <div
                       key={i}
                       className={`text-sm max-w-[90%] p-2 rounded-lg ${m.senderAddress.toLowerCase() === myAddr

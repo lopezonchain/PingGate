@@ -12,7 +12,6 @@ export default function MessageInput({
   const [modalOpen, setModalOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Cuando abres el modal, auto-focus al textarea
   useEffect(() => {
     if (modalOpen) {
       textareaRef.current?.focus();
@@ -49,7 +48,7 @@ export default function MessageInput({
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-black bg-opacity-75">
           {/* cabecera con cerrar */}
-          <div className="p-4 flex justify-end">
+          <div className="max-w-md p-4 flex justify-end">
             <button
               onClick={() => setModalOpen(false)}
               className="text-white text-2xl"
@@ -59,7 +58,7 @@ export default function MessageInput({
           </div>
 
           {/* textarea auto-creciente */}
-          <div className="flex-1 px-4 pb-4">
+          <div className="flex-1 max-w-md px-4 pb-4">
             <textarea
               ref={textareaRef}
               value={text}
@@ -75,7 +74,7 @@ export default function MessageInput({
           </div>
 
           {/* botón fijo abajo */}
-          <div className="p-4 border-t border-gray-700 bg-[#0f0d14]">
+          <div className="p-4 max-w-md border-t border-gray-700 bg-[#0f0d14]">
             <button
               onClick={submit}
               className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-bold"
