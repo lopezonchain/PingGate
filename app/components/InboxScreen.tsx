@@ -20,6 +20,7 @@ import {
 } from "../services/contractService";
 import { useRouter } from "next/navigation";
 import MessageInput from "./MessageInput";
+import { WarpcastService } from "../services/warpcastService";
 
 interface InboxScreenProps {
   onBack: () => void;
@@ -65,52 +66,46 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const hasLoadedList = useRef(false);
   const threadRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // 1️⃣ carga inicial rápida de la lista
+  /// 1️⃣ Carga inicial
   useEffect(() => {
     if (!xmtpClient || hasLoadedList.current) return;
-    xmtpClient.conversations.list().then((list) => {
+    xmtpClient.conversations.list().then(list => {
       setConversations(list);
       setLoadingList(false);
       hasLoadedList.current = true;
     });
   }, [xmtpClient]);
 
-  // 2️⃣ enriquecimiento en segundo plano (updatedAt, hasUnread, etiquetas)
+  // 2️⃣ Enriquecer UNA vez, cuando loadingList pase de true a false
   useEffect(() => {
     if (!xmtpClient || loadingList) return;
-    (async () => {
+    ;(async () => {
       const metas = await Promise.all(
-        conversations.map(async (c) => {
-          const [last] = await c.messages({
-            limit: 1,
-            direction: SortDirection.SORT_DIRECTION_DESCENDING,
-          });
-          return {
-            peerAddress: c.peerAddress,
-            updatedAt: last?.sent,
-            hasUnread:
-              !!last && last.senderAddress.toLowerCase() !== myAddr,
-          };
-        })
+        conversations.map(c =>
+          c.messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_DESCENDING })
+        )
       );
-      setConversations((prev) => {
-        const arr = prev.slice();
-        for (const c of arr) {
-          const m = metas.find((x) => x.peerAddress === c.peerAddress);
-          if (m) Object.assign(c, { updatedAt: m.updatedAt, hasUnread: m.hasUnread });
-        }
-        arr.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
-        return arr;
-      });
-      const newLabels: Record<string, string> = {};
-      conversations.forEach((c) => {
+      // Actualizas solo updatedAt/hasUnread y etiquetas, ¡pero no vuelvas a tocar conversations!  
+      // Mejor: calcula un arreglo nuevo y setConversations con él _una sola vez_.
+      const enriched = conversations.map((c, i) => ({
+        ...c,
+        updatedAt: metas[i][0]?.sent ?? null,
+        hasUnread: metas[i][0]?.senderAddress.toLowerCase() !== myAddr,
+      }));
+      // Ordena y setealo
+      enriched.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
+      setConversations(enriched);
+
+      // Etiquetas
+      const labels: Record<string, string> = {};
+      enriched.forEach(c => {
         if (!nameLabels[c.peerAddress]) {
-          newLabels[c.peerAddress] = abbreviateAddress(c.peerAddress);
+          labels[c.peerAddress] = abbreviateAddress(c.peerAddress);
         }
       });
-      setNameLabels((p) => ({ ...p, ...newLabels }));
+      setNameLabels(labels);
     })();
-  }, [conversations, xmtpClient, loadingList, myAddr, nameLabels]);
+  }, [loadingList]);
 
   // 3️⃣ carga de peers on-chain en background
   useEffect(() => {
@@ -141,17 +136,19 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   // Polling ref
   const pollingRef = useRef<number | null>(null);
 
-  async function startPolling(peer: string) {
+  function startPolling(peer: string) {
+    // ya haces stopPolling() al inicio, así no acumulas intervalos
     stopPolling();
     pollingRef.current = window.setInterval(async () => {
       const convo = await xmtpClient!.conversations.newConversation(peer);
-      const msgs = await convo.messages({
+      const msgs  = await convo.messages({
         limit: 6,
         direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
-      setMessages((m) => ({ ...m, [peer]: msgs }));
+      setMessages(m => ({ ...m, [peer]: msgs }));
     }, 3000);
   }
+
 
   function stopPolling() {
     if (pollingRef.current !== null) {
@@ -172,53 +169,109 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
   // ─── Aquí arranca/parar polling según expanded ────────────────────────────
   useEffect(() => {
-    if (expanded === null) {
+    // Si no hay conversación abierta, limpia y listo
+    if (!expanded) {
       stopPolling();
       return;
     }
+    // Arranca polling para _este_ peer
     startPolling(expanded);
-    return stopPolling;
-  }, [expanded, xmtpClient]);
+
+    // Cuando cambie expanded, limpia el anterior antes de arrancar el nuevo
+    return () => stopPolling();
+  }, [expanded]);  // <-- ¡quita xmtpClient de aquí!
 
   // 4️⃣ togglear conversación
-  const toggle = (peer: string, convo: ExtendedConversation) => {
-    const opening = expanded !== peer;
-    setExpanded(opening ? peer : null);
+  // 4️⃣ togglear conversación
+const toggle = async (peer: string) => {
+  const opening = expanded !== peer;
+  setExpanded(opening ? peer : null);
 
-    if (!opening) {
-      stopPolling();
-      return;
-    }
+  if (!opening) {
+    stopPolling();
+    return;
+  }
 
-    if (!messages[peer]) {
-      convo
-        .messages({ limit: 6, direction: SortDirection.SORT_DIRECTION_DESCENDING })
-        .then((lastTen) =>
-          setMessages((m) => ({ ...m, [peer]: lastTen }))
-        )
-        .catch(() => { });
-    }
-    if (!firstMessage[peer]) {
-      convo
-        .messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_DESCENDING })
-        .then(([first]) => {
-          if (first) setFirstMessage((m) => ({ ...m, [peer]: first }));
-        })
-        .catch(() => { });
-    }
-  };
+  // Creamos la instancia real de XMTP Conversation
+  const convo = await xmtpClient!.conversations.newConversation(peer);
 
-  // envío de mensaje
-  const handleSend = async (peer: string, text: string) => {
-    if (!xmtpClient || !text.trim()) return;
-    const convo = await xmtpClient.conversations.newConversation(peer);
-    await convo.send(text);
-    const msgs = await convo.messages({
+  // Carga primer bloque de mensajes
+  if (!messages[peer]) {
+    const lastTen = await convo.messages({
       limit: 6,
       direction: SortDirection.SORT_DIRECTION_DESCENDING,
     });
-    setMessages((m) => ({ ...m, [peer]: msgs }));
-  };
+    setMessages((m) => ({ ...m, [peer]: lastTen }));
+  }
+
+  // Carga primer mensaje
+  if (!firstMessage[peer]) {
+    const [first] = await convo.messages({
+      limit: 1,
+      direction: SortDirection.SORT_DIRECTION_DESCENDING,
+    });
+    if (first) {
+      setFirstMessage((m) => ({ ...m, [peer]: first }));
+    }
+  }
+
+  // Arranca polling sobre esta misma instancia
+  startPolling(peer);
+};
+
+
+const warpcast = new WarpcastService();
+
+const handleSend = async (peer: string, text: string) => {
+  if (!xmtpClient || !text.trim()) return;
+
+  // 1️⃣ Enviar por XMTP
+  const convo = await xmtpClient.conversations.newConversation(peer);
+  await convo.send(text);
+
+  // 2️⃣ Resolver el FID del peer (fname o wallet)
+  let fid: number;
+  try {
+    // Si peer es un fname tipo "@alice", funcionará getFidByName
+    fid = 802090;//await warpcast.getFidByName(peer);
+  } catch {
+    // Si no, asumimos que es una wallet
+    fid = 802090;//await warpcast.getFidByAddress(peer);
+  }
+
+  // 3️⃣ Disparar la notificación en tu API
+  try {
+    const res = await fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fid,
+        notification: {
+          title: `New message from ${myAddr.slice(0, 6)}…`,
+          body: text,
+          notificationDetails: null,            // importante: null
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Notify API error:", res.status, errText);
+    }
+  } catch (err) {
+    console.error("Error enviando notificación:", err);
+  }
+
+  // 4️⃣ Refrescar el hilo
+  const msgs = await convo.messages({
+    limit: 10,
+    direction: SortDirection.SORT_DIRECTION_DESCENDING,
+  });
+  setMessages((m) => ({ ...m, [peer]: msgs.reverse() }));
+};
+
+
+
 
   // crear nueva conversación
   const handleCreate = async () => {
@@ -313,7 +366,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             >
               <div
                 className="p-4 flex justify-between items-center hover:bg-[#231c32] cursor-pointer"
-                onClick={() => toggle(peer, conv)}
+                onClick={() => toggle(peer)}
               >
                 <div>
                   <p className="font-semibold flex items-center space-x-2">
