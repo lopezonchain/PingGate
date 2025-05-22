@@ -1,11 +1,7 @@
 // src/components/InboxScreen.tsx
 "use client";
 
-import React, {
-  useEffect,
-  useState,
-  useRef,
-} from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Conversation, DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
 import { FiArrowLeft, FiMessageCircle, FiPlus } from "react-icons/fi";
@@ -19,6 +15,7 @@ import {
 } from "../services/contractService";
 import { useRouter } from "next/navigation";
 import MessageInput from "./MessageInput";
+import AddressName from "./AddressName";
 import { WarpcastService } from "../services/warpcastService";
 
 interface InboxScreenProps {
@@ -32,10 +29,6 @@ interface ExtendedConversation extends Conversation {
 
 type Tab = "sales" | "purchases" | "all";
 
-function abbreviateAddress(addr: string) {
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
-}
-
 export default function InboxScreen({ onBack }: InboxScreenProps) {
   const router = useRouter();
   const { data: walletClient } = useWalletClient();
@@ -44,7 +37,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
   // → estados rápidos
   const [conversations, setConversations] = useState<ExtendedConversation[]>([]);
-  const [nameLabels, setNameLabels] = useState<Record<string, string>>({});
   const [purchasedPeers, setPurchasedPeers] = useState<Set<string>>(new Set());
   const [soldPeers, setSoldPeers] = useState<Set<string>>(new Set());
   const [loadingList, setLoadingList] = useState(true);
@@ -70,7 +62,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       setLoadingList(true);
       const list = await xmtpClient.conversations.list();
       const metas = await Promise.all(
-        list.map(c =>
+        list.map((c) =>
           c.messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_DESCENDING })
         )
       );
@@ -79,17 +71,16 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         updatedAt: metas[i][0]?.sent ?? null,
         hasUnread: metas[i][0]?.senderAddress.toLowerCase() !== myAddr,
       }));
-      enriched.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
+      enriched.sort(
+        (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
+      );
       if (!active) return;
-      const labels: Record<string, string> = {};
-      enriched.forEach(c => {
-        labels[c.peerAddress] = nameLabels[c.peerAddress] || abbreviateAddress(c.peerAddress);
-      });
       setConversations(enriched);
-      setNameLabels(labels);
       setLoadingList(false);
     })();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [xmtpClient, myAddr]);
 
   // Carga de peers on-chain en background
@@ -103,34 +94,33 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         pSet.add(svc.seller.toLowerCase());
       }
       setPurchasedPeers(pSet);
+
       const sales = await fetchSalesRecords(walletClient.account.address);
-      setSoldPeers(new Set(sales.map(r => r.buyer.toLowerCase())));
+      setSoldPeers(new Set(sales.map((r) => r.buyer.toLowerCase())));
     })();
   }, [walletClient]);
 
   // Filtrado según pestaña
   const [tab, setTab] = useState<Tab>("all");
-  const filtered = conversations.filter(c =>
+  const filtered = conversations.filter((c) =>
     tab === "all"
       ? true
       : tab === "sales"
-        ? soldPeers.has(c.peerAddress.toLowerCase())
-        : purchasedPeers.has(c.peerAddress.toLowerCase())
+      ? soldPeers.has(c.peerAddress.toLowerCase())
+      : purchasedPeers.has(c.peerAddress.toLowerCase())
   );
 
-  // Polling: obtener siempre los 6 ÚLTIMOS mensajes y mostrarlos en orden ascendente
+  // Polling: siempre obtener los 6 últimos y mostrarlos en orden ascendente
   function startPolling(peer: string) {
     stopPolling();
     pollingRef.current = window.setInterval(async () => {
       const convo = await xmtpClient!.conversations.newConversation(peer);
-      // 👉 Pedimos los últimos 6 en DESCENDING
       const lastDesc = await convo.messages({
         limit: 6,
         direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
-      // 👉 Invertimos para mostrarlos de más antiguo a más nuevo
       const lastAsc = lastDesc.slice().reverse();
-      setMessages(m => ({ ...m, [peer]: lastAsc }));
+      setMessages((m) => ({ ...m, [peer]: lastAsc }));
     }, 3000);
   }
   function stopPolling() {
@@ -140,7 +130,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   }
 
-  // Carga hilo al expandir: igual, traemos siempre los 6 últimos
+  // Carga hilo al expandir
   useEffect(() => {
     if (!expanded || !xmtpClient) {
       stopPolling();
@@ -149,14 +139,13 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     let active = true;
     (async () => {
       const convo = await xmtpClient.conversations.newConversation(expanded);
-      // Últimos 6 en DESCENDING
       const lastDesc = await convo.messages({
         limit: 6,
         direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
       const lastAsc = lastDesc.slice().reverse();
       if (active) {
-        setMessages(m => ({ ...m, [expanded]: lastAsc }));
+        setMessages((m) => ({ ...m, [expanded]: lastAsc }));
       }
       startPolling(expanded);
     })();
@@ -168,7 +157,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
   const warpcast = new WarpcastService();
 
-  // Envío de mensaje con actualización optimista (sin recargar hilo)
+  // Envío de mensaje con actualización optimista
   const handleSend = async (peer: string, text: string) => {
     if (!xmtpClient || !text.trim()) return;
     const now = new Date();
@@ -179,28 +168,32 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     } as any;
 
     // 1️⃣ Insertar optimista
-    setMessages(prev => ({
+    setMessages((prev) => ({
       ...prev,
       [peer]: [...(prev[peer] || []), optimistic],
     }));
     // 2️⃣ Actualizar icono y orden de conversaciones
-    setConversations(convs => {
-      const updated = convs.map(c =>
-        c.peerAddress === peer
-          ? { ...c, updatedAt: now, hasUnread: false }
-          : c
-      );
-      return updated.sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()));
-    });
+    setConversations((convs) =>
+      convs
+        .map((c) =>
+          c.peerAddress === peer
+            ? { ...c, updatedAt: now, hasUnread: false }
+            : c
+        )
+        .sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()))
+    );
 
-    // 3️⃣ Enviar realmente
+    // 3️⃣ Envío real
     const convo = await xmtpClient.conversations.newConversation(peer);
     await convo.send(text);
 
-    // 4️⃣ Notificar
+    // 4️⃣ Notificación
     let fid: number;
-    try { fid = await warpcast.getFidByName(peer); }
-    catch { fid = 802090; }
+    try {
+      fid = await warpcast.getFidByName(peer);
+    } catch {
+      fid = 802090;
+    }
     fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -256,14 +249,15 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
       {/* Tabs */}
       <div className="flex justify-center space-x-4 mb-4 px-2">
-        {(["all", "purchases", "sales"] as Tab[]).map(t => (
+        {(["all", "purchases", "sales"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded ${tab === t
+            className={`px-4 py-2 rounded ${
+              tab === t
                 ? "bg-purple-600 text-white"
                 : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
-              }`}
+            }`}
           >
             {t === "sales" ? "Clients" : t === "purchases" ? "Bought" : "All"}
           </button>
@@ -280,10 +274,14 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           const isSale = tab === "sales";
           const isPurchase = tab === "purchases";
           const count = isSale
-            ? soldPeers.has(lower) ? 1 : 0
+            ? soldPeers.has(lower)
+              ? 1
+              : 0
             : isPurchase
-              ? purchasedPeers.has(lower) ? 1 : 0
-              : 0;
+            ? purchasedPeers.has(lower)
+              ? 1
+              : 0
+            : 0;
 
           return (
             <motion.div
@@ -305,7 +303,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                       rel="noopener noreferrer"
                       className="hover:underline"
                     >
-                      {nameLabels[peer] || abbreviateAddress(peer)}
+                      <AddressName address={peer} />
                     </a>
                     {conv.hasUnread && <span className="text-yellow-400">📩</span>}
                   </p>
@@ -331,24 +329,30 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                   </div>
                   {(messages[peer] || []).map((m, i) => {
                     const time = m.sent
-                      ? m.sent.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                      ? m.sent.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                       : "";
                     const isMe = m.senderAddress.toLowerCase() === myAddr;
 
                     return (
                       <div
                         key={i}
-                        className={`flex flex-col text-sm text-center max-w-[80%] py-1 px-3 rounded-lg whitespace-normal break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"
-                          }`}
+                        className={`flex flex-col text-sm text-center max-w-[80%] py-1 px-3 rounded-lg whitespace-normal break-words ${
+                          isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"
+                        }`}
                         style={{ hyphens: "auto" }}
                       >
                         <div>{m.content}</div>
-                        <span className="text-[10px] text-gray-300 text-right">{time}</span>
+                        <span className="text-[10px] text-gray-300 text-right">
+                          {time}
+                        </span>
                       </div>
                     );
                   })}
 
-                  <MessageInput onSend={t => handleSend(peer, t)} />
+                  <MessageInput onSend={(t) => handleSend(peer, t)} />
                 </div>
               )}
             </motion.div>
@@ -375,14 +379,14 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               type="text"
               placeholder="ENS / Basename / Wallet"
               value={to}
-              onChange={e => setTo(e.target.value)}
+              onChange={(e) => setTo(e.target.value)}
               className="w-full p-3 bg-[#2a2438] text-white rounded-lg"
             />
             <textarea
               rows={3}
               placeholder="Message"
               value={body}
-              onChange={e => setBody(e.target.value)}
+              onChange={(e) => setBody(e.target.value)}
               className="w-full p-3 bg-[#2a2438] text-white rounded-lg"
             />
             <div className="flex justify-end space-x-2">

@@ -37,8 +37,8 @@ export default function ConversationScreen({
     const id = window.setInterval(loadMessages, 3000);
     return () => window.clearInterval(id);
   }, [xmtpClient, peerAddress]);
-
-  // Scroll automático al final
+  
+  // Scroll al final
   useEffect(() => {
     const c = scrollContainerRef.current;
     if (c) {
