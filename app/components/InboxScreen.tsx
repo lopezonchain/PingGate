@@ -32,7 +32,6 @@ interface ExtendedConversation extends Conversation {
 
 type Tab = "sales" | "purchases" | "all";
 
-// util para formatear direcciones
 function abbreviateAddress(addr: string) {
   return addr.slice(0, 6) + "…" + addr.slice(-4);
 }
@@ -53,7 +52,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   // → estados por conversación
   const [expanded, setExpanded] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, DecodedMessage[]>>({});
-  const [firstMessage, setFirstMessage] = useState<Record<string, DecodedMessage>>({});
 
   // → composer
   const [showComposer, setShowComposer] = useState(false);
@@ -67,48 +65,31 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   // 🔄 Carga, enriquece y ordena la lista de conversaciones
   useEffect(() => {
     if (!xmtpClient) return;
-
     let active = true;
     (async () => {
       setLoadingList(true);
-
-      // 1) Obtener lista
       const list = await xmtpClient.conversations.list();
-
-      // 2) Traer el último mensaje de cada conversación
       const metas = await Promise.all(
         list.map(c =>
           c.messages({ limit: 1, direction: SortDirection.SORT_DIRECTION_DESCENDING })
         )
       );
-
-      // 3) Enriquecer
       const enriched: ExtendedConversation[] = list.map((c, i) => ({
         ...c,
         updatedAt: metas[i][0]?.sent ?? null,
         hasUnread: metas[i][0]?.senderAddress.toLowerCase() !== myAddr,
       }));
-
-      // 4) Ordenar por updatedAt descendente
       enriched.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
-
       if (!active) return;
-
-      // 5) Generar labels
       const labels: Record<string, string> = {};
       enriched.forEach(c => {
         labels[c.peerAddress] = nameLabels[c.peerAddress] || abbreviateAddress(c.peerAddress);
       });
-
-      // 6) Setear estados
       setConversations(enriched);
       setNameLabels(labels);
       setLoadingList(false);
     })();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [xmtpClient, myAddr]);
 
   // Carga de peers on-chain en background
@@ -122,7 +103,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         pSet.add(svc.seller.toLowerCase());
       }
       setPurchasedPeers(pSet);
-
       const sales = await fetchSalesRecords(walletClient.account.address);
       setSoldPeers(new Set(sales.map(r => r.buyer.toLowerCase())));
     })();
@@ -134,22 +114,25 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     tab === "all"
       ? true
       : tab === "sales"
-      ? soldPeers.has(c.peerAddress.toLowerCase())
-      : purchasedPeers.has(c.peerAddress.toLowerCase())
+        ? soldPeers.has(c.peerAddress.toLowerCase())
+        : purchasedPeers.has(c.peerAddress.toLowerCase())
   );
 
+  // Polling: obtener siempre los 6 ÚLTIMOS mensajes y mostrarlos en orden ascendente
   function startPolling(peer: string) {
     stopPolling();
     pollingRef.current = window.setInterval(async () => {
       const convo = await xmtpClient!.conversations.newConversation(peer);
-      const msgs = await convo.messages({
+      // 👉 Pedimos los últimos 6 en DESCENDING
+      const lastDesc = await convo.messages({
         limit: 6,
-        direction: SortDirection.SORT_DIRECTION_ASCENDING,
+        direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
-      setMessages(m => ({ ...m, [peer]: msgs }));
+      // 👉 Invertimos para mostrarlos de más antiguo a más nuevo
+      const lastAsc = lastDesc.slice().reverse();
+      setMessages(m => ({ ...m, [peer]: lastAsc }));
     }, 3000);
   }
-
   function stopPolling() {
     if (pollingRef.current !== null) {
       window.clearInterval(pollingRef.current);
@@ -157,29 +140,26 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   }
 
-  // Carga hilo al expandir
+  // Carga hilo al expandir: igual, traemos siempre los 6 últimos
   useEffect(() => {
     if (!expanded || !xmtpClient) {
       stopPolling();
       return;
     }
     let active = true;
-
     (async () => {
       const convo = await xmtpClient.conversations.newConversation(expanded);
-      const msgs = await convo.messages({
-        limit: 50,
-        direction: SortDirection.SORT_DIRECTION_ASCENDING,
+      // Últimos 6 en DESCENDING
+      const lastDesc = await convo.messages({
+        limit: 6,
+        direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
+      const lastAsc = lastDesc.slice().reverse();
       if (active) {
-        setMessages(m => ({ ...m, [expanded]: msgs }));
-        if (msgs[0]) {
-          setFirstMessage(fm => ({ ...fm, [expanded]: msgs[0] }));
-        }
+        setMessages(m => ({ ...m, [expanded]: lastAsc }));
       }
       startPolling(expanded);
     })();
-
     return () => {
       active = false;
       stopPolling();
@@ -188,19 +168,39 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
   const warpcast = new WarpcastService();
 
+  // Envío de mensaje con actualización optimista (sin recargar hilo)
   const handleSend = async (peer: string, text: string) => {
     if (!xmtpClient || !text.trim()) return;
+    const now = new Date();
+    const optimistic: DecodedMessage = {
+      content: text,
+      sent: now,
+      senderAddress: myAddr,
+    } as any;
 
+    // 1️⃣ Insertar optimista
+    setMessages(prev => ({
+      ...prev,
+      [peer]: [...(prev[peer] || []), optimistic],
+    }));
+    // 2️⃣ Actualizar icono y orden de conversaciones
+    setConversations(convs => {
+      const updated = convs.map(c =>
+        c.peerAddress === peer
+          ? { ...c, updatedAt: now, hasUnread: false }
+          : c
+      );
+      return updated.sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()));
+    });
+
+    // 3️⃣ Enviar realmente
     const convo = await xmtpClient.conversations.newConversation(peer);
     await convo.send(text);
 
+    // 4️⃣ Notificar
     let fid: number;
-    try {
-      fid = await warpcast.getFidByName(peer);
-    } catch {
-      fid = 802090;
-    }
-
+    try { fid = await warpcast.getFidByName(peer); }
+    catch { fid = 802090; }
     fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -213,14 +213,9 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         },
       }),
     }).catch(console.error);
-
-    const msgs = await convo.messages({
-      limit: 6,
-      direction: SortDirection.SORT_DIRECTION_ASCENDING,
-    });
-    setMessages(m => ({ ...m, [peer]: msgs }));
   };
 
+  // Nuevo hilo
   const handleCreate = async () => {
     setSending(true);
     setErr(null);
@@ -265,11 +260,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded ${
-              tab === t
+            className={`px-4 py-2 rounded ${tab === t
                 ? "bg-purple-600 text-white"
                 : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
-            }`}
+              }`}
           >
             {t === "sales" ? "Clients" : t === "purchases" ? "Bought" : "All"}
           </button>
@@ -286,14 +280,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           const isSale = tab === "sales";
           const isPurchase = tab === "purchases";
           const count = isSale
-            ? soldPeers.has(lower)
-              ? 1
-              : 0
+            ? soldPeers.has(lower) ? 1 : 0
             : isPurchase
-            ? purchasedPeers.has(lower)
-              ? 1
-              : 0
-            : 0;
+              ? purchasedPeers.has(lower) ? 1 : 0
+              : 0;
 
           return (
             <motion.div
@@ -333,14 +323,12 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
               {isOpen && (
                 <div className="px-4 pb-4 space-y-2 max-h-[50%] overflow-y-auto">
-                  {firstMessage[peer] && (
-                    <div
-                      onClick={() => router.push(`/conversation/${peer}`)}
-                      className="cursor-pointer italic text-sm p-2 rounded-lg bg-[#2a2438] hover:bg-[#3a3345] flex justify-center"
-                    >
-                      Open full conversation
-                    </div>
-                  )}
+                  <div
+                    onClick={() => router.push(`/conversation/${peer}`)}
+                    className="cursor-pointer italic text-sm p-2 rounded-lg bg-[#2a2438] hover:bg-[#3a3345] flex justify-center"
+                  >
+                    Open full conversation
+                  </div>
                   {(messages[peer] || []).map((m, i) => {
                     const time = m.sent
                       ? m.sent.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -350,9 +338,8 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                     return (
                       <div
                         key={i}
-                        className={`flex flex-col text-sm text-center max-w-[80%] py-1 px-3 rounded-lg whitespace-normal break-words ${
-                          isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"
-                        }`}
+                        className={`flex flex-col text-sm text-center max-w-[80%] py-1 px-3 rounded-lg whitespace-normal break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"
+                          }`}
                         style={{ hyphens: "auto" }}
                       >
                         <div>{m.content}</div>
