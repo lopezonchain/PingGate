@@ -89,7 +89,7 @@ export async function POST(request: Request) {
         await sendFrameNotification({
           fid,
           title: `Welcome to ${appName}`,
-          body: `Chat securely. Or start offering a chat service and monetize your inbox. Wallet to wallet messages with Farcaster notifications`,
+          body: `Privately chat with wallet to wallet encryption. Find experts. Start offering a chat service and monetize your inbox. Wallet to wallet messages with Farcaster notifications`,
         });
       } else {
         await deleteUserNotificationDetails(fid);

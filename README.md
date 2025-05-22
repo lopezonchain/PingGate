@@ -2,7 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-green)](#license) [![Version](https://img.shields.io/badge/version-0.1.0-blue)](#)
 <div align="center">
-  Monetize your inbox or talk with experts — Platform powered by XMTP & Base
+  Chat privately with wallet to wallet encryption. Monetize your inbox or talk with experts.- Platform powered by XMTP, Farcaster & Base
 <br/><br/>
   <img
     src="https://pinggate.lopezonchain.xyz/PingGateLogo.png"

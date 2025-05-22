@@ -116,7 +116,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     pollingRef.current = window.setInterval(async () => {
       const convo = await xmtpClient!.conversations.newConversation(peer);
       const lastDesc = await convo.messages({
-        limit: 6,
+        limit: 5,
         direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
       const lastAsc = lastDesc.slice().reverse();
@@ -140,7 +140,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     (async () => {
       const convo = await xmtpClient.conversations.newConversation(expanded);
       const lastDesc = await convo.messages({
-        limit: 6,
+        limit: 5,
         direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
       const lastAsc = lastDesc.slice().reverse();
