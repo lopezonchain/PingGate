@@ -15,10 +15,7 @@ interface AddressNameProps {
 }
 
 /**
- * Muestra primero la dirección acortada,
- * luego intenta resolver el FID en Farcaster (via WarpcastService#getFidByAddress),
- * carga el perfil (username/displayName y pfp) con WarpcastService#getProfileByFid,
- * y si no encuentra nada, hace fallback a ENS.
+ * Muestra primero la dirección acortada, resuelve ENS.
  */
 export default function AddressName({ address }: AddressNameProps) {
   const [label, setLabel] = useState<string>(abbreviateAddress(address));
@@ -29,28 +26,7 @@ export default function AddressName({ address }: AddressNameProps) {
     const warpcast = new WarpcastService();
 
     async function lookup() {
-      // 1️⃣ Intentar resolver Farcaster FID a partir de la dirección
-      try {
-        const fid = await warpcast.getFidByAddress(address);
-        if (mounted && fid) {
-          // 2️⃣ Obtener perfil de Farcaster por FID
-          const profile = await warpcast.getProfileByFid(fid);
-        if (mounted) {
-        // elegimos displayName > username > fallback a dirección
-        const name = profile.displayName ?? profile.username ?? abbreviateAddress(address);
-        setLabel(name);
-
-        // si hay URL de avatar, la usamos
-        if (profile.pfpUrl) {
-            setAvatarUrl(profile.pfpUrl);
-        }
-        return;
-        }
-        }
-      } catch (e) {
-        // Si falla Farcaster, seguiremos al ENS
-        console.warn("Warpcast lookup failed:", e);
-      }
+      
 
       // 3️⃣ Fallback a ENS
       try {
