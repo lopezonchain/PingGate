@@ -195,15 +195,39 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   // Envío de mensaje + notificación
   const handleSend = async (peer: string, text: string) => {
     if (!xmtpClient || !text.trim()) return;
+
+    // Cargar conversacion
     const convo = await xmtpClient.conversations.newConversation(peer);
+
+    // Comprobar hora del último mensaje previo
+    const conv = conversations.find(c => c.peerAddress.toLowerCase() === peer);
+    const lastSent = conv?.updatedAt;
+    const now = new Date();
+    const THIRTY_MIN = 30 * 60 * 1000;
+
+    // Enviar el mensaje
     await convo.send(text);
+
+    // Si existe lastSent y ha sido hace < 30 min, no notificamos
+    if (lastSent && (now.getTime() - lastSent.getTime()) < THIRTY_MIN) {
+      return;
+    }
+
+    // Obtener el FID
     const profile = profilesMap[peer];
     let fid = 0;
-    if ((profile as Web3BioProfile).social?.uid) fid = (profile as Web3BioProfile).social.uid;
-    else {
-      try { fid = await warpcast.getFidByName(peer); } catch { };
+    if ((profile as Web3BioProfile).social?.uid) {
+      fid = (profile as Web3BioProfile).social.uid;
+    } else {
+      try {
+        fid = await warpcast.getFidByName(peer);
+      } catch { }
     }
+
+    // Título con nombre resuelto o fallback
     const displayName = context?.user?.displayName ?? myName;
+
+    // Disparar notificación
     fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -213,7 +237,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           title: `New message from ${displayName}`,
           body: text
         },
-        targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`
+        targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
       }),
     })
       .then(async res => {
@@ -254,22 +278,26 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   if (loadingList)
     return <>
       <div className="flex-1 flex items-center justify-center text-gray-400 mt-16 mb-8">Loading…</div>
-      <div className="bg-[#1a1725] text-gray-400 text-center rounded-lg shadow-md p-6 max-w-md text-black">
-        <div className="flex justify-start items-center">
-          <FiHelpCircle className="w-6 h-6" />
-          <h2 className="m-2 text-lg font-semibold mb-2">
-            Why do I need to sign something?
-          </h2>
-        </div>
-        <p>
-          XMTP requires a signature so you can start receiving messages the first time you join PingGate.<br /><br />
-          An additional signature is needed each time you access back to your messages, to
-          decrypt them for reading, since all messages are secure and wallet2wallet encrypted, this means
-          only you and your conversation partner can view the content.
+      {!xmtpClient && (
+        <div className="bg-[#1a1725] text-gray-400 text-center rounded-lg shadow-md p-6 max-w-md text-black">
+          <div className="flex justify-start items-center">
+            <FiHelpCircle className="w-6 h-6" />
+            <h2 className="m-2 text-lg font-semibold mb-2">
+              Why do I need to sign something?
+            </h2>
+          </div>
+          <p>
+            XMTP requires a signature so you can start receiving messages the first time you join PingGate.<br/><br/>
+            An additional signature is needed each time you access back to your messages, to
+            decrypt them for reading, since all messages are secure and wallet2wallet encrypted, this means
+            only you and your conversation partner can view the content.
 
-          <a className="block p-3" href="https://docs.xmtp.org/intro/intro">More info (What is XMTP? Official docs)</a>
-        </p>
-      </div>
+            <a className="block p-3" href="https://docs.xmtp.org/intro/intro">
+              More info (What is XMTP? Official docs)
+            </a>
+          </p>
+        </div>
+      )}
     </>;
 
   return (
