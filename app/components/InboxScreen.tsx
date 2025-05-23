@@ -1,7 +1,6 @@
 // src/components/InboxScreen.tsx
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
 import React, { useEffect, useState } from "react";
 import { Conversation, DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
