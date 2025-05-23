@@ -28,7 +28,9 @@ interface ExtendedConversation extends Conversation {
 type Tab = "sales" | "purchases" | "all";
 
 function abbreviateAddress(addr: string) {
-  return addr.slice(0, 6) + "…" + addr.slice(-4);
+  const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(addr);
+  if (!isEthAddress) return addr;
+  return addr.slice(0, 7) + "…" + addr.slice(-5);
 }
 
 export default function InboxScreen({ onBack }: InboxScreenProps) {
@@ -243,7 +245,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         {filtered.map((conv, idx) => {
           const peer = conv.peerAddress.toLowerCase();
           const entry = profilesMap[peer];
-          const label = entry ? entry.displayName : abbreviateAddress(peer);
+          const label = abbreviateAddress(entry.displayName);
           const avatarUrl = entry?.avatar || null;
           const isOpen = expanded === peer;
           const isSale = tab === "sales";
