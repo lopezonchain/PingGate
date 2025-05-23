@@ -17,6 +17,7 @@ import {
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import { useRouter } from "next/navigation";
 import MessageInput from "./MessageInput";
+import { useMiniKit } from "@coinbase/onchainkit/minikit";
 
 interface InboxScreenProps {
   onBack: () => void;
@@ -36,6 +37,7 @@ function abbreviateAddress(addr: string) {
 
 export default function InboxScreen({ onBack }: InboxScreenProps) {
   const router = useRouter();
+  const { context } = useMiniKit();
   const { data: walletClient } = useWalletClient();
   const { xmtpClient, error: xmtpError } = useXmtpClient();
   const myAddr = walletClient?.account.address.toLowerCase() || "";
@@ -159,10 +161,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         const isMe = msg.senderAddress.toLowerCase() === myAddr;
         setConversations(prev =>
           prev.map(c =>
-              c.peerAddress.toLowerCase() === peer
-                ? { ...c, updatedAt: msg.sent, hasUnread: !isMe }
-                : c
-            )
+            c.peerAddress.toLowerCase() === peer
+              ? { ...c, updatedAt: msg.sent, hasUnread: !isMe }
+              : c
+          )
             .sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()))
         );
       }
@@ -199,31 +201,31 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     let fid = 0;
     if ((profile as Web3BioProfile).social?.uid) fid = (profile as Web3BioProfile).social.uid;
     else {
-      try { fid = await warpcast.getFidByName(peer); } catch {};
-  }
-    
-fetch("/api/notify", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    fid,
-    notification: {
-      title: `New message from ${myName}`,
-      body: text
-    },
-    targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`
-  }),
-})
-  .then(async res => {
-    if (!res.ok) {
-      const err = await res.json();
-      console.error("Notification error:", err);
-      return;
+      try { fid = await warpcast.getFidByName(peer); } catch { };
     }
-    const data = await res.json();
-    console.log("Notification sent:", data);
-  })
-  .catch(console.error);
+    const displayName = context?.user?.displayName ?? myName;
+    fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fid,
+        notification: {
+          title: `New message from ${displayName}`,
+          body: text
+        },
+        targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`
+      }),
+    })
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json();
+          console.error("Notification error:", err);
+          return;
+        }
+        const data = await res.json();
+        console.log("Notification sent:", data);
+      })
+      .catch(console.error);
   };
 
   // Nuevo hilo
@@ -249,26 +251,26 @@ fetch("/api/notify", {
     return true;
   });
 
-  if (loadingList) 
-  return <>
-  <div className="flex-1 flex items-center justify-center text-gray-400 mt-16 mb-8">Loading…</div>
-  <div className="bg-[#1a1725] text-gray-400 text-center rounded-lg shadow-md p-6 max-w-md text-black">
-            <div className="flex justify-start items-center">
-              <FiHelpCircle className="w-6 h-6" />
-              <h2 className="m-2 text-lg font-semibold mb-2">
-                Why do I need to sign something?
-              </h2>
-            </div>
-            <p>
-              XMTP requires a signature so you can start receiving messages the first time you join PingGate.<br/><br/>
-              An additional signature is needed each time you access back to your messages, to
-              decrypt them for reading, since all messages are secure and wallet2wallet encrypted, this means
-              only you and your conversation partner can view the content.
+  if (loadingList)
+    return <>
+      <div className="flex-1 flex items-center justify-center text-gray-400 mt-16 mb-8">Loading…</div>
+      <div className="bg-[#1a1725] text-gray-400 text-center rounded-lg shadow-md p-6 max-w-md text-black">
+        <div className="flex justify-start items-center">
+          <FiHelpCircle className="w-6 h-6" />
+          <h2 className="m-2 text-lg font-semibold mb-2">
+            Why do I need to sign something?
+          </h2>
+        </div>
+        <p>
+          XMTP requires a signature so you can start receiving messages the first time you join PingGate.<br /><br />
+          An additional signature is needed each time you access back to your messages, to
+          decrypt them for reading, since all messages are secure and wallet2wallet encrypted, this means
+          only you and your conversation partner can view the content.
 
-              <a className="block p-3" href="https://docs.xmtp.org/intro/intro">More info (What is XMTP? Official docs)</a>
-            </p>
-          </div>
-  </>;
+          <a className="block p-3" href="https://docs.xmtp.org/intro/intro">More info (What is XMTP? Official docs)</a>
+        </p>
+      </div>
+    </>;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 max-h-[97%] bg-[#0f0d14] text-white relative">
@@ -284,7 +286,7 @@ fetch("/api/notify", {
           <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded ${tab === t
             ? "bg-purple-600 text-white"
             : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
-          }`}>
+            }`}>
             {t === "sales" ? "Clients" : t === "purchases" ? "Bought" : "All"}
           </button>
         ))}
@@ -304,8 +306,8 @@ fetch("/api/notify", {
           const count = isSale
             ? soldPeers.has(peer) ? 1 : 0
             : isPurchase
-            ? purchasedPeers.has(peer) ? 1 : 0
-            : 0;
+              ? purchasedPeers.has(peer) ? 1 : 0
+              : 0;
 
           return (
             <motion.div key={peer} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="bg-[#1a1725] rounded-xl overflow-hidden">
