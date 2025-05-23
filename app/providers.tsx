@@ -71,8 +71,8 @@ function MiniKitWrapper({ children }: { children: ReactNode }) {
       chain={selectedChain}
       config={{
         appearance: {
-          mode: "dark",
-          theme: "default",
+          mode: "auto",
+          theme: "mini-app-theme",
           name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME,
           logo: process.env.NEXT_PUBLIC_ICON_URL,
         },

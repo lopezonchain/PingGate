@@ -4,101 +4,98 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --app-background: #ffffff;
-  --app-foreground: #111111;
-  --app-foreground-muted: #58585c;
-  --app-accent: #0052ff;
-  --app-accent-hover: #0047e1;
-  --app-accent-active: #003db8;
-  --app-accent-light: #e6edff;
-  --app-gray: #f5f5f5;
-  --app-gray-dark: #e0e0e0;
-  --app-card-bg: rgba(255, 255, 255, 0.4);
-  --app-card-border: rgba(0, 0, 0, 0.1);
-}
+/* Todas las variables definidas en <body> para cubrir toda la aplicación */
+body {
+  /* Tokens de PingGate (Dark Mode) */
+  --pg-bg: #1A171B !important;
+  --pg-fg: #ececec !important;
+  --pg-fg-muted: #949494 !important;
+  --pg-accent: #8565CB !important;
+  --pg-accent-hover: #7A57C2 !important;
+  --pg-accent-active: #6E4FB7 !important;
+  --pg-accent-light: #1a1725 !important;
+  --pg-gray: #1A171B !important;
+  --pg-gray-dark: #1A171B !important;
+  --pg-card-bg: #1A171B !important;
+  --pg-card-border: rgba(133, 101, 203, 1) !important;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --app-background: #111111;
-    --app-foreground: #ffffff;
-    --app-foreground-muted: #c8c8d1;
-    --app-accent: #0052ff;
-    --app-accent-hover: #0047e1;
-    --app-accent-active: #003db8;
-    --app-accent-light: #1e293b;
-    --app-gray: #1e1e1e;
-    --app-gray-dark: #2e2e2e;
-    --app-card-bg: rgba(17, 17, 17, 0.4);
-    --app-card-border: rgba(115, 115, 115, 0.5);
-  }
-}
+  /* Mapeo de app/** variables basadas en tokens */
+  --app-background: var(--pg-bg) !important;
+  --app-foreground: var(--pg-fg) !important;
+  --app-foreground-muted: var(--pg-fg-muted) !important;
+  --app-accent: var(--pg-accent) !important;
+  --app-accent-hover: var(--pg-accent-hover) !important;
+  --app-accent-active: var(--pg-accent-active) !important;
+  --app-accent-light: var(--pg-accent-light) !important;
+  --app-gray: var(--pg-gray) !important;
+  --app-gray-dark: var(--pg-gray-dark) !important;
+  --app-card-bg: var(--pg-card-bg) !important;
+  --app-card-border: var(--pg-card-border) !important;
 
-.mini-app-theme {
-  --ock-font-family: "Geist", sans-serif;
-  --ock-border-radius: 0.75rem;
-  --ock-border-radius-inner: 0.5rem;
+  /* Variables OCK dentro de la mini-app-theme, movidas también a body */
+  --ock-font-family: "Geist", sans-serif !important;
+  --ock-border-radius: 0.75rem !important;
+  --ock-border-radius-inner: 0.5rem !important;
 
   /* Text colors */
-  --ock-text-inverse: var(--app-background);
-  --ock-text-foreground: var(--app-foreground);
-  --ock-text-foreground-muted: var(--app-foreground-muted);
-  --ock-text-error: #ef4444;
-  --ock-text-primary: var(--app-accent);
-  --ock-text-success: #22c55e;
-  --ock-text-warning: #f59e0b;
-  --ock-text-disabled: #a1a1aa;
+  --ock-text-inverse: var(--app-background) !important;
+  --ock-text-foreground: var(--app-foreground) !important;
+  --ock-text-foreground-muted: var(--app-foreground-muted) !important;
+  --ock-text-error: #EF4444 !important;
+  --ock-text-primary: var(--app-accent) !important;
+  --ock-text-success: #22C55E !important;
+  --ock-text-warning: #F59E0B !important;
+  --ock-text-disabled: #A1A1AA !important;
 
   /* Background colors */
-  --ock-bg-default: var(--app-background);
-  --ock-bg-default-hover: var(--app-gray);
-  --ock-bg-default-active: var(--app-gray-dark);
-  --ock-bg-alternate: var(--app-gray);
-  --ock-bg-alternate-hover: var(--app-gray-dark);
-  --ock-bg-alternate-active: var(--app-gray-dark);
-  --ock-bg-inverse: var(--app-foreground);
-  --ock-bg-inverse-hover: #2a2a2a;
-  --ock-bg-inverse-active: #3a3a3a;
-  --ock-bg-primary: var(--app-accent);
-  --ock-bg-primary-hover: var(--app-accent-hover);
-  --ock-bg-primary-active: var(--app-accent-active);
-  --ock-bg-primary-washed: var(--app-accent-light);
-  --ock-bg-primary-disabled: #80a8ff;
-  --ock-bg-secondary: var(--app-gray);
-  --ock-bg-secondary-hover: var(--app-gray-dark);
-  --ock-bg-secondary-active: #d1d1d1;
-  --ock-bg-error: #fee2e2;
-  --ock-bg-warning: #fef3c7;
-  --ock-bg-success: #dcfce7;
-  --ock-bg-default-reverse: var(--app-foreground);
+  --ock-bg-default: var(--app-background) !important;
+  --ock-bg-default-hover: var(--app-gray) !important;
+  --ock-bg-default-active: var(--app-gray-dark) !important;
+  --ock-bg-alternate: var(--app-gray) !important;
+  --ock-bg-alternate-hover: var(--app-gray-dark) !important;
+  --ock-bg-alternate-active: var(--app-gray-dark) !important;
+  --ock-bg-inverse: var(--app-foreground) !important;
+  --ock-bg-inverse-hover: #2a2a2a !important;
+  --ock-bg-inverse-active: #3a3a3a !important;
+  --ock-bg-primary: var(--app-accent) !important;
+  --ock-bg-primary-hover: var(--app-accent-hover) !important;
+  --ock-bg-primary-active: var(--app-accent-active) !important;
+  --ock-bg-primary-washed: var(--app-accent-light) !important;
+  --ock-bg-primary-disabled: #80a8ff !important;
+  --ock-bg-secondary: var(--app-gray) !important;
+  --ock-bg-secondary-hover: var(--app-gray-dark) !important;
+  --ock-bg-secondary-active: #d1d1d1 !important;
+  --ock-bg-error: #fee2e2 !important;
+  --ock-bg-warning: #fef3c7 !important;
+  --ock-bg-success: #dcfce7 !important;
+  --ock-bg-default-reverse: var(--app-foreground) !important;
 
   /* Icon colors */
-  --ock-icon-color-primary: var(--app-accent);
-  --ock-icon-color-foreground: var(--app-foreground);
-  --ock-icon-color-foreground-muted: #71717a;
-  --ock-icon-color-inverse: var(--app-background);
-  --ock-icon-color-error: #ef4444;
-  --ock-icon-color-success: #22c55e;
-  --ock-icon-color-warning: #f59e0b;
+  --ock-icon-color-primary: var(--app-accent) !important;
+  --ock-icon-color-foreground: var(--app-foreground) !important;
+  --ock-icon-color-foreground-muted: #71717a !important;
+  --ock-icon-color-inverse: var(--app-background) !important;
+  --ock-icon-color-error: #ef4444 !important;
+  --ock-icon-color-success: #22c55e !important;
+  --ock-icon-color-warning: #f59e0b !important;
 
   /* Line colors */
-  --ock-line-primary: var(--app-accent);
-  --ock-line-default: var(--app-gray-dark);
-  --ock-line-heavy: #a1a1aa;
-  --ock-line-inverse: #d4d4d8;
+  --ock-line-primary: var(--app-accent) !important;
+  --ock-line-default: var(--app-gray-dark) !important;
+  --ock-line-heavy: #a1a1aa !important;
+  --ock-line-inverse: #d4d4d8 !important;
+
+  /* Estilos base */
+  color: var(--app-foreground) !important;
+  background: var(--app-background) !important;
+  font-family: var(--font-geist-sans), sans-serif !important;
+  font-optical-sizing: auto !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
 }
 
 * {
   touch-action: manipulation;
-}
-
-body {
-  color: var(--app-foreground);
-  background: var(--app-background);
-  font-family: var(--font-geist-sans), sans-serif;
-  font-optical-sizing: auto;
-  font-weight: 400;
-  font-style: normal;
 }
 
 @layer utilities {
@@ -116,22 +113,12 @@ body {
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes fadeOut {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
+  0% { opacity: 1; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
 }
