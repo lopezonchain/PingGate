@@ -72,7 +72,7 @@ function MiniKitWrapper({ children }: { children: ReactNode }) {
       config={{
         appearance: {
           mode: "dark",
-          theme: "default",
+          theme: "defaul",
           name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME,
           logo: process.env.NEXT_PUBLIC_ICON_URL,
         },
