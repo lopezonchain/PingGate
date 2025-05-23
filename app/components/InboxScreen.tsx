@@ -25,11 +25,18 @@ interface ExtendedConversation extends Conversation {
   updatedAt?: Date;
   hasUnread?: boolean;
 }
+
 type Tab = "sales" | "purchases" | "all";
 
+// Acorta direcciones
 function abbreviateAddress(addr: string) {
   return addr.slice(0, 6) + "…" + addr.slice(-4);
 }
+
+// Unión de tipo para perfil real o fallback ENS
+type ProfileEntry =
+  | Web3BioProfile
+  | { displayName: string; avatar: string | null };
 
 export default function InboxScreen({ onBack }: InboxScreenProps) {
   const router = useRouter();
@@ -37,15 +44,14 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const { xmtpClient, error: xmtpError } = useXmtpClient();
   const myAddr = walletClient?.account.address.toLowerCase() || "";
 
-  // — Todos los hooks al tope —
+  // — Hooks al tope —
   const [conversations, setConversations] = useState<ExtendedConversation[]>([]);
   const [purchasedPeers, setPurchasedPeers] = useState<Set<string>>(new Set());
   const [soldPeers, setSoldPeers] = useState<Set<string>>(new Set());
   const [loadingList, setLoadingList] = useState(true);
 
-  const [resolvedNames, setResolvedNames] = useState<{
-    [address: string]: { label: string; avatarUrl: string | null };
-  }>({});
+  // Mapa de peerAddress → perfil (Web3.bio o fallback ENS)
+  const [profilesMap, setProfilesMap] = useState<Record<string, ProfileEntry>>({});
 
   const [expanded, setExpanded] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, DecodedMessage[]>>({});
@@ -57,12 +63,9 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Muevo el hook de tab **antes** de cualquier return
   const [tab, setTab] = useState<Tab>("all");
 
   const warpcast = new WarpcastService();
-
-  // — Efectos y lógica igual que antes —
 
   // 1️⃣ Cargo & ordeno conversaciones
   useEffect(() => {
@@ -81,9 +84,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         updatedAt: metas[i][0]?.sent ?? null,
         hasUnread: metas[i][0]?.senderAddress.toLowerCase() !== myAddr,
       }));
-      enriched.sort(
-        (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
-      );
+      enriched.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
       if (active) {
         setConversations(enriched);
         setLoadingList(false);
@@ -109,139 +110,122 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     })();
   }, [walletClient]);
 
-  // 3️⃣ Batch Farcaster lookup + fallback ENS
+  // 3️⃣ Batch Farcaster lookup + fallback ENS → guarda en profilesMap
   useEffect(() => {
     if (conversations.length === 0) return;
 
-    const peers = Array.from(
-      new Set(conversations.map((c) => c.peerAddress.toLowerCase()))
-    );
-    const ids = peers.map((addr) => `farcaster,${addr}`);
+    const peers = Array.from(new Set(conversations.map(c => c.peerAddress.toLowerCase())));
+    const ids = peers.map(addr => `farcaster,${addr}`);
 
     (async () => {
-      const newResolved: typeof resolvedNames = {};
+      const newProfiles: Record<string, ProfileEntry> = {};
+
       try {
         const profiles = await warpcast.getWeb3BioProfiles(ids);
+
+        // Map alias → perfil completo
         const aliasMap: Record<string, Web3BioProfile> = {};
-        profiles.forEach((p) => {
-          p.aliases.forEach((alias) => {
-            // alias tiene formato "farcaster,0x123..."
+        profiles.forEach(p => {
+          p.aliases.forEach(alias => {
             const [, id] = alias.split(",");
             aliasMap[id.toLowerCase()] = p;
           });
         });
 
-        // Asignamos los que matcheen por alias, no por address
-        peers.forEach((addr) => {
+        // Asigna perfiles encontrados
+        peers.forEach(addr => {
           const p = aliasMap[addr];
           if (p) {
-            newResolved[addr] = {
-              label: p.displayName,
-              avatarUrl: p.avatar,
-            };
+            newProfiles[addr] = p;
           }
         });
       } catch (e) {
         console.error("Batch Farcaster lookup failed:", e);
       }
 
-      await Promise.all(
-        peers.map(async (addr) => {
-          if (newResolved[addr]) return;
-          try {
-            const ens = await shortenAddress(await resolveNameLabel(addr));
-            newResolved[addr] = {
-              label: ens || abbreviateAddress(addr),
-              avatarUrl: null,
-            };
-          } catch {
-            newResolved[addr] = {
-              label: abbreviateAddress(addr),
-              avatarUrl: null,
-            };
-          }
-        })
-      );
-      setResolvedNames(newResolved);
+      // Fallback ENS para los que faltan
+      await Promise.all(peers.map(async addr => {
+        if (newProfiles[addr]) return;
+        try {
+          const ens = await resolveNameLabel(addr);
+          newProfiles[addr] = {
+            displayName: ens || abbreviateAddress(addr),
+            avatar: null
+          };
+        } catch {
+          newProfiles[addr] = {
+            displayName: abbreviateAddress(addr),
+            avatar: null
+          };
+        }
+      }));
+
+      setProfilesMap(newProfiles);
     })();
   }, [conversations]);
 
-
-  // 4️⃣ Stream global para actualizar solo el listado (hora + unread + reorden)
+  // 4️⃣ Stream global → actualiza lista (hora, unread, orden)
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
-
     (async () => {
       const msgStream = await xmtpClient.conversations.streamAllMessages();
       for await (const msg of msgStream) {
         if (!active) break;
         const peer = msg.conversation.peerAddress.toLowerCase();
         const isMe = msg.senderAddress.toLowerCase() === myAddr;
-
-        setConversations((prev) =>
+        setConversations(prev =>
           prev
-            .map((c) =>
+            .map(c =>
               c.peerAddress === peer
-                ? {
-                  ...c,
-                  updatedAt: msg.sent,
-                  hasUnread: !isMe,
-                }
+                ? { ...c, updatedAt: msg.sent, hasUnread: !isMe }
                 : c
             )
             .sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()))
         );
       }
     })().catch(console.error);
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [xmtpClient, myAddr]);
 
-  // 5️⃣ Stream por conversación expandida para mostrar mensajes en vivo
+  // 5️⃣ Stream por conversación expandida → muestra mensajes
   useEffect(() => {
     if (!xmtpClient || !expanded) return;
     let active = true;
-
     (async () => {
       const convo = await xmtpClient.conversations.newConversation(expanded);
       const msgStream = await convo.streamMessages();
       for await (const msg of msgStream) {
         if (!active) break;
-        setMessages((all) => ({
+        setMessages(all => ({
           ...all,
-          [expanded]: [...(all[expanded] || []), msg],
+          [expanded]: [...(all[expanded] || []), msg]
         }));
       }
     })().catch(console.error);
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [xmtpClient, expanded]);
 
-  // Polling helpers
+  // Polling helpers (fallback si no se expande el hilo)
   function startPolling(peer: string) {
     stopPolling();
     pollingRef.current = window.setInterval(async () => {
       const convo = await xmtpClient!.conversations.newConversation(peer);
       const lastDesc = await convo.messages({
         limit: 5,
-        direction: SortDirection.SORT_DIRECTION_DESCENDING,
+        direction: SortDirection.SORT_DIRECTION_DESCENDING
       });
-      setMessages((m) => ({ ...m, [peer]: lastDesc.slice().reverse() }));
+      setMessages(m => ({ ...m, [peer]: lastDesc.slice().reverse() }));
     }, 3000);
   }
   function stopPolling() {
     if (pollingRef.current !== null) {
-      window.clearInterval(pollingRef.current);
+      clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
   }
 
-  // Carga de hilo al expandir
+  // Expansión de hilo
   useEffect(() => {
     if (!expanded || !xmtpClient) {
       stopPolling();
@@ -252,10 +236,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       const convo = await xmtpClient.conversations.newConversation(expanded);
       const lastDesc = await convo.messages({
         limit: 5,
-        direction: SortDirection.SORT_DIRECTION_DESCENDING,
+        direction: SortDirection.SORT_DIRECTION_DESCENDING
       });
       if (active) {
-        setMessages((m) => ({ ...m, [expanded]: lastDesc.slice().reverse() }));
+        setMessages(m => ({ ...m, [expanded]: lastDesc.slice().reverse() }));
       }
       startPolling(expanded);
     })();
@@ -265,29 +249,60 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     };
   }, [expanded, xmtpClient]);
 
-  // Envío optimista + real + notificación
+  // Envío + notificación usando social.uid si existe
   const handleSend = async (peer: string, text: string) => {
     if (!xmtpClient || !text.trim()) return;
     const now = new Date();
+
+    // Optimistic UI
+    const optimistic: DecodedMessage = {
+      content: text,
+      sent: now,
+      senderAddress: myAddr
+    } as any;
+    setMessages(prev => ({
+      ...prev,
+      [peer]: [...(prev[peer] || []), optimistic]
+    }));
+    setConversations(prev =>
+      prev
+        .map(c =>
+          c.peerAddress === peer
+            ? { ...c, updatedAt: now, hasUnread: false }
+            : c
+        )
+        .sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()))
+    );
+
+    // Envío real
     const convo = await xmtpClient.conversations.newConversation(peer);
     await convo.send(text);
-    let fid: number;
-    try {
-      fid = await warpcast.getFidByName(peer);
-    } catch {
-      fid = 802090;
+
+    // Determina FID destino
+    const entry = profilesMap[peer];
+    let fid: number = 0;
+    if ("social" in (entry as Web3BioProfile) && (entry as Web3BioProfile).social?.uid) {
+      fid = (entry as Web3BioProfile).social.uid;
+    } else {
+      try {
+        fid = await warpcast.getFidByName(peer);
+      } catch {
+        fid = 0;
+      }
     }
+
+    // Notificación
     fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fid,
         notification: {
-          title: `New message from ${myAddr.slice(0, 6)}…`,
+          title: `New message from ${shortenAddress(myAddr)}`,
           body: text,
-          notificationDetails: null,
-        },
-      }),
+          notificationDetails: null
+        }
+      })
     }).catch(console.error);
   };
 
@@ -311,15 +326,13 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   };
 
-  // — FILTRADO utilizando el hook de tab —
-  const filtered = conversations.filter((c) => {
+  const filtered = conversations.filter(c => {
     const lower = c.peerAddress.toLowerCase();
     if (tab === "sales") return soldPeers.has(lower);
     if (tab === "purchases") return purchasedPeers.has(lower);
     return true;
   });
 
-  // — Retorno temprano SIEMPRE después de haber declarado TODOS los hooks —
   if (loadingList) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-400 mt-16">
@@ -341,14 +354,15 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
       {/* Tabs */}
       <div className="flex justify-center space-x-4 mb-4 px-2">
-        {(["all", "purchases", "sales"] as Tab[]).map((t) => (
+        {(["all", "purchases", "sales"] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded ${tab === t
-              ? "bg-purple-600 text-white"
-              : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
-              }`}
+            className={`px-4 py-2 rounded ${
+              tab === t
+                ? "bg-purple-600 text-white"
+                : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
+            }`}
           >
             {t === "sales" ? "Clients" : t === "purchases" ? "Bought" : "All"}
           </button>
@@ -357,13 +371,12 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       {xmtpError && <p className="text-red-500 text-center mb-2">{xmtpError}</p>}
 
       {/* Lista scrollable */}
-      <div className="flex-1 overflow-y-auto px-2 space-y-4 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+      <div className="flex-1 overflow-y-auto px-2 space-y-4">
         {filtered.map((conv, idx) => {
           const peer = conv.peerAddress.toLowerCase();
-          const resolved = resolvedNames[peer] || {
-            label: abbreviateAddress(peer),
-            avatarUrl: null,
-          };
+          const entry = profilesMap[peer];
+          const label = entry ? entry.displayName : abbreviateAddress(peer);
+          const avatarUrl = entry ? entry.avatar : null;
           const isOpen = expanded === peer;
           const isSale = tab === "sales";
           const isPurchase = tab === "purchases";
@@ -372,10 +385,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               ? 1
               : 0
             : isPurchase
-              ? purchasedPeers.has(peer)
-                ? 1
-                : 0
-              : 0;
+            ? purchasedPeers.has(peer)
+              ? 1
+              : 0
+            : 0;
 
           return (
             <motion.div
@@ -389,27 +402,24 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                 className="p-4 hover:bg-[#231c32] cursor-pointer"
                 onClick={() => setExpanded(isOpen ? null : peer)}
               >
-                {/* — Nombre (y avatar) en su propia línea — */}
+                {/* Nombre + avatar */}
                 <div className="flex items-center space-x-2 mb-2">
-                  {resolved.avatarUrl && (
+                  {avatarUrl && (
                     <img
-                      src={resolved.avatarUrl}
+                      src={avatarUrl}
                       alt=""
                       className="w-5 h-5 rounded-full object-cover"
                     />
                   )}
-                  <span className="font-semibold text-white">{resolved.label}</span>
+                  <span className="font-semibold">{label}</span>
                 </div>
-
-                {/* — Fecha a la izquierda, iconos a la derecha — */}
+                {/* Fecha + iconos */}
                 <div className="flex justify-between items-center">
                   <p className="text-xs text-gray-400">
                     {conv.updatedAt?.toLocaleString() || "No messages"}
                   </p>
                   <div className="flex items-center space-x-2">
-                    {conv.hasUnread && (
-                      <span className="text-yellow-400" title="Unread">📩</span>
-                    )}
+                    {conv.hasUnread && <span className="text-yellow-400">📩</span>}
                     {(isSale || isPurchase) && (
                       <span className="text-xs text-gray-500">
                         {isSale ? `Sold: ${count}` : `Bought: ${count}`}
@@ -431,17 +441,17 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                   {(messages[peer] || []).map((m, i) => {
                     const time = m.sent
                       ? m.sent.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                       : "";
                     const isMe = m.senderAddress.toLowerCase() === myAddr;
                     return (
                       <div
                         key={i}
-                        className={`flex flex-col text-sm text-center max-w-[80%] py-1 px-3 rounded-lg whitespace-normal break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"
-                          }`}
-                        style={{ hyphens: "auto" }}
+                        className={`flex flex-col text-sm text-center max-w-[80%] py-1 px-3 rounded-lg ${
+                          isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"
+                        } whitespace-normal break-words`}
                       >
                         <div>{m.content}</div>
                         <span className="text-[10px] text-gray-300 text-right">
@@ -450,7 +460,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                       </div>
                     );
                   })}
-                  <MessageInput onSend={(t) => handleSend(peer, t)} />
+                  <MessageInput onSend={t => handleSend(peer, t)} />
                 </div>
               )}
             </motion.div>
@@ -461,7 +471,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       {/* FAB nuevo chat */}
       <button
         onClick={() => setShowComposer(true)}
-        className="fixed bottom-6 right-6 z-25 bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
+        className="fixed bottom-6 right-6 bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
         aria-label="New Conversation"
       >
         <FiPlus />
@@ -477,14 +487,14 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               type="text"
               placeholder="ENS / Basename / Wallet"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={e => setTo(e.target.value)}
               className="w-full p-3 bg-[#2a2438] text-white rounded-lg"
             />
             <textarea
               rows={3}
               placeholder="Message"
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={e => setBody(e.target.value)}
               className="w-full p-3 bg-[#2a2438] text-white rounded-lg"
             />
             <div className="flex justify-end space-x-2">
