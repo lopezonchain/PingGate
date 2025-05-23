@@ -39,7 +39,7 @@ Creators, mentors, and experts can define access tiers (plans) for DMs, consulta
 - **Smart Contract**: Solidity ^0.8.20 · Hardhat · OpenZeppelin  
 - **Wallet Integration**: Onchainkit · wagmi · viem  
 - **Messaging**: XMTP  
-- **Social**: Farcaster (FID support)
+- **Social**: Farcaster (Notifications, feed integrations)
 
 ---
 

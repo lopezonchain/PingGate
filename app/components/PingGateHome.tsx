@@ -3,7 +3,6 @@
 
 import React, { useCallback, useState } from "react";
 import {
-  FiUser,
   FiInbox,
   FiSearch,
   FiPlusCircle,
@@ -80,7 +79,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
           className="w-12 h-12 ml-4 rounded-full animate-pulse"/>
       </div>
       <p className="text-sm text-gray-400 mb-6 text-center leading-snug">
-        Monetize your inbox, connect with experts or just chat
+        Monetize your inbox, connect with experts<br/>or just chat
       </p>
 
       {/* Actions list */}
