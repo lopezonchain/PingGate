@@ -78,7 +78,7 @@ function MiniKitWrapper({ children }: { children: ReactNode }) {
         },
       }}
     >
-      <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
+      <Suspense fallback={<div className="bg-[#0F1E14]">Loading...</div>}>{children}</Suspense>
     </MiniKitProvider>
   );
 }
