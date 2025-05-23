@@ -12,6 +12,7 @@ import {
   getPurchasesBy as fetchPurchasedServiceIds,
   getSalesBy as fetchSalesRecords,
   getService as fetchServiceDetails,
+  resolveRecipient,
 } from "../services/contractService";
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import { useRouter } from "next/navigation";
@@ -200,7 +201,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     try {
       if (!xmtpClient) throw new Error("XMTP not ready");
       if (!to || !body) throw new Error("Fill all fields");
-      const addr = await resolveNameLabel(to);
+      const addr = await resolveRecipient(to);
       const convo = await xmtpClient.conversations.newConversation(addr);
       await convo.send(body);
       setShowComposer(false);
