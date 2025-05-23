@@ -62,7 +62,7 @@ export interface Web3BioProfile {
     follower: number;
     following: number;
   };
-  aliases: string[];
+  aliases?: string[];
 }
 
 export class WarpcastService {
