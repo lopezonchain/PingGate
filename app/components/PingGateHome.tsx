@@ -8,7 +8,8 @@ import {
   FiPlusCircle,
   FiInfo,
   FiStar,
-  FiAirplay
+  FiAirplay,
+  FiHelpCircle
 } from "react-icons/fi";
 import { WarpView } from "../page-client";
 import { motion } from 'framer-motion';
@@ -31,17 +32,9 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
     {
       icon: <FiInbox />,
       label: "Inbox",
-      desc: "View and reply to messages. Chats are sorted by latest activity, with unread indicators.",
+      desc: "View and reply to messages. Start new conversations",
       action: "inbox",
       enabled: true,
-      fee: 0,
-    },
-    {
-      icon: <FiPlusCircle />,
-      label: "My Services",
-      desc: "Create and manage your own paid DM or consultation offerings.",
-      action: "myplans",
-      enabled: false,
       fee: 0,
     },
     {
@@ -53,10 +46,26 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
       fee: 0,
     },
     {
+      icon: <FiPlusCircle />,
+      label: "My Services",
+      desc: "Create and manage your own paid DM or consultation offerings.",
+      action: "myplans",
+      enabled: false,
+      fee: 0,
+    },
+    {
       icon: <FiStar />,
       label: "Reviews",
       desc: "Check feedback from users or leave reviews after your own interactions.",
       action: "reviews",
+      enabled: false,
+      fee: 0,
+    },
+    {
+      icon: <FiHelpCircle />,
+      label: "FAQ",
+      desc: "Frequently Asked Questions",
+      action: "faq",
       enabled: false,
       fee: 0,
     },

@@ -32,7 +32,7 @@ import ReviewsScreen from "./components/ReviewsScreen";
 import ExploreScreen from "./components/ExploreScreen";
 import MyServicesScreen from "./components/MyServicesScreen";
 
-export type WarpView = "home" | "inbox" | "myplans" | "explore" | "reviews" ;
+export type WarpView = "home" | "inbox" | "myplans" | "explore" | "reviews" | "faq" ;
 
 const chainOptions = [
   { label: "Sepolia", chain: baseSepolia },
@@ -203,7 +203,7 @@ export default function Page(): JSX.Element {
   const { setFrameReady, isFrameReady, context } = useMiniKit();
   const addFrame = useAddFrame();
 
-  const [warpView, setWarpView] = useState<WarpView>("home");
+  const [warpView, setWarpView] = useState<WarpView>("inbox");
   const [frameAdded, setFrameAdded] = useState(false);
   const [selectedChain, setSelectedChain] = useState<any>(base);
   const triedAutoConnect = useRef(false);
@@ -319,6 +319,7 @@ export default function Page(): JSX.Element {
           {warpView === "myplans" && (<MyServicesScreen onBack={() => setWarpView("home")} />)}
           {warpView === "explore" && (<ExploreScreen onBack={() => setWarpView("home")} />)}
           {warpView === "reviews" && (<ReviewsScreen onBack={() => setWarpView("home")} />)}
+          {warpView === "faq" && (<ExploreScreen onBack={() => setWarpView("home")} />)}
         </main>
       </div>
        <WalletModal isOpen={false} onClose={function (): void {

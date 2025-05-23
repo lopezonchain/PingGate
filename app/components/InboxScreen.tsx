@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { Conversation, DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
-import { FiArrowLeft, FiMessageCircle, FiPlus } from "react-icons/fi";
+import { FiMenu, FiMessageCircle, FiPlus } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { useXmtpClient } from "../hooks/useXmtpClient";
 import { resolveNameLabel, shortenAddress } from "../services/resolveNameLabel";
@@ -218,13 +218,29 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     return true;
   });
 
-  if (loadingList) return <div className="flex-1 flex items-center justify-center text-gray-400 mt-16">Loading…</div>;
+  if (loadingList) 
+  return <>
+  <div className="flex-1 flex items-center justify-center text-gray-400 mt-16 mb-8">Loading…</div>
+  <div className="bg-[#1a1725] text-gray-400 text-center rounded-lg shadow-md p-6 max-w-md text-black">
+            <h2 className=" text-lg font-semibold mb-2">
+              Why do I need to sign a transaction?
+            </h2>
+            <p>
+              XMTP requires a signature so you can start receiving messages the first time.<br/>
+              An additional signature is needed each time you access back to your messages, to
+              decrypt them for reading, since all messages are secure and wallet2wallet encrypted,
+              only you and your conversation partner can view the content.
+
+              <a className="block p-3" href="https://docs.xmtp.org/intro/intro">More info (What is XMTP? Official docs)</a>
+            </p>
+          </div>
+  </>;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 max-h-[97%] bg-[#0f0d14] text-white relative">
       {/* Back + Title */}
       <button onClick={onBack} className="mb-4 flex items-center justify-center text-purple-400 px-4 py-2 bg-[#1a1725] rounded-lg max-w-[200px]">
-        <FiArrowLeft className="w-5 h-5 mr-2" /> Back
+        <FiMenu className="w-5 h-5 mr-2" /> Menu
       </button>
       <h2 className="text-2xl font-bold text-center mb-4">Inbox</h2>
 
