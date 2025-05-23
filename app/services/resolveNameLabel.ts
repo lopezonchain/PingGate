@@ -32,8 +32,7 @@ export async function resolveNameLabel(address: string): Promise<string> {
     console.warn("ENS reverse lookup failed:", e);
   }
 
-  // 3️⃣ Abreviado
-  return shortenAddress(lower);
+  return lower;
 }
 
 export function shortenAddress(addr: string): string {

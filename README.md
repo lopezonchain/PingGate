@@ -24,12 +24,11 @@ Creators, mentors, and experts can define access tiers (plans) for DMs, consulta
 ## 🚀 Features
 
 - **Farcaster & Coinbase Miniapp**, also available on desktop  
-- **Pay-to-message**: Users must pay to start a chat  
-- **Wallet-to-wallet communication**: Via XMTP, encrypted and direct  
-- **Custom plans**: Experts define services (e.g., consulting, support, review)  
-- **Inbox-first UX**: Directly see conversations, unread messages highlighted
-- **Social integration**: Optional Farcaster FID to boost identity and trust  
-- **Review system**: Buyers can rate and leave feedback after interaction  
+- **Wallet-to-wallet communication**: Via XMTP, wallet to wallet, end2end encryption... start owning your conversations!
+- **Monetize your Inbox**: If you start offering a service, people will have to pay to contact you.
+- **Custom plans**: Experts define services (e.g., consulting, support, review) if you don't, anyone can contact you completely free. 
+- **Social integration**: Farcaster accounts, names, feed integration.
+- **Review system**: Buyers can rate and leave feedback.
 
 ---
 
@@ -70,7 +69,7 @@ npm run dev
 ## 📈 Usage
 
 - **Inbox**: View and reply to conversations.
-- **Pay-to-Ping**: Start conversations with experts by selecting a paid plan. Payment unlocks direct chat access.
+- **Pay-to-Ping**: Start conversations with experts that started services by selecting a paid plan. Payment unlocks direct chat access.
 - **My Services**: Create and manage your own service offerings (consulting, support, feedback).
 - **Explore**: Browse other users' profiles and plans. Pay and start chatting instantly.
 - **Farcaster Identity**: Link your FID to build trust and visibility in the decentralized social space.

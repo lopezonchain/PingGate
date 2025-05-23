@@ -7,7 +7,7 @@ import { useWalletClient } from "wagmi";
 import { FiArrowLeft, FiMessageCircle, FiPlus } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { useXmtpClient } from "../hooks/useXmtpClient";
-import { resolveNameLabel } from "../services/resolveNameLabel";
+import { resolveNameLabel, shortenAddress } from "../services/resolveNameLabel";
 import {
   getPurchasesBy as fetchPurchasedServiceIds,
   getSalesBy as fetchSalesRecords,
@@ -149,7 +149,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         peers.map(async (addr) => {
           if (newResolved[addr]) return;
           try {
-            const ens = await resolveNameLabel(addr);
+            const ens = await shortenAddress(await resolveNameLabel(addr));
             newResolved[addr] = {
               label: ens || abbreviateAddress(addr),
               avatarUrl: null,
@@ -165,6 +165,64 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       setResolvedNames(newResolved);
     })();
   }, [conversations]);
+
+
+  // 4️⃣ Stream global para actualizar solo el listado (hora + unread + reorden)
+  useEffect(() => {
+    if (!xmtpClient) return;
+    let active = true;
+
+    (async () => {
+      const msgStream = await xmtpClient.conversations.streamAllMessages();
+      for await (const msg of msgStream) {
+        if (!active) break;
+        const peer = msg.conversation.peerAddress.toLowerCase();
+        const isMe = msg.senderAddress.toLowerCase() === myAddr;
+
+        setConversations((prev) =>
+          prev
+            .map((c) =>
+              c.peerAddress === peer
+                ? {
+                  ...c,
+                  updatedAt: msg.sent,
+                  hasUnread: !isMe,
+                }
+                : c
+            )
+            .sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()))
+        );
+      }
+    })().catch(console.error);
+
+    return () => {
+      active = false;
+    };
+  }, [xmtpClient, myAddr]);
+
+  // 5️⃣ Stream por conversación expandida para mostrar mensajes en vivo
+  useEffect(() => {
+    if (!xmtpClient || !expanded) return;
+    let active = true;
+
+    (async () => {
+      const convo = await xmtpClient.conversations.newConversation(expanded);
+      const msgStream = await convo.streamMessages();
+      for await (const msg of msgStream) {
+        if (!active) break;
+        setMessages((all) => ({
+          ...all,
+          [expanded]: [...(all[expanded] || []), msg],
+        }));
+      }
+    })().catch(console.error);
+
+    return () => {
+      active = false;
+    };
+  }, [xmtpClient, expanded]);
+
+
 
   // Polling helpers
   function startPolling(peer: string) {
