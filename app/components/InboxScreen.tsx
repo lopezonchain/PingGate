@@ -222,8 +222,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     };
   }, [xmtpClient, expanded]);
 
-
-
   // Polling helpers
   function startPolling(peer: string) {
     stopPolling();
@@ -271,24 +269,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const handleSend = async (peer: string, text: string) => {
     if (!xmtpClient || !text.trim()) return;
     const now = new Date();
-    const optimistic: DecodedMessage = {
-      content: text,
-      sent: now,
-      senderAddress: myAddr,
-    } as any;
-    setMessages((prev) => ({
-      ...prev,
-      [peer]: [...(prev[peer] || []), optimistic],
-    }));
-    setConversations((convs) =>
-      convs
-        .map((c) =>
-          c.peerAddress === peer
-            ? { ...c, updatedAt: now, hasUnread: false }
-            : c
-        )
-        .sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()))
-    );
     const convo = await xmtpClient.conversations.newConversation(peer);
     await convo.send(text);
     let fid: number;
