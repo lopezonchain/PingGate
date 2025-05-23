@@ -17,6 +17,7 @@ import {
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import { useRouter } from "next/navigation";
 import MessageInput from "./MessageInput";
+import { resolveEnsName } from "../services/nameResolver";
 
 interface InboxScreenProps {
   onBack: () => void;
@@ -188,11 +189,29 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     else {
       try { fid = await warpcast.getFidByName(peer); } catch {};
     }
-    fetch("/api/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fid, notification: { title: `New message from ${shortenAddress(myAddr)}`, body: text, notificationDetails: null } })
-    }).catch(console.error);
+    
+fetch("/api/notify", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    fid,
+    notification: {
+      title: `New message from ${resolveEnsName(myAddr)}`,
+      body: text
+    },
+    targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`
+  }),
+})
+  .then(async res => {
+    if (!res.ok) {
+      const err = await res.json();
+      console.error("Notification error:", err);
+      return;
+    }
+    const data = await res.json();
+    console.log("Notification sent:", data);
+  })
+  .catch(console.error);
   };
 
   // Nuevo hilo
