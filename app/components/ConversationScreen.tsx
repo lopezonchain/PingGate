@@ -1,80 +1,130 @@
+// src/components/ConversationScreen.tsx
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { DecodedMessage } from "@xmtp/xmtp-js";
+import { DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
 import { FiArrowLeft } from "react-icons/fi";
 import { useXmtpClient } from "../hooks/useXmtpClient";
+import { resolveNameLabel } from "../services/resolveNameLabel";
+import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import MessageInput from "./MessageInput";
 
-export default function ConversationScreen({
-  peerAddress,
-  onBack,
-}: {
+interface ConversationScreenProps {
   peerAddress: string;
   onBack: () => void;
-}) {
+}
+
+export default function ConversationScreen({ peerAddress, onBack }: ConversationScreenProps) {
   const { data: walletClient } = useWalletClient();
   const { xmtpClient } = useXmtpClient();
-  const [messages, setMessages] = useState<DecodedMessage[]>([]);
-  const myAddress = walletClient?.account.address.toLowerCase();
+  const myAddress = walletClient?.account.address.toLowerCase() || "";
+  const warpcast = new WarpcastService();
 
-  // Ref al contenedor de mensajes para scroll
+  const [displayName, setDisplayName] = useState<string>(peerAddress);
+  const [messages, setMessages] = useState<DecodedMessage[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Función para cargar mensajes
-  const loadMessages = async () => {
-    if (!xmtpClient) return;
-    const convo = await xmtpClient.conversations.newConversation(peerAddress);
-    const msgs = await convo.messages();
-    setMessages(msgs);
-  };
+  // 1️⃣ Resuelve Farcaster name o ENS para el header
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const addr = peerAddress.toLowerCase();
+      // Intentar Farcaster lookup
+      try {
+        const ids = [`farcaster,${addr}`];
+        const profiles = await warpcast.getWeb3BioProfiles(ids);
+        const aliasMap: Record<string, Web3BioProfile> = {};
+        profiles.forEach((p) => p.aliases?.forEach((alias) => {
+          const [, id] = alias.split(",");
+          aliasMap[id.toLowerCase()] = p;
+        }));
+        const profile = aliasMap[addr];
+        if (active && profile) {
+          setDisplayName(profile.displayName);
+          return;
+        }
+      } catch {
+        // ignora error
+      }
+      // Fallback ENS
+      try {
+        const ens = await resolveNameLabel(addr);
+        if (active && ens) {
+          setDisplayName(ens);
+        }
+      } catch {
+        if (active) {
+          setDisplayName(peerAddress);
+        }
+      }
+    })();
+    return () => { active = false; };
+  }, [peerAddress, warpcast]);
 
-  // Carga inicial + polling cada 3s
+  // 2️⃣ Fetch inicial + stream de mensajes
   useEffect(() => {
     if (!xmtpClient) return;
-    loadMessages();
-    const id = window.setInterval(loadMessages, 3000);
-    return () => window.clearInterval(id);
+    let active = true;
+    let stream: AsyncIterable<DecodedMessage>;
+
+    (async () => {
+      const convo = await xmtpClient.conversations.newConversation(peerAddress);
+      // Fetch inicial (hasta 50)
+      const initial = await convo.messages({ limit: 50, direction: SortDirection.SORT_DIRECTION_DESCENDING });
+      if (!active) return;
+      setMessages(initial.slice().reverse());
+      // Stream en tiempo real
+      stream = await convo.streamMessages();
+      for await (const msg of stream) {
+        if (!active) break;
+        setMessages((prev) => [...prev, msg]);
+      }
+    })().catch(console.error);
+
+    return () => {
+      active = false;
+      // Si el stream soporta cancelación:
+      if (stream && typeof (stream as any).return === 'function') {
+        (stream as any).return();
+      }
+    };
   }, [xmtpClient, peerAddress]);
-  
-  // Scroll al final
+
+  // 3️⃣ Auto-scroll on new message
   useEffect(() => {
-    const c = scrollContainerRef.current;
-    if (c) {
+    const container = scrollContainerRef.current;
+    if (container) {
       requestAnimationFrame(() => {
-        c.scrollTop = c.scrollHeight;
+        container.scrollTop = container.scrollHeight;
       });
     }
   }, [messages]);
 
-  // Envío de mensaje
+  // 4️⃣ Envío de mensaje
   const handleSend = async (text: string) => {
     if (!xmtpClient || !text.trim()) return;
     const convo = await xmtpClient.conversations.newConversation(peerAddress);
     await convo.send(text);
-    await loadMessages();
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#0f0d14] text-white max-w-md mx-auto">
+    <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
       {/* Header */}
       <div className="flex items-center px-4 py-2 border-b border-gray-700">
         <button
           onClick={onBack}
-          className="flex items-center justify-center text-purple-400 text-lg px-4 py-2 bg-[#1a1725] rounded-lg"
+          className="flex items-center text-purple-400 text-lg px-2 py-1 bg-[#1a1725] rounded-lg mr-4"
         >
-          <FiArrowLeft className="w-5 h-5 mr-2" />
-          Back
+          <FiArrowLeft className="w-5 h-5" />
         </button>
-        <h2 className="flex-1 text-center font-semibold truncate px-2">
-          {peerAddress}
+        <h2 className="flex-1 text-center font-semibold truncate">
+          {displayName}
         </h2>
       </div>
 
-      {/* Mensajes + Input */}
+      {/* Mensajes */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Contenedor scrollable */}
         <div
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500"
