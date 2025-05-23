@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { Conversation, DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
-import { FiMenu, FiMessageCircle, FiPlus } from "react-icons/fi";
+import { FiHelpCircle, FiMenu, FiMessageCircle, FiPlus } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { useXmtpClient } from "../hooks/useXmtpClient";
 import { resolveNameLabel, shortenAddress } from "../services/resolveNameLabel";
@@ -182,9 +182,9 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     if (!xmtpClient || !text.trim()) return;
     const convo = await xmtpClient.conversations.newConversation(peer);
     await convo.send(text);
-    const entry = profilesMap[peer];
+    const profile = profilesMap[peer];
     let fid = 0;
-    if ((entry as Web3BioProfile).social?.uid) fid = (entry as Web3BioProfile).social.uid;
+    if ((profile as Web3BioProfile).social?.uid) fid = (profile as Web3BioProfile).social.uid;
     else {
       try { fid = await warpcast.getFidByName(peer); } catch {};
     }
@@ -222,13 +222,16 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   return <>
   <div className="flex-1 flex items-center justify-center text-gray-400 mt-16 mb-8">Loading…</div>
   <div className="bg-[#1a1725] text-gray-400 text-center rounded-lg shadow-md p-6 max-w-md text-black">
-            <h2 className=" text-lg font-semibold mb-2">
-              Why do I need to sign a transaction?
-            </h2>
+            <div className="flex justify-start items-center">
+              <FiHelpCircle className="w-6 h-6" />
+              <h2 className="m-2 text-lg font-semibold mb-2">
+                Why do I need to sign something?
+              </h2>
+            </div>
             <p>
-              XMTP requires a signature so you can start receiving messages the first time.<br/>
+              XMTP requires a signature so you can start receiving messages the first time you join PingGate.<br/><br/>
               An additional signature is needed each time you access back to your messages, to
-              decrypt them for reading, since all messages are secure and wallet2wallet encrypted,
+              decrypt them for reading, since all messages are secure and wallet2wallet encrypted, this means
               only you and your conversation partner can view the content.
 
               <a className="block p-3" href="https://docs.xmtp.org/intro/intro">More info (What is XMTP? Official docs)</a>
@@ -261,9 +264,9 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       <div className="flex-1 overflow-y-auto px-2 space-y-4 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
         {filtered.map((conv, idx) => {
           const peer = conv.peerAddress.toLowerCase();
-          const entry = profilesMap[peer];
-          const label = entry ? abbreviateAddress(entry.displayName) : abbreviateAddress(peer);
-          const avatarUrl = entry?.avatar || null;
+          const profile = profilesMap[peer];
+          const label = profile ? abbreviateAddress(profile.displayName) : abbreviateAddress(peer);
+          const avatarUrl = profile?.avatar || null;
           const isOpen = expanded === peer;
           const isSale = tab === "sales";
           const isPurchase = tab === "purchases";

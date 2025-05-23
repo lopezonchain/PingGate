@@ -22,6 +22,7 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
   const warpcast = new WarpcastService();
 
   const [displayName, setDisplayName] = useState<string>(peerAddress);
+  const [profile, setProfile] = useState<Web3BioProfile>();
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +41,7 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
           aliasMap[id.toLowerCase()] = p;
         }));
         const profile = aliasMap[addr];
+        setProfile(profile);
         if (active && profile) {
           setDisplayName(profile.displayName);
           return;
@@ -114,10 +116,11 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
       <div className="flex items-center px-4 py-2 border-b border-gray-700">
         <button
           onClick={onBack}
-          className="flex items-center text-purple-400 text-lg px-2 py-1 bg-[#1a1725] rounded-lg mr-4"
+          className="flex items-center text-purple-400 text-lg px-6 py-2 bg-[#1a1725] rounded-lg mr-4"
         >
           <FiArrowLeft className="w-5 h-5" />
         </button>
+        {profile?.avatar && <img src={profile?.avatar} alt="" className="w-5 h-5 rounded-full object-cover" />}
         <h2 className="flex-1 text-center font-semibold truncate">
           {displayName}
         </h2>
