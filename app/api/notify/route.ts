@@ -35,32 +35,23 @@ export async function POST(request: Request) {
       { status: 422 }
     );
   }
-  if (notificationId !== undefined && typeof notificationId !== "string") {
-    return NextResponse.json(
-      { error: "notificationId must be a string" },
-      { status: 422 }
-    );
-  }
   if (targetUrl !== undefined && typeof targetUrl !== "string") {
     return NextResponse.json(
       { error: "targetUrl must be a string" },
       { status: 422 }
     );
   }
-  if (!Array.isArray(tokens) || tokens.length < 1 || tokens.length > 100) {
-    return NextResponse.json(
-      { error: "tokens must be an array of 1-100 strings" },
-      { status: 422 }
-    );
-  }
-  for (const token of tokens) {
-    if (typeof token !== "string") {
-      return NextResponse.json(
-        { error: "each token must be a string" },
-        { status: 422 }
-      );
+  if (tokens && tokens.length > 0 ) {
+    for (const token of tokens) {
+      if (typeof token !== "string") {
+        return NextResponse.json(
+          { error: "each token must be a string" },
+          { status: 422 }
+        );
+      }
     }
   }
+  
 
   // 3️⃣ Construir payload para sendFrameNotification
   const sendPayload = {
