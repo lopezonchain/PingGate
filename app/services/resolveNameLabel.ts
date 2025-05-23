@@ -12,7 +12,7 @@ const publicClient = createPublicClient({
 export async function resolveNameLabel(address: string): Promise<string> {
   const lower = address.toLowerCase();
 
-  /* 1️⃣ Buscar en Warpcast
+  /* 1️⃣ Buscar en Warpcast */
   try {
     const url = `/api/warpcast/fname-by-address?address=${lower}`;
     const res = await fetch(url);
@@ -22,7 +22,7 @@ export async function resolveNameLabel(address: string): Promise<string> {
     }
   } catch (err) {
     console.warn("Farcaster name lookup failed:", err);
-  }*/
+  }
 
 // 2️⃣  ENS reverse
   try {
