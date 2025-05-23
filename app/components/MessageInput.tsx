@@ -82,7 +82,7 @@ export default function MessageInput({
                   scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600
                   focus:outline-none
                 "
-                placeholder="Type your message… (Shift+Enter for newline)"
+                placeholder="Type your message…"
               />
             </div>
 
