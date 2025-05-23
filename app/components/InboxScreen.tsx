@@ -7,7 +7,7 @@ import { useWalletClient } from "wagmi";
 import { FiHelpCircle, FiMenu, FiMessageCircle, FiPlus } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { useXmtpClient } from "../hooks/useXmtpClient";
-import { resolveNameLabel, shortenAddress } from "../services/resolveNameLabel";
+import { resolveNameLabel } from "../services/resolveNameLabel";
 import {
   getPurchasesBy as fetchPurchasedServiceIds,
   getSalesBy as fetchSalesRecords,
@@ -17,7 +17,6 @@ import {
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import { useRouter } from "next/navigation";
 import MessageInput from "./MessageInput";
-import { resolveEnsName } from "../services/nameResolver";
 
 interface InboxScreenProps {
   onBack: () => void;
@@ -91,7 +90,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     if (!myAddr) return;
     (async () => {
       try {
-        const ens = await resolveEnsName(myAddr);
+        const ens = await resolveNameLabel(myAddr);
         setMyName(ens);
       } catch {
         setMyName(abbreviateAddress(myAddr));
