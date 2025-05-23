@@ -364,7 +364,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           <div className="bg-[#1a1725] p-6 rounded-xl w-full max-w-md space-y-4">
             <h3 className="text-lg font-bold text-white">New Conversation</h3>
             {err && <p className="text-red-400">{err}</p>}
-            <input type="text" placeholder="ENS / Basename / Wallet" value={to} onChange={e => setTo(e.target.value)} className="w-full p-3 bg-[#2a2438] text-white rounded-lg" />
+            <input type="text" placeholder="Farcaster name / Basename or ENS / Wallet" value={to} onChange={e => setTo(e.target.value)} className="w-full p-3 bg-[#2a2438] text-white rounded-lg" />
             <textarea rows={3} placeholder="Message" value={body} onChange={e => setBody(e.target.value)} className="w-full p-3 bg-[#2a2438] text-white rounded-lg" />
             <div className="flex justify-end space-x-2">
               <button onClick={() => setShowComposer(false)} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-white" disabled={sending}>Cancel</button>
