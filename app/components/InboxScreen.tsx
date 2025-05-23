@@ -245,7 +245,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         {filtered.map((conv, idx) => {
           const peer = conv.peerAddress.toLowerCase();
           const entry = profilesMap[peer];
-          const label = abbreviateAddress(entry.displayName);
+          const label = entry ? abbreviateAddress(entry.displayName) : abbreviateAddress(peer);
           const avatarUrl = entry?.avatar || null;
           const isOpen = expanded === peer;
           const isSale = tab === "sales";
