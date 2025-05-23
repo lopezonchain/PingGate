@@ -40,6 +40,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const { data: walletClient } = useWalletClient();
   const { xmtpClient, error: xmtpError } = useXmtpClient();
   const myAddr = walletClient?.account.address.toLowerCase() || "";
+  const [myName, setMyName] = useState<string>("");
 
   // — State hooks —
   const [conversations, setConversations] = useState<ExtendedConversation[]>([]);
@@ -85,6 +86,18 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     })();
     return () => { active = false; };
   }, [xmtpClient, myAddr]);
+
+  useEffect(() => {
+    if (!myAddr) return;
+    (async () => {
+      try {
+        const ens = await resolveEnsName(myAddr);
+        setMyName(ens);
+      } catch {
+        setMyName(abbreviateAddress(myAddr));
+      }
+    })();
+  }, [myAddr]);
 
   // 2️⃣ Purchases & Sales
   useEffect(() => {
@@ -188,7 +201,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     if ((profile as Web3BioProfile).social?.uid) fid = (profile as Web3BioProfile).social.uid;
     else {
       try { fid = await warpcast.getFidByName(peer); } catch {};
-    }
+  }
     
 fetch("/api/notify", {
   method: "POST",
@@ -196,7 +209,7 @@ fetch("/api/notify", {
   body: JSON.stringify({
     fid,
     notification: {
-      title: `New message from ${resolveEnsName(myAddr)}`,
+      title: `New message from ${myName}`,
       body: text
     },
     targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`
