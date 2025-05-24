@@ -235,16 +235,16 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peer);
     const conv = conversations.find((c) => c.peerAddress.toLowerCase() === peer);
-    const lastSent = conv?.updatedAt;
+    /*const lastSent = conv?.updatedAt;
     const now = new Date();
-    const THIRTY_MIN = 30 * 60 * 1000;
+    const THIRTY_MIN = 30 * 60 * 1000;*/
 
     if (typeof text === "string") {
       await convo.send(text);
     } else {
       await convo.send(text, { contentType: ContentTypeAttachment });
     }
-    if (lastSent && now.getTime() - lastSent.getTime() < THIRTY_MIN) return;
+    //if (lastSent && now.getTime() - lastSent.getTime() < THIRTY_MIN) return;
 
     const profile = profilesMap[peer];
     let fid = 0;
