@@ -246,8 +246,8 @@ export default function Page(): JSX.Element {
   const saveFrameButton = useMemo(() => {
     if (context && !context.client.added) {
       return (
-        <Button variant="ghost" size="sm" onClick={handleAddFrame} className="p-4" icon={<Icon name="plus" size="sm" />}>
-          Save Miniapp
+        <Button variant="ghost" size="md" onClick={handleAddFrame} className="p-1" icon={<Icon name="star" size="sm" />}>
+          Enable Notifications
         </Button>
       );
     }
