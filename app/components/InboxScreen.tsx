@@ -193,8 +193,8 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   }, [xmtpClient, expanded]);
 
   // Envío de mensaje + notificación
-  const handleSend = async (peer: string, text: string) => {
-    if (!xmtpClient || !text.trim()) return;
+  const handleSend = async (peer: string, text: string | File) => {
+    if (!xmtpClient || !text) return;
 
     // Cargar conversacion
     const convo = await xmtpClient.conversations.newConversation(peer);

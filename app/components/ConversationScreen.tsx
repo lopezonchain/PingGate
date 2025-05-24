@@ -9,6 +9,7 @@ import { useXmtpClient } from "../hooks/useXmtpClient";
 import { resolveNameLabel } from "../services/resolveNameLabel";
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import MessageInput from "./MessageInput";
+import { useMiniKit } from "@coinbase/onchainkit/minikit";
 
 interface ConversationScreenProps {
   peerAddress: string;
@@ -25,6 +26,7 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
   const [profile, setProfile] = useState<Web3BioProfile>();
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { context } = useMiniKit();
 
   // 1️⃣ Resuelve Farcaster name o ENS para el header
   useEffect(() => {
@@ -103,12 +105,74 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
     }
   }, [messages]);
 
-  // 4️⃣ Envío de mensaje
-  const handleSend = async (text: string) => {
-    if (!xmtpClient || !text.trim()) return;
-    const convo = await xmtpClient.conversations.newConversation(peerAddress);
-    await convo.send(text);
-  };
+    // 4️⃣ Envío de mensaje + notificacion
+    const handleSend = async (text: string | File) => {
+  if (!xmtpClient || !text) return;
+
+  // 1️⃣ Abrir/crear conversación
+  const convo = await xmtpClient.conversations.newConversation(peerAddress);
+
+  // 2️⃣ Comprobar timestamp del último mensaje
+  const lastMsg = messages[messages.length - 1];
+  const lastSent = lastMsg?.sent?.getTime() ?? 0;
+  const now = Date.now();
+  const THIRTY_MIN = 30 * 60 * 1000;
+
+  // 3️⃣ Enviar el mensaje (texto o archivo)
+  await convo.send(text);
+
+  // 4️⃣ Si el último fue hace menos de 30 min, no notificamos
+  if (lastSent && now - lastSent < THIRTY_MIN) {
+    return;
+  }
+
+  // 5️⃣ Obtener FID del peer
+  let fid = 0;
+  if (profile?.social?.uid) {
+    fid = profile.social.uid;
+  } else {
+    try {
+      fid = await warpcast.getFidByName(peerAddress);
+    } catch (e) {
+      console.error("Failed to lookup peer FID:", e);
+      return;
+    }
+  }
+
+  // 6️⃣ Resolver mi nombre (ENS) y elegir entre context o miName
+  let myName: string;
+  try {
+    myName = await resolveNameLabel(myAddress);
+  } catch {
+    myName = myAddress;
+  }
+  const displayName = context?.user?.displayName ?? myName;
+
+  // 7️⃣ Construir título y cuerpo
+  const title = `New message from ${displayName}`;
+  const body =
+    typeof text === "string"
+      ? text
+      : `Sent you a file: ${(text as File).name}`;
+
+  // 8️⃣ Llamada a tu API de notificaciones
+  fetch("/api/notify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fid,
+      notification: { title, body },
+      targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddress}`,
+    }),
+  })
+    .then(async (res) => {
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("Notification error:", err);
+      }
+    })
+    .catch((err) => console.error("Notification failed:", err));
+};
 
   return (
     <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
@@ -156,7 +220,7 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
 
         {/* Input fijo abajo */}
         <div className="border-t border-gray-700 p-4">
-          <MessageInput onSend={handleSend} />
+          <MessageInput onSend={t => handleSend(t)} />
         </div>
       </div>
     </div>
