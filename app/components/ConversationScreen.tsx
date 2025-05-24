@@ -32,8 +32,20 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
 
   // Helper para convertir attachment a data-URL
-  const attachmentToUrl = (att: XMTPAttachment) =>
-    `data:${att.mimeType};base64,${att.data}`;
+  const attachmentToUrl = (att: XMTPAttachment): string => {
+    // si viene como cadena base64
+    if (typeof att.data === "string") {
+        return `data:${att.mimeType};base64,${att.data}`;
+    }
+    // si viene como Uint8Array o number[]
+    const bytes = att.data instanceof Uint8Array
+        ? att.data
+        : Array.isArray(att.data)
+        ? Uint8Array.from(att.data as number[])
+        : new Uint8Array(att.data as ArrayBuffer);
+    // crea un Blob y devuelve un object URL
+    return URL.createObjectURL(new Blob([bytes], { type: att.mimeType }));
+    };
 
   // Resuelve Farcaster name o ENS para el header
   useEffect(() => {
