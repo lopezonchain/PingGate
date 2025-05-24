@@ -162,7 +162,7 @@ export default function ConversationScreen({
       myName = myAddress;
     }
     const sender = context?.user?.displayName ?? myName;
-    const title = `New message from ${sender}`;
+    const title = `New ping from ${sender}`;
     const body =
       typeof text === "string"
         ? text

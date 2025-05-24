@@ -148,38 +148,30 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   }, [walletClient]);
 
   useEffect(() => {
-    if (conversations.length === 0) return;
-    const peers = Array.from(new Set(conversations.map((c) => c.peerAddress.toLowerCase())));
-    const ids = peers.map((addr) => `farcaster,${addr}`);
-    (async () => {
-      const newProfiles: Record<string, any> = {};
-      try {
-        const profiles = await warpcast.getWeb3BioProfiles(ids);
-        const aliasMap: Record<string, Web3BioProfile> = {};
-        profiles.forEach((p) =>
-          p.aliases?.forEach((alias) => {
-            const [, id] = alias.split(",");
-            aliasMap[id.toLowerCase()] = p;
-          })
-        );
-        peers.forEach((addr) => {
-          if (aliasMap[addr]) newProfiles[addr] = aliasMap[addr];
-        });
-      } catch {}
-      await Promise.all(
-        peers.map(async (addr) => {
-          if (newProfiles[addr]) return;
-          try {
-            const ens = await resolveNameLabel(addr);
-            newProfiles[addr] = { displayName: ens || abbreviateAddress(addr), avatar: null };
-          } catch {
-            newProfiles[addr] = { displayName: abbreviateAddress(addr), avatar: null };
-          }
-        })
-      );
-      setProfilesMap(newProfiles);
-    })();
-  }, [conversations, warpcast]);
+  if (!myAddr) return;
+  (async () => {
+    // 1) Intento Farcaster
+    let alias = "";
+    try {
+      const [prof] = await warpcast.getWeb3BioProfiles([`farcaster,${myAddr}`]);
+      if (prof?.displayName) alias = prof.displayName;
+    } catch { /* Farcaster caído, seguimos */ }
+
+    if (alias) {
+      setMyName(alias);
+      return;
+    }
+
+    // 2) ENS
+    try {
+      const ens = await resolveNameLabel(myAddr);
+      setMyName(ens);
+    } catch {
+      // 3) Wallet abreviada
+      setMyName(abbreviateAddress(myAddr));
+    }
+  })();
+}, [myAddr, warpcast]);
 
   useEffect(() => {
     if (!xmtpClient) return;
@@ -256,7 +248,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       } catch {}
     }
 
-    const displayName = context?.user?.displayName ?? myName;
+    const displayName = myName;
 
     fetch("/api/notify", {
       method: "POST",
