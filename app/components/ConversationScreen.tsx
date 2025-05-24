@@ -1,9 +1,10 @@
+// src/components/ConversationScreen.tsx
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
 import { DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
-import { FiArrowLeft } from "react-icons/fi";
+import { FiArrowLeft, FiFile } from "react-icons/fi";
 import { useXmtpClient } from "../hooks/useXmtpClient";
 import { resolveNameLabel } from "../services/resolveNameLabel";
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
@@ -16,38 +17,47 @@ interface ConversationScreenProps {
   onBack: () => void;
 }
 
-export default function ConversationScreen({ peerAddress, onBack }: ConversationScreenProps) {
+export default function ConversationScreen({
+  peerAddress,
+  onBack,
+}: ConversationScreenProps) {
   const { data: walletClient } = useWalletClient();
   const { xmtpClient } = useXmtpClient();
   const myAddress = walletClient?.account.address.toLowerCase() || "";
   const warpcast = new WarpcastService();
+  const { context } = useMiniKit();
 
   const [displayName, setDisplayName] = useState<string>(peerAddress);
   const [profile, setProfile] = useState<Web3BioProfile>();
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { context } = useMiniKit();
-
-  // Estado para modal de imagen fullscreen
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
+  const [fullFileText, setFullFileText] = useState<string | null>(null);
 
-  // Helper para convertir attachment a data-URL
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   const attachmentToUrl = (att: XMTPAttachment): string => {
-    // si viene como cadena base64
     if (typeof att.data === "string") {
-        return `data:${att.mimeType};base64,${att.data}`;
+      return `data:${att.mimeType};base64,${att.data}`;
     }
-    // si viene como Uint8Array o number[]
     const bytes = att.data instanceof Uint8Array
-        ? att.data
-        : Array.isArray(att.data)
-        ? Uint8Array.from(att.data as number[])
-        : new Uint8Array(att.data as ArrayBuffer);
-    // crea un Blob y devuelve un object URL
+      ? att.data
+      : Array.isArray(att.data)
+      ? Uint8Array.from(att.data as number[])
+      : new Uint8Array(att.data as ArrayBuffer);
     return URL.createObjectURL(new Blob([bytes], { type: att.mimeType }));
-    };
+  };
 
-  // Resuelve Farcaster name o ENS para el header
+  const handleAttachmentClick = async (att: XMTPAttachment) => {
+    if (att.mimeType.startsWith("image/")) {
+      setFullImageSrc(attachmentToUrl(att));
+    } else {
+      const url = attachmentToUrl(att);
+      const resp = await fetch(url);
+      const text = await resp.text();
+      setFullFileText(text);
+    }
+  };
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -63,8 +73,8 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
           })
         );
         const prof = aliasMap[addr];
-        setProfile(prof);
         if (active && prof) {
+          setProfile(prof);
           setDisplayName(prof.displayName);
           return;
         }
@@ -76,12 +86,9 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
         if (active) setDisplayName(peerAddress);
       }
     })();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [peerAddress, warpcast]);
 
-  // Fetch inicial + stream de mensajes
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
@@ -89,7 +96,10 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
 
     (async () => {
       const convo = await xmtpClient.conversations.newConversation(peerAddress);
-      const initial = await convo.messages({ limit: 50, direction: SortDirection.SORT_DIRECTION_DESCENDING });
+      const initial = await convo.messages({
+        limit: 50,
+        direction: SortDirection.SORT_DIRECTION_DESCENDING,
+      });
       if (!active) return;
       setMessages(initial.slice().reverse());
       stream = await convo.streamMessages();
@@ -107,17 +117,15 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
     };
   }, [xmtpClient, peerAddress]);
 
-  // Auto-scroll on new message
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (container) {
+    const c = scrollContainerRef.current;
+    if (c) {
       requestAnimationFrame(() => {
-        container.scrollTop = container.scrollHeight;
+        c.scrollTop = c.scrollHeight;
       });
     }
   }, [messages]);
 
-  // Envío de mensaje + notificación
   const handleSend = async (text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peerAddress);
@@ -132,9 +140,7 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
       await convo.send(text, { contentType: ContentTypeAttachment });
     }
 
-    if (lastSent && now - lastSent < THIRTY_MIN) {
-      return;
-    }
+    if (lastSent && now - lastSent < THIRTY_MIN) return;
 
     let fid = 0;
     if (profile?.social?.uid) {
@@ -142,8 +148,7 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
     } else {
       try {
         fid = await warpcast.getFidByName(peerAddress);
-      } catch (e) {
-        console.error("Failed to lookup peer FID:", e);
+      } catch {
         return;
       }
     }
@@ -154,12 +159,12 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
     } catch {
       myName = myAddress;
     }
-    const displayName = context?.user?.displayName ?? myName;
-
-    const title = `New message from ${displayName}`;
-    const body = typeof text === "string"
-      ? text
-      : `Sent you a file: ${(text as XMTPAttachment).filename}`;
+    const sender = context?.user?.displayName ?? myName;
+    const title = `New message from ${sender}`;
+    const body =
+      typeof text === "string"
+        ? text
+        : `Sent you a file: ${(text as XMTPAttachment).filename}`;
 
     fetch("/api/notify", {
       method: "POST",
@@ -169,19 +174,11 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
         notification: { title, body },
         targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddress}`,
       }),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const err = await res.json();
-          console.error("Notification error:", err);
-        }
-      })
-      .catch((err) => console.error("Notification failed:", err));
+    }).catch(console.error);
   };
 
   return (
     <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
-      {/* Header */}
       <div className="flex items-center px-4 py-2 border-b border-gray-700">
         <button
           onClick={onBack}
@@ -201,7 +198,6 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
         </h2>
       </div>
 
-      {/* Mensajes */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div
           ref={scrollContainerRef}
@@ -210,29 +206,43 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
           {messages.map((m, i) => {
             const isMe = m.senderAddress.toLowerCase() === myAddress;
             const time = m.sent
-              ? m.sent.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              ? m.sent.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
               : "";
-            const isAtt = typeof m.content !== "string" && (m.content as any).data;
+            const isAtt =
+              typeof m.content !== "string" && (m.content as any).data;
             const att = isAtt ? (m.content as XMTPAttachment) : null;
 
             return (
               <div
                 key={i}
-                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"}`}
+                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${
+                  isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"
+                }`}
                 style={{ hyphens: "auto" }}
               >
                 {att ? (
-                  <>
-                    <img
-                      src={attachmentToUrl(att)}
-                      alt={att.filename}
-                      className="max-h-40 object-contain cursor-pointer"
-                      onClick={() => setFullImageSrc(attachmentToUrl(att))}
-                    />
-                    <span className="text-[10px] text-gray-300 mt-1">
-                      {att.filename}
-                    </span>
-                  </>
+                  <div
+                    className="flex items-center space-x-2 cursor-pointer"
+                    onClick={() => handleAttachmentClick(att)}
+                  >
+                    {att.mimeType.startsWith("image/") ? (
+                      <img
+                        src={attachmentToUrl(att)}
+                        alt={att.filename}
+                        className="max-h-40 object-contain rounded"
+                      />
+                    ) : (
+                      <>
+                        <FiFile className="w-6 h-6 text-gray-300" />
+                        <span className="truncate text-sm">
+                          {att.filename}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 ) : (
                   <div className="text-center">{m.content}</div>
                 )}
@@ -243,14 +253,11 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
             );
           })}
         </div>
-
-        {/* Input fijo abajo */}
         <div className="border-t border-gray-700 p-4">
           <MessageInput onSend={(t) => handleSend(t)} />
         </div>
       </div>
 
-      {/* Modal fullscreen */}
       {fullImageSrc && (
         <div
           className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
@@ -261,6 +268,17 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
             alt="Full screen"
             className="max-h-full max-w-full"
           />
+        </div>
+      )}
+
+      {fullFileText && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"
+          onClick={() => setFullFileText(null)}
+        >
+          <pre className="bg-[#1a1725] text-white p-4 rounded-xl max-h-full overflow-auto">
+            {fullFileText}
+          </pre>
         </div>
       )}
     </div>
