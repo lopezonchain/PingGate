@@ -55,6 +55,9 @@ export default function MessageInput({
     if (modalOpen) textareaRef.current?.focus();
   }, [modalOpen]);
 
+  useEffect(() => {
+    if (inConversation) adjustInlineHeight(inlineTextRef.current);
+  }, [text, inConversation]);
 
   const closeModal = () => {
     setModalOpen(false);
