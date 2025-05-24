@@ -315,6 +315,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             onClick={() => setTab(t)}
             className={`
               px-6 py-3
+              first:rounded-l-lg last:rounded-r-lg
               ${tab === t
                 ? "bg-purple-600 text-white"
                 : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
@@ -329,7 +330,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       {xmtpError && <p className="text-red-500 text-center mb-2">{xmtpError}</p>}
 
       {/* Lista scrollable */}
-      <div className="flex-1 overflow-y-auto px-2 space-y-4 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+      <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
         {filtered.map((conv, idx) => {
           const peer = conv.peerAddress.toLowerCase();
           const profile = profilesMap[peer];
