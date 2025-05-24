@@ -172,7 +172,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       }));
       setProfilesMap(newProfiles);
     })();
-  }, [conversations]);
+  }, [conversations, warpcast]);
 
   // Stream global de mensajes
   useEffect(() => {
@@ -298,7 +298,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               </h2>
             </div>
             <p>
-              This chat uses XMTP to send and receive messages. XMTP requires a signature the first time you join it so you can start using it, but don't worry, this is completely free.<br /><br />
+              This chat uses XMTP to send and receive messages. XMTP requires a signature the first time you join it so you can start using it, but don&apos;t worry, this is completely free.<br /><br />
               An additional signature is needed each time you access back to your messages, to
               decrypt them for reading.
               All messages are secured and wallet2wallet encrypted, this means
