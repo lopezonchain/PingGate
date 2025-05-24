@@ -16,8 +16,9 @@ import {
 } from "../services/contractService";
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import { useRouter } from "next/navigation";
-import MessageInput from "./MessageInput";
+import MessageInput, { XMTPAttachment } from "./MessageInput";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
+import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
 
 interface InboxScreenProps {
   onBack: () => void;
@@ -62,6 +63,29 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const [tab, setTab] = useState<Tab>("all");
   const warpcast = new WarpcastService();
 
+  // Nuevo estado para fullscreen images
+  const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
+
+  // Helper: convierte attachment a data URL
+   const attachmentToUrl = (att: XMTPAttachment) => {
+    // Si ya es una cadena base64
+    if (typeof att.data === "string") {
+      return `data:${att.mimeType};base64,${att.data}`;
+    }
+    // Si es Uint8Array o array de números, crea un Blob
+    let bytes: Uint8Array;
+    if (att.data instanceof Uint8Array) {
+      bytes = att.data;
+    } else if (Array.isArray(att.data)) {
+      bytes = Uint8Array.from(att.data as number[]);
+    } else {
+      // Fallback: si es ArrayBuffer
+      bytes = new Uint8Array(att.data as ArrayBuffer);
+    }
+    const blob = new Blob([bytes], { type: att.mimeType });
+    return URL.createObjectURL(blob);
+  };
+
   // 1️⃣ Carga inicial de conversaciones
   useEffect(() => {
     if (!xmtpClient) return;
@@ -88,6 +112,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     return () => { active = false; };
   }, [xmtpClient, myAddr]);
 
+  // ENS lookup for my name
   useEffect(() => {
     if (!myAddr) return;
     (async () => {
@@ -100,7 +125,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     })();
   }, [myAddr]);
 
-  // 2️⃣ Purchases & Sales
+  // Purchases & Sales
   useEffect(() => {
     if (!walletClient) return;
     (async () => {
@@ -117,7 +142,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     })();
   }, [walletClient]);
 
-  // 3️⃣ Lookup de perfiles en Farcaster + ENS
+  // Profiles lookup
   useEffect(() => {
     if (conversations.length === 0) return;
     const peers = Array.from(new Set(conversations.map(c => c.peerAddress.toLowerCase())));
@@ -149,7 +174,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     })();
   }, [conversations]);
 
-  // 4️⃣ Stream global de mensajes → actualiza hora y unread
+  // Stream global de mensajes
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
@@ -172,17 +197,15 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     return () => { active = false; };
   }, [xmtpClient, myAddr]);
 
-  // 5️⃣ Mensajes por conversación expandida (fetch inicial + stream)
+  // Mensajes por conversación expandida
   useEffect(() => {
     if (!xmtpClient || !expanded) return;
     let active = true;
     (async () => {
       const convo = await xmtpClient.conversations.newConversation(expanded);
-      // Fetch inicial de hasta 50 mensajes
       const initial = await convo.messages({ limit: 50, direction: SortDirection.SORT_DIRECTION_DESCENDING });
       if (!active) return;
       setMessages(prev => ({ ...prev, [expanded]: initial.slice().reverse() }));
-      // Stream en tiempo real
       const stream = await convo.streamMessages();
       for await (const msg of stream) {
         if (!active) break;
@@ -193,27 +216,23 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   }, [xmtpClient, expanded]);
 
   // Envío de mensaje + notificación
-  const handleSend = async (peer: string, text: string | File) => {
+  const handleSend = async (peer: string, text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
-
-    // Cargar conversacion
     const convo = await xmtpClient.conversations.newConversation(peer);
-
-    // Comprobar hora del último mensaje previo
     const conv = conversations.find(c => c.peerAddress.toLowerCase() === peer);
     const lastSent = conv?.updatedAt;
     const now = new Date();
     const THIRTY_MIN = 30 * 60 * 1000;
 
-    // Enviar el mensaje
-    await convo.send(text);
-
-    // Si existe lastSent y ha sido hace < 30 min, no notificamos
+    if (typeof text === "string") {
+      await convo.send(text);
+    } else {
+      await convo.send(text, { contentType: ContentTypeAttachment });
+    }
     if (lastSent && (now.getTime() - lastSent.getTime()) < THIRTY_MIN) {
       return;
     }
 
-    // Obtener el FID
     const profile = profilesMap[peer];
     let fid = 0;
     if ((profile as Web3BioProfile).social?.uid) {
@@ -224,10 +243,8 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       } catch { }
     }
 
-    // Título con nombre resuelto o fallback
     const displayName = context?.user?.displayName ?? myName;
 
-    // Disparar notificación
     fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -235,21 +252,11 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         fid,
         notification: {
           title: `New ping from ${displayName}`,
-          body: text
+          body: typeof text === "string" ? text : (text as XMTPAttachment).filename
         },
         targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
       }),
-    })
-      .then(async res => {
-        if (!res.ok) {
-          const err = await res.json();
-          console.error("Notification error:", err);
-          return;
-        }
-        const data = await res.json();
-        console.log("Notification sent:", data);
-      })
-      .catch(console.error);
+    }).catch(console.error);
   };
 
   // Nuevo hilo
@@ -262,12 +269,15 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       const convo = await xmtpClient.conversations.newConversation(addr);
       await convo.send(body);
       setShowComposer(false);
-      setTo(";"); setBody(";");
-    } catch (e: any) { setErr(e.message); }
-    finally { setSending(false); }
+      setTo(""); setBody("");
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setSending(false);
+    }
   };
 
-  // Filtrado según pestaña
+  // Filtrado por tab
   const filtered = conversations.filter(c => {
     const peer = c.peerAddress.toLowerCase();
     if (tab === "sales") return soldPeers.has(peer);
@@ -276,29 +286,32 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   });
 
   if (loadingList)
-    return <>
-      <div className="flex-1 flex items-center justify-center text-gray-400 mt-16 mb-8">Loading…</div>
-      {!xmtpClient && (
-        <div className="bg-[#1a1725] text-gray-400 text-center rounded-lg shadow-md p-6 max-w-md text-black">
-          <div className="flex justify-start items-center">
-            <FiHelpCircle className="w-6 h-6" />
-            <h2 className="m-2 text-lg font-semibold mb-2">
-              Why do I need to sign something?
-            </h2>
-          </div>
-          <p>
-            XMTP requires a signature so you can start receiving messages the first time you join PingGate.<br/><br/>
-            An additional signature is needed each time you access back to your messages, to
-            decrypt them for reading, since all messages are secure and wallet2wallet encrypted, this means
-            only you and your conversation partner can view the content.
+    return (
+      <>
+        <div className="flex-1 flex items-center justify-center text-gray-400 mt-16 mb-8">Loading…</div>
+        {!xmtpClient && (
+          <div className="bg-[#1a1725] text-gray-400 text-center rounded-lg shadow-md p-6 max-w-md text-black">
+            <div className="flex justify-start items-center">
+              <FiHelpCircle className="w-6 h-6" />
+              <h2 className="m-2 text-lg font-semibold mb-2">
+                Why do I need to sign something?
+              </h2>
+            </div>
+            <p>
+              This chat uses XMTP to send and receive messages. XMTP requires a signature the first time you join it so you can start using it, but don't worry, this is completely free.<br /><br />
+              An additional signature is needed each time you access back to your messages, to
+              decrypt them for reading.
+              All messages are secured and wallet2wallet encrypted, this means
+              only you and your conversation partner can view the content.
 
-            <a className="block p-3" href="https://docs.xmtp.org/intro/intro">
-              More info (What is XMTP? Official docs)
-            </a>
-          </p>
-        </div>
-      )}
-    </>;
+              <a className="block p-3 mt-3 bg-[#0F0D14]" href="https://docs.xmtp.org/intro/intro">
+                More info (What is XMTP? Official docs)
+              </a>
+            </p>
+          </div>
+        )}
+      </>
+    );
 
   return (
     <div className="flex-1 flex flex-col min-h-0 max-h-[99%] bg-[#0f0d14] text-white relative">
@@ -309,7 +322,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
       {/* Tabs */}
       <div className="flex justify-center mb-4 divide-x divide-purple-600">
-        {(["all","purchases","sales"] as Tab[]).map(t => (
+        {(["all", "purchases", "sales"] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -348,12 +361,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           return (
             <motion.div key={peer} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="bg-[#1a1725] rounded-xl overflow-hidden">
               <div className="p-4 hover:bg-[#231c32] cursor-pointer" onClick={() => setExpanded(isOpen ? null : peer)}>
-                {/* Nombre + avatar */}
                 <div className="flex items-center space-x-2 mb-2">
                   {avatarUrl && <img src={avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />}
                   <span className="font-semibold">{label}</span>
                 </div>
-                {/* Fecha + iconos */}
                 <div className="flex justify-between items-center">
                   <p className="text-xs text-gray-400">{conv.updatedAt?.toLocaleString() || "No messages"}</p>
                   <div className="flex items-center space-x-2">
@@ -374,9 +385,26 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                       ? m.sent.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                       : "";
                     const isMe = m.senderAddress.toLowerCase() === myAddr;
+
+                    // Detección de attachment
+                    const isAttachment = typeof m.content !== "string" && (m.content as any).data;
+                    const att = isAttachment ? (m.content as XMTPAttachment) : null;
+
                     return (
-                      <div key={i} className={`flex flex-col text-sm text-center max-w-[80%] py-1 px-3 rounded-lg ${isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"} whitespace-normal break-words`}>
-                        <div>{m.content}</div>
+                      <div key={i} className={`flex flex-col text-sm max-w-[80%] py-1 px-3 rounded-lg ${isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"} whitespace-normal break-words`}>
+                        {att ? (
+                          <>
+                            <img
+                              src={attachmentToUrl(att)}
+                              alt={att.filename}
+                              className="max-h-40 object-contain cursor-pointer"
+                              onClick={() => setFullImageSrc(attachmentToUrl(att))}
+                            />
+                            <span className="text-[10px] text-gray-300 mt-1">{att.filename}</span>
+                          </>
+                        ) : (
+                          <div className="text-center">{m.content}</div>
+                        )}
                         <span className="text-[10px] text-gray-300 text-right">{time}</span>
                       </div>
                     );
@@ -407,6 +435,16 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               <button onClick={handleCreate} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white" disabled={sending}>{sending ? "Sending…" : "Send"}</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal de fullscreen para imágenes */}
+      {fullImageSrc && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
+          onClick={() => setFullImageSrc(null)}
+        >
+          <img src={fullImageSrc} alt="Full screen" className="max-h-full max-w-full" />
         </div>
       )}
     </div>

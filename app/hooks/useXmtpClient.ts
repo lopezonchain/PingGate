@@ -3,6 +3,10 @@
 
 import { useState, useEffect } from "react";
 import { Client } from "@xmtp/xmtp-js";
+import {
+  AttachmentCodec,
+  RemoteAttachmentCodec,
+} from "@xmtp/content-type-remote-attachment";
 import { useWalletClient } from "wagmi";
 
 // We cache the XMTP client so that once initialized it survives across renders.
@@ -70,25 +74,34 @@ export function useXmtpClient() {
         };
 
         _clientPromise = Client.create(signer, { env: "production" })
-          .then((client) => {
-            _cachedClient = client;
-            return client;
-          })
-          .catch(async (err: any) => {
-            const msg = (err?.message || "").toLowerCase();
-            if (msg.includes("signature validation failed")) {
-              console.warn("⚠️ Corrupt XMTP identity. Clearing...");
-              await clearXmtpStorage();
-            } else if (msg.includes("user rejected")) {
-              throw new Error("You must sign a message to enable messaging.");
-            } else {
-              throw new Error("Failed to initialize XMTP.");
-            }
-            throw err;
-          })
-          .finally(() => {
-            _clientPromise = null;
-          });
+        .then((client) => {
+          // 1) Cacheamos
+          _cachedClient = client;
+
+          // 2) Registramos los codecs de attachments
+          //    Para ficheros pequeños (≤1 MB):
+          client.registerCodec(new AttachmentCodec());
+          //    Para attachments remotos / cifrados:
+          client.registerCodec(new RemoteAttachmentCodec());
+
+          // 3) Devolvemos el client ya preparado
+          return client;
+        })
+        .catch(async (err: any) => {
+          const msg = (err?.message || "").toLowerCase();
+          if (msg.includes("signature validation failed")) {
+            console.warn("⚠️ Corrupt XMTP identity. Clearing...");
+            await clearXmtpStorage();
+          } else if (msg.includes("user rejected")) {
+            throw new Error("You must sign a message to enable messaging.");
+          } else {
+            throw new Error("Failed to initialize XMTP.");
+          }
+          throw err;
+        })
+        .finally(() => {
+          _clientPromise = null;
+        });
       }
 
       try {

@@ -1,4 +1,3 @@
-// src/components/ConversationScreen.tsx
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
@@ -8,8 +7,9 @@ import { FiArrowLeft } from "react-icons/fi";
 import { useXmtpClient } from "../hooks/useXmtpClient";
 import { resolveNameLabel } from "../services/resolveNameLabel";
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
-import MessageInput from "./MessageInput";
+import MessageInput, { XMTPAttachment } from "./MessageInput";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
+import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
 
 interface ConversationScreenProps {
   peerAddress: string;
@@ -28,45 +28,48 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { context } = useMiniKit();
 
-  // 1️⃣ Resuelve Farcaster name o ENS para el header
+  // Estado para modal de imagen fullscreen
+  const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
+
+  // Helper para convertir attachment a data-URL
+  const attachmentToUrl = (att: XMTPAttachment) =>
+    `data:${att.mimeType};base64,${att.data}`;
+
+  // Resuelve Farcaster name o ENS para el header
   useEffect(() => {
     let active = true;
     (async () => {
       const addr = peerAddress.toLowerCase();
-      // Intentar Farcaster lookup
       try {
         const ids = [`farcaster,${addr}`];
         const profiles = await warpcast.getWeb3BioProfiles(ids);
         const aliasMap: Record<string, Web3BioProfile> = {};
-        profiles.forEach((p) => p.aliases?.forEach((alias) => {
-          const [, id] = alias.split(",");
-          aliasMap[id.toLowerCase()] = p;
-        }));
-        const profile = aliasMap[addr];
-        setProfile(profile);
-        if (active && profile) {
-          setDisplayName(profile.displayName);
+        profiles.forEach((p) =>
+          p.aliases?.forEach((alias) => {
+            const [, id] = alias.split(",");
+            aliasMap[id.toLowerCase()] = p;
+          })
+        );
+        const prof = aliasMap[addr];
+        setProfile(prof);
+        if (active && prof) {
+          setDisplayName(prof.displayName);
           return;
         }
-      } catch {
-        // ignora error
-      }
-      // Fallback ENS
+      } catch {}
       try {
         const ens = await resolveNameLabel(addr);
-        if (active && ens) {
-          setDisplayName(ens);
-        }
+        if (active && ens) setDisplayName(ens);
       } catch {
-        if (active) {
-          setDisplayName(peerAddress);
-        }
+        if (active) setDisplayName(peerAddress);
       }
     })();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [peerAddress, warpcast]);
 
-  // 2️⃣ Fetch inicial + stream de mensajes
+  // Fetch inicial + stream de mensajes
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
@@ -74,11 +77,9 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
 
     (async () => {
       const convo = await xmtpClient.conversations.newConversation(peerAddress);
-      // Fetch inicial (hasta 50)
       const initial = await convo.messages({ limit: 50, direction: SortDirection.SORT_DIRECTION_DESCENDING });
       if (!active) return;
       setMessages(initial.slice().reverse());
-      // Stream en tiempo real
       stream = await convo.streamMessages();
       for await (const msg of stream) {
         if (!active) break;
@@ -88,14 +89,13 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
 
     return () => {
       active = false;
-      // Si el stream soporta cancelación:
-      if (stream && typeof (stream as any).return === 'function') {
+      if (stream && typeof (stream as any).return === "function") {
         (stream as any).return();
       }
     };
   }, [xmtpClient, peerAddress]);
 
-  // 3️⃣ Auto-scroll on new message
+  // Auto-scroll on new message
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (container) {
@@ -105,74 +105,67 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
     }
   }, [messages]);
 
-    // 4️⃣ Envío de mensaje + notificacion
-    const handleSend = async (text: string | File) => {
-  if (!xmtpClient || !text) return;
+  // Envío de mensaje + notificación
+  const handleSend = async (text: string | XMTPAttachment) => {
+    if (!xmtpClient || !text) return;
+    const convo = await xmtpClient.conversations.newConversation(peerAddress);
+    const lastMsg = messages[messages.length - 1];
+    const lastSent = lastMsg?.sent?.getTime() ?? 0;
+    const now = Date.now();
+    const THIRTY_MIN = 30 * 60 * 1000;
 
-  // 1️⃣ Abrir/crear conversación
-  const convo = await xmtpClient.conversations.newConversation(peerAddress);
+    if (typeof text === "string") {
+      await convo.send(text);
+    } else {
+      await convo.send(text, { contentType: ContentTypeAttachment });
+    }
 
-  // 2️⃣ Comprobar timestamp del último mensaje
-  const lastMsg = messages[messages.length - 1];
-  const lastSent = lastMsg?.sent?.getTime() ?? 0;
-  const now = Date.now();
-  const THIRTY_MIN = 30 * 60 * 1000;
-
-  // 3️⃣ Enviar el mensaje (texto o archivo)
-  await convo.send(text);
-
-  // 4️⃣ Si el último fue hace menos de 30 min, no notificamos
-  if (lastSent && now - lastSent < THIRTY_MIN) {
-    return;
-  }
-
-  // 5️⃣ Obtener FID del peer
-  let fid = 0;
-  if (profile?.social?.uid) {
-    fid = profile.social.uid;
-  } else {
-    try {
-      fid = await warpcast.getFidByName(peerAddress);
-    } catch (e) {
-      console.error("Failed to lookup peer FID:", e);
+    if (lastSent && now - lastSent < THIRTY_MIN) {
       return;
     }
-  }
 
-  // 6️⃣ Resolver mi nombre (ENS) y elegir entre context o miName
-  let myName: string;
-  try {
-    myName = await resolveNameLabel(myAddress);
-  } catch {
-    myName = myAddress;
-  }
-  const displayName = context?.user?.displayName ?? myName;
-
-  // 7️⃣ Construir título y cuerpo
-  const title = `New message from ${displayName}`;
-  const body =
-    typeof text === "string"
-      ? text
-      : `Sent you a file: ${(text as File).name}`;
-
-  // 8️⃣ Llamada a tu API de notificaciones
-  fetch("/api/notify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fid,
-      notification: { title, body },
-      targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddress}`,
-    }),
-  })
-    .then(async (res) => {
-      if (!res.ok) {
-        const err = await res.json();
-        console.error("Notification error:", err);
+    let fid = 0;
+    if (profile?.social?.uid) {
+      fid = profile.social.uid;
+    } else {
+      try {
+        fid = await warpcast.getFidByName(peerAddress);
+      } catch (e) {
+        console.error("Failed to lookup peer FID:", e);
+        return;
       }
+    }
+
+    let myName: string;
+    try {
+      myName = await resolveNameLabel(myAddress);
+    } catch {
+      myName = myAddress;
+    }
+    const displayName = context?.user?.displayName ?? myName;
+
+    const title = `New message from ${displayName}`;
+    const body = typeof text === "string"
+      ? text
+      : `Sent you a file: ${(text as XMTPAttachment).filename}`;
+
+    fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fid,
+        notification: { title, body },
+        targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddress}`,
+      }),
     })
-    .catch((err) => console.error("Notification failed:", err));
-};
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json();
+          console.error("Notification error:", err);
+        }
+      })
+      .catch((err) => console.error("Notification failed:", err));
+  };
 
   return (
     <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
@@ -184,7 +177,13 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
         >
           <FiArrowLeft className="w-5 h-5" />
         </button>
-        {profile?.avatar && <img src={profile?.avatar} alt="" className="w-5 h-5 rounded-full object-cover" />}
+        {profile?.avatar && (
+          <img
+            src={profile.avatar}
+            alt=""
+            className="w-5 h-5 rounded-full object-cover"
+          />
+        )}
         <h2 className="flex-1 text-center font-semibold truncate">
           {displayName}
         </h2>
@@ -201,15 +200,30 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
             const time = m.sent
               ? m.sent.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
               : "";
+            const isAtt = typeof m.content !== "string" && (m.content as any).data;
+            const att = isAtt ? (m.content as XMTPAttachment) : null;
+
             return (
               <div
                 key={i}
-                className={`flex flex-col text-sm text-center max-w-[80%] p-2 rounded-lg whitespace-normal break-words ${
-                  isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"
-                }`}
+                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"}`}
                 style={{ hyphens: "auto" }}
               >
-                <div>{m.content}</div>
+                {att ? (
+                  <>
+                    <img
+                      src={attachmentToUrl(att)}
+                      alt={att.filename}
+                      className="max-h-40 object-contain cursor-pointer"
+                      onClick={() => setFullImageSrc(attachmentToUrl(att))}
+                    />
+                    <span className="text-[10px] text-gray-300 mt-1">
+                      {att.filename}
+                    </span>
+                  </>
+                ) : (
+                  <div className="text-center">{m.content}</div>
+                )}
                 <span className="text-[10px] text-gray-300 text-right">
                   {time}
                 </span>
@@ -220,9 +234,23 @@ export default function ConversationScreen({ peerAddress, onBack }: Conversation
 
         {/* Input fijo abajo */}
         <div className="border-t border-gray-700 p-4">
-          <MessageInput onSend={t => handleSend(t)} />
+          <MessageInput onSend={(t) => handleSend(t)} />
         </div>
       </div>
+
+      {/* Modal fullscreen */}
+      {fullImageSrc && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
+          onClick={() => setFullImageSrc(null)}
+        >
+          <img
+            src={fullImageSrc}
+            alt="Full screen"
+            className="max-h-full max-w-full"
+          />
+        </div>
+      )}
     </div>
   );
 }
