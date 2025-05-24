@@ -131,8 +131,8 @@ export default function ConversationScreen({
   const handleSend = async (text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peerAddress);
-    const lastMsg = messages[messages.length - 1];
-    /*const lastSent = lastMsg?.sent?.getTime() ?? 0;
+    /*const lastMsg = messages[messages.length - 1];
+    const lastSent = lastMsg?.sent?.getTime() ?? 0;
     const now = Date.now();
     const THIRTY_MIN = 30 * 60 * 1000;*/
 
