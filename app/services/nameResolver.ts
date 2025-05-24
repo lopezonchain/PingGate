@@ -51,7 +51,7 @@ export async function resolveRecipient(raw: string): Promise<`0x${string}`> {
   const fid = await svc.getFidByName(name);
   const [res] = await svc.getPrimaryAddresses([fid], "ethereum");
   if (!res.success || !res.address) {
-    throw new Error(`No se encontró dirección para "${raw}"`);
+    throw new Error(`Not address found for "${raw}"`);
   }
   return res.address.address as `0x${string}`;
 }

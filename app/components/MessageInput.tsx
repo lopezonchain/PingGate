@@ -8,6 +8,7 @@ import {
   FiPlus,
   FiImage,
   FiFile,
+  FiDollarSign,
 } from "react-icons/fi";
 import dynamic from "next/dynamic";
 import { EmojiClickData, Theme } from "emoji-picker-react";
@@ -23,22 +24,29 @@ export default function MessageInput({
   const [modalOpen, setModalOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
-  const [menuAnchor, setMenuAnchor] =
-    useState<{ x: number; y: number } | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inlineInputRef = useRef<HTMLInputElement>(null);
 
+  // Abrir modal y enfocar textarea
   useEffect(() => {
-    if (modalOpen) textareaRef.current?.focus();
+    if (modalOpen) {
+      textareaRef.current?.focus();
+    }
   }, [modalOpen]);
 
-  const resetAll = () => {
-    setText("");
+  const closeModal = () => {
     setModalOpen(false);
     setMenuOpen(false);
     setShowPicker(false);
-    setMenuAnchor(null);
+    // no reseteamos text aquí
+  };
+
+  const resetAll = () => {
+    setText("");
+    closeModal();
   };
 
   const submitText = () => {
@@ -54,15 +62,10 @@ export default function MessageInput({
     }
   };
 
-  // ➤ firma correcta: primero EmojiClickData, luego DOM MouseEvent
-  const onEmojiClick = (
-    emojiData: EmojiClickData,
-    event: MouseEvent
-  ) => {
-    // extraemos Unicode desde la URL del sprite
+  const onEmojiClick = (emojiData: EmojiClickData, event: MouseEvent) => {
     const img = event.target as HTMLImageElement;
     const filename = img.src.split("/").pop() || "";
-    const code = filename.split(".")[0];           // ej. "1f609"
+    const code = filename.split(".")[0];
     const chars = code.split("-").map(c => parseInt(c, 16));
     const emoji = String.fromCodePoint(...chars);
     setText(prev => prev + emoji);
@@ -85,12 +88,19 @@ export default function MessageInput({
     e.stopPropagation();
     setMenuAnchor({ x: e.clientX, y: e.clientY });
     setMenuOpen(o => !o);
-    if (!modalOpen) setModalOpen(false);
   };
 
   const openModal = () => {
     setModalOpen(true);
     setMenuOpen(false);
+  };
+
+  // Helper para mover el cursor al final
+  const moveCursorToEnd = (el: HTMLInputElement | HTMLTextAreaElement | null) => {
+    if (el && el.value) {
+      const len = el.value.length;
+      el.setSelectionRange(len, len);
+    }
   };
 
   return (
@@ -105,11 +115,13 @@ export default function MessageInput({
         </button>
 
         <input
+          ref={inlineInputRef}
           className="flex-1 min-w-0 px-4 py-2 bg-[#2a2438] text-white rounded-lg cursor-text"
           placeholder="Type a message..."
           value={text}
           readOnly
           onClick={openModal}
+          onFocus={() => moveCursorToEnd(inlineInputRef.current)}
         />
 
         <button
@@ -130,11 +142,13 @@ export default function MessageInput({
       {/* FLOATING MENU */}
       {menuOpen && menuAnchor && (
         <div
-          className="z-50 w-40 bg-[#0f0d14] rounded-lg shadow-lg p-2 flex flex-col space-y-1"
+          className={`
+            fixed z-[60] bg-[#0f0d14] rounded-lg shadow-lg p-2 flex flex-col space-y-1
+            w-56 sm:w-40 max-w-[90vw] max-h-[50vh] overflow-auto
+          `}
           style={{
-            position: "fixed",
-            top: menuAnchor.y,
-            left: menuAnchor.x,
+            top: `${Math.min(menuAnchor.y, window.innerHeight - 10)}px`,
+            left: `${Math.min(menuAnchor.x, window.innerWidth - 10)}px`,
             transform: "translate(-50%, -100%)",
           }}
         >
@@ -145,19 +159,25 @@ export default function MessageInput({
             }}
             className="flex items-center px-3 py-2 hover:bg-[#231c32] rounded text-white"
           >
-            <FiPlus className="mr-2" /> Emoji
+            <FiPlus className="mr-2" /> Emojis
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center px-3 py-2 hover:bg-[#231c32] rounded text-white"
           >
-            <FiImage className="mr-2" /> Imagen
+            <FiImage className="mr-2" /> Images
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center px-3 py-2 hover:bg-[#231c32] rounded text-white"
           >
-            <FiFile className="mr-2" /> Archivo
+            <FiFile className="mr-2" /> Files
+          </button>
+
+          <button
+            className="flex items-center px-3 py-2 hover:bg-[#231c32] rounded text-white"
+          >
+            <FiDollarSign className="mr-2" /> Crypto
           </button>
         </div>
       )}
@@ -181,7 +201,8 @@ export default function MessageInput({
         <div className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-75">
           <div className="w-full max-w-md h-full bg-[#0f0d14] rounded-lg overflow-hidden flex flex-col">
             <div className="flex justify-end p-4">
-              <button onClick={resetAll} className="text-white text-2xl">
+              {/* Solo cerramos modal, sin perder el texto */}
+              <button onClick={closeModal} className="text-white text-2xl">
                 <FiX />
               </button>
             </div>
@@ -191,6 +212,7 @@ export default function MessageInput({
                 value={text}
                 onChange={e => setText(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onFocus={e => moveCursorToEnd(e.target)}
                 className="
                   w-full h-full
                   bg-[#1a1725] text-white p-4 rounded-lg
