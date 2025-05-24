@@ -130,9 +130,9 @@ export default function ConversationScreen({
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peerAddress);
     const lastMsg = messages[messages.length - 1];
-    const lastSent = lastMsg?.sent?.getTime() ?? 0;
+    /*const lastSent = lastMsg?.sent?.getTime() ?? 0;
     const now = Date.now();
-    const THIRTY_MIN = 30 * 60 * 1000;
+    const THIRTY_MIN = 30 * 60 * 1000;*/
 
     if (typeof text === "string") {
       await convo.send(text);
@@ -140,7 +140,7 @@ export default function ConversationScreen({
       await convo.send(text, { contentType: ContentTypeAttachment });
     }
 
-    if (lastSent && now - lastSent < THIRTY_MIN) return;
+    //if (lastSent && now - lastSent < THIRTY_MIN) return;
 
     let fid = 0;
     if (profile?.social?.uid) {
