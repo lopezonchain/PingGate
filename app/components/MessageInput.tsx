@@ -174,7 +174,11 @@ export default function MessageInput({
           ) : inConversation ? (
             <textarea
               ref={inlineTextRef}
-              className="w-full px-4 bg-[#2a2438] text-white rounded-lg resize-none overflow-hidden"
+              className="w-full px-4 bg-[#2a2438] text-white rounded-lg resize-none overflow-hidden
+                transition-shadow duration-200
+                focus:shadow-[0_0_8px_rgba(139,92,246,0.5)]
+                focus:outline-none focus:ring-0 focus:border focus:border-[#8b5cf6]
+                focus-visible:outline-none focus-visible:ring-0"
               placeholder="Type a message..."
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -298,12 +302,10 @@ export default function MessageInput({
                     e.currentTarget.value.length
                   );
                 }}
-                className="
-                  w-full h-full
+                className="w-full h-full
                   bg-[#1a1725] text-white p-4 rounded-lg
                   scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600
-                  focus:outline-none
-                "
+                  focus:outline-none"
                 placeholder="Type your message…"
               />
             </div>
