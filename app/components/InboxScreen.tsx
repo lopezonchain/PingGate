@@ -42,8 +42,39 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const { data: walletClient } = useWalletClient();
   const { xmtpClient, error: xmtpError } = useXmtpClient();
   const myAddr = walletClient?.account.address.toLowerCase() || "";
-  const [myName, setMyName] = useState<string>("");
+  const warpcast = new WarpcastService();
 
+  // Mi nombre: Farcaster > ENS > abreviatura de wallet
+  const [myName, setMyName] = useState<string>("");
+  useEffect(() => {
+    if (!myAddr) return;
+    let active = true;
+    (async () => {
+      // 1) Intento Farcaster
+      try {
+        const [prof] = await warpcast.getWeb3BioProfiles([`farcaster,${myAddr}`]);
+        if (active && prof?.displayName) {
+          setMyName(prof.displayName);
+          return;
+        }
+      } catch {}
+      // 2) ENS
+      try {
+        const ens = await resolveNameLabel(myAddr);
+        if (active && ens) {
+          setMyName(ens);
+          return;
+        }
+      } catch {}
+      // 3) fallback
+      if (active) {
+        setMyName(abbreviateAddress(myAddr));
+      }
+    })();
+    return () => { active = false };
+  }, [myAddr, warpcast]);
+
+  // — State hooks —
   const [conversations, setConversations] = useState<ExtendedConversation[]>([]);
   const [purchasedPeers, setPurchasedPeers] = useState<Set<string>>(new Set());
   const [soldPeers, setSoldPeers] = useState<Set<string>>(new Set());
@@ -60,7 +91,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const [err, setErr] = useState<string | null>(null);
 
   const [tab, setTab] = useState<Tab>("all");
-  const warpcast = new WarpcastService();
 
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
@@ -92,6 +122,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   };
 
+  // 1️⃣ Carga inicial de conversaciones
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
@@ -114,23 +145,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         setLoadingList(false);
       }
     })();
-    return () => {
-      active = false;
-    };
+    return () => { active = false };
   }, [xmtpClient, myAddr]);
 
-  useEffect(() => {
-    if (!myAddr) return;
-    (async () => {
-      try {
-        const ens = await resolveNameLabel(myAddr);
-        setMyName(ens);
-      } catch {
-        setMyName(abbreviateAddress(myAddr));
-      }
-    })();
-  }, [myAddr]);
-
+  // 2️⃣ Purchases & Sales
   useEffect(() => {
     if (!walletClient) return;
     (async () => {
@@ -147,32 +165,42 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     })();
   }, [walletClient]);
 
+  // 3️⃣ Lookup perfiles Farcaster + ENS
   useEffect(() => {
-  if (!myAddr) return;
-  (async () => {
-    // 1) Intento Farcaster
-    let alias = "";
-    try {
-      const [prof] = await warpcast.getWeb3BioProfiles([`farcaster,${myAddr}`]);
-      if (prof?.displayName) alias = prof.displayName;
-    } catch { /* Farcaster caído, seguimos */ }
+    if (conversations.length === 0) return;
+    const peers = Array.from(new Set(conversations.map((c) => c.peerAddress.toLowerCase())));
+    const ids = peers.map((addr) => `farcaster,${addr}`);
+    (async () => {
+      const newProfiles: Record<string, any> = {};
+      try {
+        const profiles = await warpcast.getWeb3BioProfiles(ids);
+        const aliasMap: Record<string, Web3BioProfile> = {};
+        profiles.forEach((p) =>
+          p.aliases?.forEach((alias) => {
+            const [, id] = alias.split(",");
+            aliasMap[id.toLowerCase()] = p;
+          })
+        );
+        peers.forEach((addr) => {
+          if (aliasMap[addr]) newProfiles[addr] = aliasMap[addr];
+        });
+      } catch {}
+      await Promise.all(
+        peers.map(async (addr) => {
+          if (newProfiles[addr]) return;
+          try {
+            const ens = await resolveNameLabel(addr);
+            newProfiles[addr] = { displayName: ens || abbreviateAddress(addr), avatar: null };
+          } catch {
+            newProfiles[addr] = { displayName: abbreviateAddress(addr), avatar: null };
+          }
+        })
+      );
+      setProfilesMap(newProfiles);
+    })();
+  }, [conversations, warpcast]);
 
-    if (alias) {
-      setMyName(alias);
-      return;
-    }
-
-    // 2) ENS
-    try {
-      const ens = await resolveNameLabel(myAddr);
-      setMyName(ens);
-    } catch {
-      // 3) Wallet abreviada
-      setMyName(abbreviateAddress(myAddr));
-    }
-  })();
-}, [myAddr, warpcast]);
-
+  // 4️⃣ Stream global de mensajes
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
@@ -193,11 +221,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         );
       }
     })().catch(console.error);
-    return () => {
-      active = false;
-    };
+    return () => { active = false };
   }, [xmtpClient, myAddr]);
 
+  // 5️⃣ Mensajes de conversación expandida
   useEffect(() => {
     if (!xmtpClient || !expanded) return;
     let active = true;
@@ -218,16 +245,15 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         }));
       }
     })().catch(console.error);
-    return () => {
-      active = false;
-    };
+    return () => { active = false };
   }, [xmtpClient, expanded]);
 
+  // Envío + notificación (usa siempre myName resuelto)
   const handleSend = async (peer: string, text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peer);
-    const conv = conversations.find((c) => c.peerAddress.toLowerCase() === peer);
-    /*const lastSent = conv?.updatedAt;
+    /*const conv = conversations.find((c) => c.peerAddress.toLowerCase() === peer);
+    const lastSent = conv?.updatedAt;
     const now = new Date();
     const THIRTY_MIN = 30 * 60 * 1000;*/
 
@@ -236,6 +262,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     } else {
       await convo.send(text, { contentType: ContentTypeAttachment });
     }
+
     //if (lastSent && now.getTime() - lastSent.getTime() < THIRTY_MIN) return;
 
     const profile = profilesMap[peer];
@@ -248,22 +275,22 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       } catch {}
     }
 
-    const displayName = myName;
+    // Título usando myName resuelto
+    const title = `New ping from ${myName}`;
+    const bodyText = typeof text === "string" ? text : (text as XMTPAttachment).filename;
 
     fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fid,
-        notification: {
-          title: `New ping from ${displayName}`,
-          body: typeof text === "string" ? text : (text as XMTPAttachment).filename,
-        },
+        notification: { title, body: bodyText },
         targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
       }),
     }).catch(console.error);
   };
 
+  // Nuevo hilo
   const handleCreate = async () => {
     setSending(true);
     setErr(null);
@@ -293,21 +320,27 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   if (loadingList)
     return (
       <>
-        <div className="flex-1 flex items-center justify-center text-gray-400 mt-16 mb-8">Loading…</div>
+        <div className="flex-1 flex items-center justify-center text-gray-400 mt-16 mb-8">
+          Loading…
+        </div>
         {!xmtpClient && (
           <div className="bg-[#1a1725] text-gray-400 text-center rounded-lg shadow-md p-6 max-w-md text-black">
             <div className="flex justify-start items-center">
               <FiHelpCircle className="w-6 h-6" />
-              <h2 className="m-2 text-lg font-semibold mb-2">Why do I need to sign something?</h2>
+              <h2 className="m-2 text-lg font-semibold mb-2">
+                Why do I need to sign something?
+              </h2>
             </div>
             <p>
-              This chat uses XMTP to send and receive messages. XMTP requires a signature the first time you
-              join it so you can start using it, but don&apos;t worry, this is completely free.
+              This chat uses XMTP to send and receive messages. XMTP requires a
+              signature the first time you join it so you can start using it,
+              but don&apos;t worry, this is completely free.
               <br />
               <br />
-              An additional signature is needed each time you access back to your messages, to decrypt
-              them for reading. All messages are secured and wallet2wallet encrypted, this means only you
-              and your conversation partner can view the content.
+              An additional signature is needed each time you access back to
+              your messages, to decrypt them for reading. All messages are
+              secured and wallet2wallet encrypted, this means only you and your
+              conversation partner can view the content.
               <a
                 className="block p-3 mt-3 bg-[#0F0D14]"
                 href="https://docs.xmtp.org/intro/intro"
@@ -337,9 +370,11 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             className={`
               px-6 py-3
               first:rounded-l-lg last:rounded-r-lg
-              ${tab === t
-                ? "bg-purple-600 text-white"
-                : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"}
+              ${
+                tab === t
+                  ? "bg-purple-600 text-white"
+                  : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
+              }
             `}
           >
             {t === "sales" ? "Clients" : t === "purchases" ? "Bought" : "All"}
@@ -420,8 +455,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                     .slice(-5)
                     .map((m, i) => {
                       const isAttachment =
-                        typeof m.content !== "string" &&
-                        (m.content as any).data;
+                        typeof m.content !== "string" && (m.content as any).data;
                       const att = isAttachment
                         ? (m.content as XMTPAttachment)
                         : null;
@@ -444,9 +478,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                                   src={attachmentToUrl(att)}
                                   alt={att.filename}
                                   className="max-h-40 object-contain rounded"
-                                  onClick={() =>
-                                    setFullImageSrc(attachmentToUrl(att))
-                                  }
                                 />
                               ) : (
                                 <>
@@ -529,7 +560,11 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
           onClick={() => setFullImageSrc(null)}
         >
-          <img src={fullImageSrc!} className="max-h-full max-w-full" />
+          <img
+            src={fullImageSrc}
+            alt="Full screen"
+            className="max-h-full max-w-full"
+          />
         </div>
       )}
 
