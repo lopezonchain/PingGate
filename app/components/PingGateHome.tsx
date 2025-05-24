@@ -31,8 +31,8 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
   }[] = [
     {
       icon: <FiInbox />,
-      label: "Inbox",
-      desc: "View and reply to messages. Start new conversations",
+      label: "Pings",
+      desc: "View and reply to your Pings (messages). Start new conversations with farcaster names, Basename/ENS or wallets.",
       action: "inbox",
       enabled: true,
       fee: 0,

@@ -7,16 +7,16 @@
 /* Todas las variables definidas en <body> para cubrir toda la aplicación */
 body {
   /* Tokens de PingGate (Dark Mode) */
-  --pg-bg: #1A171B !important;
+  --pg-bg: #1a1725 !important;
   --pg-fg: #ececec !important;
   --pg-fg-muted: #949494 !important;
   --pg-accent: #8565CB !important;
   --pg-accent-hover: #7A57C2 !important;
   --pg-accent-active: #6E4FB7 !important;
   --pg-accent-light: #1a1725 !important;
-  --pg-gray: #1A171B !important;
-  --pg-gray-dark: #1A171B !important;
-  --pg-card-bg: #1A171B !important;
+  --pg-gray: #1a1725 !important;
+  --pg-gray-dark: #1a1725 !important;
+  --pg-card-bg: #1a1725 !important;
   --pg-card-border: rgba(133, 101, 203, 1) !important;
 
   /* Mapeo de app/** variables basadas en tokens */
@@ -63,8 +63,8 @@ body {
   --ock-bg-primary-washed: var(--app-accent-light) !important;
   --ock-bg-primary-disabled: #80a8ff !important;
   --ock-bg-secondary: var(--app-gray) !important;
-  --ock-bg-secondary-hover: var(--app-gray-dark) !important;
-  --ock-bg-secondary-active: #d1d1d1 !important;
+  --ock-bg-secondary-hover: #231c32 !important;
+  --ock-bg-secondary-active: #231c32 !important;
   --ock-bg-error: #fee2e2 !important;
   --ock-bg-warning: #fef3c7 !important;
   --ock-bg-success: #dcfce7 !important;

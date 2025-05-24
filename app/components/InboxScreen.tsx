@@ -234,7 +234,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       body: JSON.stringify({
         fid,
         notification: {
-          title: `New message from ${displayName}`,
+          title: `New ping from ${displayName}`,
           body: text
         },
         targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
@@ -301,24 +301,31 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     </>;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 max-h-[97%] bg-[#0f0d14] text-white relative">
+    <div className="flex-1 flex flex-col min-h-0 max-h-[99%] bg-[#0f0d14] text-white relative">
       {/* Back + Title */}
       <button onClick={onBack} className="mb-4 flex items-center justify-center text-purple-400 px-4 py-2 bg-[#1a1725] rounded-lg max-w-[200px]">
         <FiMenu className="w-5 h-5 mr-2" /> Menu
       </button>
-      <h2 className="text-2xl font-bold text-center mb-4">Inbox</h2>
 
       {/* Tabs */}
-      <div className="flex justify-center space-x-4 mb-4 px-2">
-        {(["all", "purchases", "sales"] as Tab[]).map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded ${tab === t
-            ? "bg-purple-600 text-white"
-            : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
-            }`}>
+      <div className="flex justify-center mb-4 divide-x divide-purple-600">
+        {(["all","purchases","sales"] as Tab[]).map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`
+              px-6 py-3
+              ${tab === t
+                ? "bg-purple-600 text-white"
+                : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
+              }
+            `}
+          >
             {t === "sales" ? "Clients" : t === "purchases" ? "Bought" : "All"}
           </button>
         ))}
       </div>
+
       {xmtpError && <p className="text-red-500 text-center mb-2">{xmtpError}</p>}
 
       {/* Lista scrollable */}
