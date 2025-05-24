@@ -231,7 +231,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     (async () => {
       const convo = await xmtpClient.conversations.newConversation(expanded);
       const initial = await convo.messages({
-        limit: 50,
+        limit: 10,
         direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
       if (!active) return;
@@ -252,10 +252,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const handleSend = async (peer: string, text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peer);
-    /*const conv = conversations.find((c) => c.peerAddress.toLowerCase() === peer);
+    const conv = conversations.find((c) => c.peerAddress.toLowerCase() === peer);
     const lastSent = conv?.updatedAt;
     const now = new Date();
-    const THIRTY_MIN = 30 * 60 * 1000;*/
+    const THIRTY_MIN = 30 * 60 * 1000;
 
     if (typeof text === "string") {
       await convo.send(text);
@@ -263,7 +263,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       await convo.send(text, { contentType: ContentTypeAttachment });
     }
 
-    //if (lastSent && now.getTime() - lastSent.getTime() < THIRTY_MIN) return;
+    if (lastSent && now.getTime() - lastSent.getTime() < THIRTY_MIN) return;
 
     const profile = profilesMap[peer];
     let fid = 0;
@@ -465,7 +465,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                           className={`flex flex-col max-w-[80%] py-1 px-3 rounded-lg ${
                             m.senderAddress.toLowerCase() === myAddr
                               ? "bg-purple-600 ml-auto"
-                              : "bg-gray-700"
+                              : "bg-[#2a2438]"
                           }`}
                         >
                           {att ? (
@@ -500,7 +500,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                         </div>
                       );
                     })}
-                  <MessageInput onSend={(t) => handleSend(peer, t)} />
+                  <MessageInput onSend={(t) => handleSend(peer, t)} inConversation={false}/>
                 </div>
               )}
             </motion.div>

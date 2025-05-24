@@ -221,7 +221,7 @@ export default function ConversationScreen({
               <div
                 key={i}
                 className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${
-                  isMe ? "bg-purple-600 ml-auto" : "bg-gray-700"
+                  isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
                 }`}
                 style={{ hyphens: "auto" }}
               >
@@ -256,7 +256,7 @@ export default function ConversationScreen({
           })}
         </div>
         <div className="border-t border-gray-700 p-4">
-          <MessageInput onSend={(t) => handleSend(t)} />
+          <MessageInput onSend={(t) => handleSend(t)} inConversation={true}/>
         </div>
       </div>
 
