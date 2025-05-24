@@ -150,7 +150,7 @@ export class WarpcastService {
     if (!res.ok) throw new Error(`FName API error: ${res.status}`);
     const json = await res.json() as { transfers: Array<{ to: number }> };
     if (json.transfers.length === 0) {
-      throw new Error(`El nombre "${name}" no está registrado`);
+      throw new Error(`The name "${name}" is not registered`);
     }
     // El primer registro es la asignación original al FID
     return json.transfers[0].to;

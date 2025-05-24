@@ -49,13 +49,13 @@ export async function resolveRecipient(
   const input = raw.trim();
   if (input.startsWith("0x")) return input as `0x${string}`;
   const name = input.replace(/^@/, "");
+  if (name.toLowerCase().endsWith(".eth")) {
+      return resolveEnsName(name);
+  }
   const svc = new WarpcastService();
   const fid = await svc.getFidByName(name);
   const [res] = await svc.getPrimaryAddresses([fid], "ethereum");
   if (!res.success || !res.address) {
-    if (name.toLowerCase().endsWith(".eth")) {
-      return resolveEnsName(name);
-    }
     throw new Error(`No address for "${raw}"`);
   }
   return res.address.address as `0x${string}`;
