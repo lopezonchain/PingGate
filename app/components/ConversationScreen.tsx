@@ -79,11 +79,13 @@ export default function ConversationScreen({
           return;
         }
       } catch {}
-      try {
+      if(!displayName){
+        try {
         const ens = await resolveNameLabel(addr);
         if (active && ens) setDisplayName(ens);
       } catch {
         if (active) setDisplayName(peerAddress);
+      }
       }
     })();
     return () => { active = false; };
