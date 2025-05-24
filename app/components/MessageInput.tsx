@@ -144,12 +144,12 @@ export default function MessageInput({
         <div
           className={`
             fixed z-[60] bg-[#0f0d14] rounded-lg shadow-lg p-2 flex flex-col space-y-1
-            w-56 sm:w-40 max-w-[90vw] max-h-[50vh] overflow-auto
+            w-56 sm:w-40 min-w-[30vw] max-w-[90vw] max-h-[50vh] overflow-auto
           `}
           style={{
             top: `${Math.min(menuAnchor.y, window.innerHeight - 10)}px`,
             left: `${Math.min(menuAnchor.x, window.innerWidth - 10)}px`,
-            transform: "translate(-50%, -100%)",
+            transform: "translate(0, -100%)",
           }}
         >
           <button
@@ -184,17 +184,14 @@ export default function MessageInput({
 
       {/* EMOJI PICKER OVERLAY */}
       {showPicker && (
-        <Picker
-          onEmojiClick={onEmojiClick}
-          theme={Theme.DARK}
-          style={{
-            position: "fixed",
-            bottom: "80px",
-            right: "20px",
-            zIndex: 2000,
-          }}
-        />
+        <div className="fixed inset-0 flex items-center justify-center z-[55]">
+          <Picker
+            onEmojiClick={onEmojiClick}
+            theme={Theme.DARK}
+          />
+        </div>
       )}
+
 
       {/* FULLSCREEN MODAL */}
       {modalOpen && (
