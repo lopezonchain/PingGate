@@ -13,6 +13,7 @@
     "@headlessui/react": "^2.2.3",
     "@tanstack/react-query": "^5",
     "@upstash/redis": "^1.34.4",
+    "@xmtp/browser-sdk": "^2.0.13",
     "@xmtp/content-type-remote-attachment": "^2.0.2",
     "@xmtp/xmtp-js": "^13.0.4",
     "canvas-confetti": "^1.9.3",
