@@ -231,7 +231,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     (async () => {
       const convo = await xmtpClient.conversations.newConversation(expanded);
       const initial = await convo.messages({
-        limit: 10,
+        limit: 5,
         direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
       if (!active) return;
