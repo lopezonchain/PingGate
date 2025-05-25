@@ -341,10 +341,9 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               your messages, to decrypt them for reading. All messages are
               secured and wallet2wallet encrypted, this means only you and your
               conversation partner can view the content.
-              <a
-                className="block p-3 mt-3 bg-[#0F0D14]"
+              <a className="block p-3 mt-3 bg-[#0F0D14]"
                 href="https://docs.xmtp.org/intro/intro"
-              >
+                target="_blank">
                 More info (What is XMTP? Official docs)
               </a>
             </p>
