@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import { DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
 import { FiArrowLeft, FiFile } from "react-icons/fi";
 import { useXmtpClient } from "../hooks/useXmtpClient";
@@ -10,11 +11,6 @@ import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import MessageInput, { XMTPAttachment } from "./MessageInput";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
-import {
-  Client,
-  DecodedMessage,
-  SortDirection,
-} from "@xmtp/browser-sdk";
 
 interface ConversationScreenProps {
   peerAddress: string;
@@ -28,15 +24,15 @@ export default function ConversationScreen({
   const { data: walletClient } = useWalletClient();
   const { xmtpClient } = useXmtpClient();
   const myAddress = walletClient?.account.address.toLowerCase() || "";
-  const myInboxId = xmtpClient?.inboxId || "";
   const warpcast = new WarpcastService();
   const { context } = useMiniKit();
 
   const [displayName, setDisplayName] = useState<string>(peerAddress);
   const [profile, setProfile] = useState<Web3BioProfile>();
-  const [messages, setMessages] = useState<DecodedMessage<unknown>[]>([]);
+  const [messages, setMessages] = useState<DecodedMessage[]>([]);
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const attachmentToUrl = (att: XMTPAttachment): string => {
@@ -46,8 +42,8 @@ export default function ConversationScreen({
     const bytes = att.data instanceof Uint8Array
       ? att.data
       : Array.isArray(att.data)
-        ? Uint8Array.from(att.data as number[])
-        : new Uint8Array(att.data as ArrayBuffer);
+      ? Uint8Array.from(att.data as number[])
+      : new Uint8Array(att.data as ArrayBuffer);
     return URL.createObjectURL(new Blob([bytes], { type: att.mimeType }));
   };
 
@@ -63,54 +59,66 @@ export default function ConversationScreen({
   };
 
   useEffect(() => {
+    let active = true;
+    (async () => {
+      const addr = peerAddress.toLowerCase();
+      try {
+        const ids = [`farcaster,${addr}`];
+        const profiles = await warpcast.getWeb3BioProfiles(ids);
+        const aliasMap: Record<string, Web3BioProfile> = {};
+        profiles.forEach((p) =>
+          p.aliases?.forEach((alias) => {
+            const [, id] = alias.split(",");
+            aliasMap[id.toLowerCase()] = p;
+          })
+        );
+        const prof = aliasMap[addr];
+        if (active && prof) {
+          setProfile(prof);
+          setDisplayName(prof.displayName);
+          return;
+        }
+      } catch {}
+      if(!displayName){
+        try {
+        const ens = await resolveNameLabel(addr);
+        if (active && ens) setDisplayName(ens);
+      } catch {
+        if (active) setDisplayName(peerAddress);
+      }
+      }
+    })();
+    return () => { active = false; };
+  }, [peerAddress, warpcast]);
+
+  useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
-    let stopStream: (() => Promise<void>) | null = null;
+    let stream: AsyncIterable<DecodedMessage>;
 
     (async () => {
-      // 1) Verificar que podemos mensajear al peer
-      const identity = {
-        identifier: peerAddress.toLowerCase(),
-        identifierKind: "Ethereum" as const,
-      };
-      const canMsg = await Client.canMessage([identity]);
-      if (!canMsg.get(identity.identifier)) {
-        console.warn(`No es posible enviar mensajes a ${peerAddress}`);
-        return;
-      }
-
-      // 2) Crear o recuperar la conversación DM
-      const convo = await xmtpClient.conversations.newDm(identity.identifier);
-
-      // 3) Fetch inicial: hasta 50 mensajes, descendentemente
+      const convo = await xmtpClient.conversations.newConversation(peerAddress);
       const initial = await convo.messages({
-        limit: BigInt(50)
+        limit: 50,
+        direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
       if (!active) return;
       setMessages(initial.slice().reverse());
-
-      // 4) Stream global de mensajes y filtrado por conversationId
-      const stream = await xmtpClient.conversations.streamAllMessages();
-      stopStream = async () => {
-        if (typeof (stream as any).return === "function") {
-          await (stream as any).return();
-        }
-      };
+      stream = await convo.streamMessages();
       for await (const msg of stream) {
         if (!active) break;
-        if (msg?.conversationId === convo.id) {
-          setMessages((prev) => [...prev, msg]);
-        }
+        setMessages((prev) => [...prev, msg]);
       }
     })().catch(console.error);
 
     return () => {
       active = false;
-      if (stopStream) stopStream();
+      if (stream && typeof (stream as any).return === "function") {
+        (stream as any).return();
+      }
     };
   }, [xmtpClient, peerAddress]);
 
-  // Auto-scroll al final
   useEffect(() => {
     const c = scrollContainerRef.current;
     if (c) {
@@ -122,14 +130,20 @@ export default function ConversationScreen({
 
   const handleSend = async (text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
-    const convo = await xmtpClient.conversations.newDm(peerAddress.toLowerCase());
+    const convo = await xmtpClient.conversations.newConversation(peerAddress);
+    /*const lastMsg = messages[messages.length - 1];
+    const lastSent = lastMsg?.sent?.getTime() ?? 0;
+    const now = Date.now();
+    const THIRTY_MIN = 30 * 60 * 1000;*/
+
     if (typeof text === "string") {
       await convo.send(text);
     } else {
-      await convo.send(text, ContentTypeAttachment);
+      await convo.send(text, { contentType: ContentTypeAttachment });
     }
 
-    // Notificación Warpcast (igual que antes)...
+    //if (lastSent && now - lastSent < THIRTY_MIN) return;
+
     let fid = 0;
     if (profile?.social?.uid) {
       fid = profile.social.uid;
@@ -140,6 +154,7 @@ export default function ConversationScreen({
         return;
       }
     }
+
     let myName: string;
     try {
       myName = await resolveNameLabel(myAddress);
@@ -166,7 +181,6 @@ export default function ConversationScreen({
 
   return (
     <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
-      {/* Cabecera */}
       <div className="flex items-center px-4 py-2 border-b border-gray-700">
         <button
           onClick={onBack}
@@ -186,149 +200,66 @@ export default function ConversationScreen({
         </h2>
       </div>
 
-      {/* Mensajes */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500"
         >
           {messages.map((m, i) => {
-            const isMe = m.senderInboxId === myInboxId;
-            // convertir de ns a ms
-            const sentMs = Number(m.sentAtNs / BigInt(1000000));
-            const time = new Date(sentMs).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            });
+            const isMe = m.senderAddress.toLowerCase() === myAddress;
+            const time = m.sent
+              ? m.sent.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "";
             const isAtt =
-              m.content !== undefined && (m.content as any).data !== undefined;
+              typeof m.content !== "string" && (m.content as any).data;
             const att = isAtt ? (m.content as XMTPAttachment) : null;
 
             return (
-              <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
-                {/* Cabecera */}
-                <div className="flex items-center px-4 py-2 border-b border-gray-700">
-                  <button
-                    onClick={onBack}
-                    className="flex items-center text-purple-400 text-lg px-6 py-2 bg-[#1a1725] rounded-lg mr-4"
-                  >
-                    <FiArrowLeft className="w-5 h-5" />
-                  </button>
-                  {profile?.avatar && (
-                    <img
-                      src={profile.avatar}
-                      alt=""
-                      className="w-5 h-5 rounded-full object-cover"
-                    />
-                  )}
-                  <h2 className="flex-1 text-center font-semibold truncate">
-                    {displayName}
-                  </h2>
-                </div>
-
-                {/* Mensajes */}
-                <div className="flex-1 flex flex-col overflow-hidden">
+              <div
+                key={i}
+                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${
+                  isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
+                }`}
+                style={{ hyphens: "auto" }}
+              >
+                {att ? (
                   <div
-                    ref={scrollContainerRef}
-                    className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500"
+                    className="flex items-center space-x-2 cursor-pointer"
+                    onClick={() => handleAttachmentClick(att)}
                   >
-                    {messages.map((m, i) => {
-                      const isMe = m.senderInboxId === myInboxId;
-                      const sentMs = Number(m.sentAtNs / BigInt(1000000));
-                      const time = new Date(sentMs).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      });
-
-                      const isAtt =
-                        m.content !== undefined && (m.content as any).data !== undefined;
-                      const att = isAtt ? (m.content as XMTPAttachment) : null;
-
-                      // Aquí definimos un texto seguro para renderizar
-                      const text =
-                        typeof m.content === "string"
-                          ? m.content
-                          : m.fallback ?? "";
-
-                      return (
-                        <div
-                          key={i}
-                          className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
-                            }`}
-                          style={{ hyphens: "auto" }}
-                        >
-                          {att ? (
-                            <div
-                              className="flex items-center space-x-2 cursor-pointer"
-                              onClick={() => handleAttachmentClick(att)}
-                            >
-                              {att.mimeType.startsWith("image/") ? (
-                                <img
-                                  src={attachmentToUrl(att)}
-                                  alt={att.filename}
-                                  className="max-h-40 object-contain rounded"
-                                />
-                              ) : (
-                                <>
-                                  <FiFile className="w-6 h-6 text-gray-300" />
-                                  <span className="truncate text-sm">{att.filename}</span>
-                                </>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-center">{text}</div>
-                          )}
-                          <span className="text-[10px] text-gray-300 text-right">
-                            {time}
-                          </span>
-                        </div>
-                      );
-                    })}
+                    {att.mimeType.startsWith("image/") ? (
+                      <img
+                        src={attachmentToUrl(att)}
+                        alt={att.filename}
+                        className="max-h-40 object-contain rounded"
+                      />
+                    ) : (
+                      <>
+                        <FiFile className="w-6 h-6 text-gray-300" />
+                        <span className="truncate text-sm">
+                          {att.filename}
+                        </span>
+                      </>
+                    )}
                   </div>
-
-                  {/* Input */}
-                  <div className="border-t border-gray-700 p-4">
-                    <MessageInput onSend={(t) => handleSend(t)} inConversation={true} />
-                  </div>
-                </div>
-
-                {/* Modal Imagen */}
-                {fullImageSrc && (
-                  <div
-                    className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
-                    onClick={() => setFullImageSrc(null)}
-                  >
-                    <img
-                      src={fullImageSrc}
-                      alt="Full screen"
-                      className="max-h-full max-w-full"
-                    />
-                  </div>
+                ) : (
+                  <div className="text-center">{m.content}</div>
                 )}
-
-                {/* Modal Archivo */}
-                {fullFileText && (
-                  <div
-                    className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"
-                    onClick={() => setFullFileText(null)}
-                  >
-                    <pre className="bg-[#1a1725] text-white p-4 rounded-xl max-h-full overflow-auto">
-                      {fullFileText}
-                    </pre>
-                  </div>
-                )}
+                <span className="text-[10px] text-gray-300 text-right">
+                  {time}
+                </span>
               </div>
             );
           })}
         </div>
-
-        {/* Input */}
         <div className="border-t border-gray-700 p-4">
-          <MessageInput onSend={(t) => handleSend(t)} inConversation={true} />
+          <MessageInput onSend={(t) => handleSend(t)} inConversation={true}/>
         </div>
       </div>
 
-      {/* Modal de imagen */}
       {fullImageSrc && (
         <div
           className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
@@ -342,7 +273,6 @@ export default function ConversationScreen({
         </div>
       )}
 
-      {/* Modal de archivo */}
       {fullFileText && (
         <div
           className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"
