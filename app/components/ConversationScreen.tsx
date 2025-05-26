@@ -235,6 +235,7 @@ export default function ConversationScreen({
                     {messages.map((m, i) => {
                       const isMe = m.senderInboxId === myInboxId;
                       const sentMs = Number(m.sentAtNs / BigInt(1000000));
+                      const key = `${m.senderInboxId}-${sentMs}`;
                       const time = new Date(sentMs).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -252,7 +253,7 @@ export default function ConversationScreen({
 
                       return (
                         <div
-                          key={i}
+                          key={key}
                           className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
                             }`}
                           style={{ hyphens: "auto" }}
