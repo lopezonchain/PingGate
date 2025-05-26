@@ -205,7 +205,7 @@ export default function ConversationScreen({
             const att = isAtt ? (m.content as XMTPAttachment) : null;
 
             return (
-              <div key={i} className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
+              <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
                 {/* Cabecera */}
                 <div className="flex items-center px-4 py-2 border-b border-gray-700">
                   <button
