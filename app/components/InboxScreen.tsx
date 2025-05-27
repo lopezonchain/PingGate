@@ -263,7 +263,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       await convo.send(text, { contentType: ContentTypeAttachment });
     }
 
-    if (lastSent && now.getTime() - lastSent.getTime() < THIRTY_MIN) return;
+    //if (lastSent && now.getTime() - lastSent.getTime() < THIRTY_MIN) return;
 
     const profile = profilesMap[peer];
     let fid = 0;
@@ -303,6 +303,31 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       setShowComposer(false);
       setTo("");
       setBody("");
+
+      const profile = profilesMap[addr];
+
+      let fid = 0;
+      if ((profile as Web3BioProfile).social?.uid) {
+        fid = (profile as Web3BioProfile).social.uid;
+      } else {
+        try {
+          fid = await warpcast.getFidByName(addr);
+        } catch {}
+      }
+      
+      // Título usando myName resuelto
+      const title = `New ping from ${myName}`;
+      const bodyText = typeof body === "string" ? body : (body as XMTPAttachment).filename;
+
+      fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fid,
+          notification: { title, body: bodyText },
+          targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
+        }),
+      }).catch(console.error);
     } catch (e: any) {
       setErr(e.message);
     } finally {
