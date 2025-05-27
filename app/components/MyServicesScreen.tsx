@@ -22,6 +22,7 @@ import {
   editService,
   createService,
   getCreationFee,
+  getEditFee,
 } from "../services/contractService";
 import { base } from "viem/chains";
 
@@ -57,17 +58,19 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
   const [reviews, setReviews] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
 
-  // Creation modal state
+  // Modal & form state
   const [showCreator, setShowCreator] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newPriceEth, setNewPriceEth] = useState("");
   const [newDuration, setNewDuration] = useState("");
   const [creationFee, setCreationFee] = useState<bigint>(BigInt(0));
-  const [sending, setSending] = useState(false);
+  const [editFee, setEditFee] = useState<bigint>(BigInt(0));
+  const [sendingCreate, setSendingCreate] = useState(false);
+  const [sendingEditId, setSendingEditId] = useState<bigint | null>(null);
   const [error, setError] = useState<string>("");
 
-  // Load services & sales
+  // Load services & sales on mount / address change
   useEffect(() => {
     if (!sellerAddress) return;
     (async () => {
@@ -88,11 +91,10 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
     })();
   }, [sellerAddress]);
 
-  // Fetch creationFee once
+  // Fetch on-chain fees
   useEffect(() => {
-    getCreationFee()
-      .then((fee) => setCreationFee(fee))
-      .catch((e) => console.error("Could not load creationFee", e));
+    getCreationFee().then(setCreationFee).catch((e) => console.error(e));
+    getEditFee().then(setEditFee).catch((e) => console.error(e));
   }, []);
 
   const toggle = (id: bigint) => {
@@ -102,7 +104,7 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
       (async () => {
         try {
           const avg = await getAverageRating(id);
-          setRatings((p) => ({ ...p, [id.toString()]: Number(avg) }));
+          setRatings((p) => ({ ...p, [id.toString()]: avg }));
 
           const recs = sales.filter((s) => s.serviceId === id);
           const list = await Promise.all(
@@ -121,22 +123,21 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
     }
   };
 
-  const onPause = async (id: bigint) => {
-    if (!walletClient) return;
+  const ensureBase = async () => {
+    if (!walletClient) throw new Error("Wallet not connected");
     if (walletClient.chain?.id !== base.id) {
-      try {
-        await walletClient.switchChain({ id: base.id });
-      } catch {
-        toast.error("Please switch your wallet to Base network");
-        return;
-      }
+      await walletClient.switchChain({ id: base.id });
     }
+  };
+
+  const onPause = async (id: bigint) => {
     try {
-      await pauseService(walletClient, id);
+      await ensureBase();
+      await pauseService(walletClient!, id);
       setServices((p) =>
         p.map((s) => (s.id === id ? { ...s, active: false } : s))
       );
-      toast.success("Paused");
+      toast.success("Service paused");
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Pause failed");
@@ -145,26 +146,27 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
 
   const onEdit = async (svc: ServiceDetails) => {
     if (!walletClient) return;
-    if (walletClient.chain?.id !== base.id) {
-      try {
-        await walletClient.switchChain({ id: base.id });
-      } catch {
-        toast.error("Please switch your wallet to Base network");
-        return;
-      }
-    }
     const newTitleInput = prompt("New title", svc.title) || svc.title;
     const newDescInput =
       prompt("New description", svc.description) || svc.description;
     const newPrice = prompt(
-      "New price (ETH)",
+      `New price (ETH) — editFee: ${ethers.formatEther(editFee)} ETH`,
       ethers.formatEther(svc.price)
     );
     if (!newPrice) return;
     const priceWei = ethers.parseEther(newPrice);
 
+    setSendingEditId(svc.id);
     try {
-      await editService(walletClient, svc.id, newTitleInput, newDescInput, priceWei);
+      await ensureBase();
+      await editService(
+        walletClient,
+        svc.id,
+        newTitleInput,
+        newDescInput,
+        priceWei,
+        editFee
+      );
       setServices((p) =>
         p.map((s) =>
           s.id === svc.id
@@ -172,42 +174,34 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
             : s
         )
       );
-      toast.success("Updated");
+      toast.success("Service updated");
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Edit failed");
+    } finally {
+      setSendingEditId(null);
     }
   };
 
   const onCreate = async () => {
     if (!walletClient) return;
-    setSending(true);
+    setSendingCreate(true);
     setError("");
 
-    // ensure wallet on Base
-    if (walletClient.chain?.id !== base.id) {
-      try {
-        await walletClient.switchChain({ id: base.id });
-      } catch {
-        toast.error("Please switch your wallet to Base network");
-        setSending(false);
-        return;
-      }
-    }
-
     try {
+      await ensureBase();
       const priceWei = ethers.parseEther(newPriceEth || "0");
-      const durationSecs = Number(newDuration);
+      const durationSecs = BigInt(newDuration || "0");
       await createService(
         walletClient,
         newTitle,
         newDesc,
         priceWei,
-        durationSecs,
+        Number(durationSecs),
         creationFee
       );
       toast.success("Service created");
-      // refresh list
+      // refresh
       const ids = await getServicesBy(sellerAddress);
       const details = await Promise.all(ids.map((id) => getService(id)));
       setServices(details);
@@ -218,9 +212,9 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
       setNewDuration("");
     } catch (e: any) {
       console.error(e);
-      setError(e.message);
+      setError(e.message || "Creation failed");
     } finally {
-      setSending(false);
+      setSendingCreate(false);
     }
   };
 
@@ -247,19 +241,19 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
 
       <div className="space-y-4 overflow-y-auto flex-1 px-2">
         {services.map((svc) => {
-          const key = svc.id.toString();
+          const idStr = svc.id.toString();
           const soldCount = sales.filter((s) => s.serviceId === svc.id).length;
           const revenue = Number(
             ethers.formatEther(svc.price * BigInt(soldCount))
           );
-          const avg = ratings[key] ?? 0;
+          const avg = ratings[idStr] ?? 0;
+          const reviewList = reviews[idStr] || [];
           const isOpen = expanded === svc.id;
+          const isEditing = sendingEditId === svc.id;
 
           return (
-            <div
-              key={key}
-              className="bg-[#1a1725] rounded-lg overflow-hidden"
-            >
+            <div key={idStr} className="bg-[#1a1725] rounded-lg overflow-hidden">
+              {/* Aquí usamos toggle en lugar de setExpanded directamente */}
               <div
                 className="p-4 flex justify-between items-center cursor-pointer hover:bg-[#231c32]"
                 onClick={() => toggle(svc.id)}
@@ -271,28 +265,42 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button onClick={() => onEdit(svc)}>
-                    <FiEdit2 />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(svc);
+                    }}
+                    disabled={isEditing}
+                  >
+                    {isEditing ? "Saving…" : <FiEdit2 />}
                   </button>
-                  <button onClick={() => onPause(svc.id)}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPause(svc.id);
+                    }}
+                  >
                     <FiPauseCircle />
                   </button>
                   {isOpen ? <FiChevronUp /> : <FiChevronDown />}
                 </div>
               </div>
+
+              {/* Sólo renderizamos y mostramos reviews si isOpen es true */}
               {isOpen && (
                 <div className="p-4 border-t border-gray-700 space-y-2">
-                  {(reviews[key] || []).map((r, i) => (
-                    <div key={i} className="bg-[#2a2438] p-2 rounded">
-                      <p className="text-sm">
-                        ⭐ Quality: {r.quality} · Communication:{" "}
-                        {r.communication} · Timeliness: {r.timeliness}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {r.comment}
-                      </p>
-                    </div>
-                  ))}
+                  {reviewList.length > 0 ? (
+                    reviewList.map((r, i) => (
+                      <div key={i} className="bg-[#2a2438] p-2 rounded">
+                        <p className="text-sm">
+                          ⭐ Quality: {r.quality} · Communication: {r.communication} · Timeliness: {r.timeliness}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">{r.comment}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-sm">No reviews yet</p>
+                  )}
                 </div>
               )}
             </div>
@@ -300,7 +308,7 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
         })}
       </div>
 
-      {/* Floating "+" button to add a service */}
+      {/* Floating "+" button */}
       <button
         onClick={() => setShowCreator(true)}
         className="fixed bottom-6 right-6 z-50 bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
@@ -309,7 +317,7 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
         +
       </button>
 
-      {/* Add Service Modal */}
+      {/* Create Modal */}
       {showCreator && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-40 flex items-center justify-center">
           <div className="bg-[#1a1725] p-6 rounded-xl w-full max-w-md space-y-4">
@@ -352,16 +360,16 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
               <button
                 onClick={() => setShowCreator(false)}
                 className="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 text-white"
-                disabled={sending}
+                disabled={sendingCreate}
               >
                 Cancel
               </button>
               <button
                 onClick={onCreate}
                 className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold"
-                disabled={sending}
+                disabled={sendingCreate}
               >
-                {sending ? "Creating..." : "Create"}
+                {sendingCreate ? "Creating..." : "Create"}
               </button>
             </div>
           </div>

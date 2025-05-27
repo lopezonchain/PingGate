@@ -69,11 +69,14 @@ export async function resolveRecipient(
 export async function getService(
   id: bigint
 ): Promise<Service> {
-  return (await publicClient.readContract({
+  const res = (await publicClient.readContract({
     ...getContractConfig(),
     functionName: "services",
     args: [id],
-  })) as Service;
+  })) as [bigint, `0x${string}`, string, string, bigint, bigint, boolean];
+
+  const [sid, seller, title, description, price, duration, active] = res;
+  return { id: sid, seller, title, description, price, duration, active };
 }
 
 /** List all active services */
@@ -196,7 +199,8 @@ export async function editService(
   id: bigint,
   title: string,
   description: string,
-  price: bigint
+  price: bigint,
+  fee: bigint
 ) {
   return walletClient.writeContract({
     account: walletClient.account ?? null,
@@ -204,6 +208,7 @@ export async function editService(
     ...getContractConfig(),
     functionName: "editService",
     args: [id, title, description, price],
+    value: fee,
   });
 }
 
