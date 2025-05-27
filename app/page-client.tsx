@@ -31,6 +31,7 @@ import MyPlansScreen from "./components/MyServicesScreen";
 import ReviewsScreen from "./components/ReviewsScreen";
 import ExploreScreen from "./components/ExploreScreen";
 import MyServicesScreen from "./components/MyServicesScreen";
+import FAQScreen from "./components/FAQScreen";
 
 export type WarpView = "home" | "inbox" | "myplans" | "explore" | "reviews" | "faq" ;
 
@@ -319,7 +320,7 @@ export default function Page(): JSX.Element {
           {warpView === "myplans" && (<MyServicesScreen onBack={() => setWarpView("home")} />)}
           {warpView === "explore" && (<ExploreScreen onBack={() => setWarpView("home")} />)}
           {warpView === "reviews" && (<ReviewsScreen onBack={() => setWarpView("home")} />)}
-          {warpView === "faq" && (<ExploreScreen onBack={() => setWarpView("home")} />)}
+          {warpView === "faq" && (<FAQScreen onBack={() => setWarpView("home")} />)}
         </main>
       </div>
        <WalletModal isOpen={false} onClose={function (): void {

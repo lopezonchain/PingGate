@@ -239,7 +239,7 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
 
       <h2 className="text-2xl font-bold mb-4 text-center">My Services</h2>
 
-      <div className="space-y-4 overflow-y-auto flex-1 px-2">
+      <div className="space-y-4 overflow-y-auto flex-1 px-2  scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
         {services.map((svc) => {
           const idStr = svc.id.toString();
           const soldCount = sales.filter((s) => s.serviceId === svc.id).length;

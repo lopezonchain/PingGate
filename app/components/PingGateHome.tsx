@@ -27,47 +27,41 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
     desc: string;
     action: WarpView;
     enabled: boolean;
-    fee: number;
   }[] = [
     {
       icon: <FiInbox />,
       label: "Pings",
       desc: "View and reply to your Pings (messages). Start new conversations with farcaster names, Basename/ENS or wallets.",
       action: "inbox",
-      enabled: true,
-      fee: 0,
+      enabled: true
     },
     {
       icon: <FiSearch />,
       label: "Explore",
-      desc: "Browse other users' profiles and plans. Pay to message and start chatting.",
+      desc: "Browse services. Pay and directly get 1 to 1 chat access!",
       action: "explore",
-      enabled: false,
-      fee: 0,
+      enabled: true
+    },
+    {
+      icon: <FiStar />,
+      label: "Reviews",
+      desc: "Leave reviews of services you bought, check or edit previous ones.",
+      action: "reviews",
+      enabled: true
     },
     {
       icon: <FiPlusCircle />,
       label: "My Services",
       desc: "Create and manage your own paid DM or consultation offerings.",
       action: "myplans",
-      enabled: false,
-      fee: 0,
-    },
-    {
-      icon: <FiStar />,
-      label: "Reviews",
-      desc: "Check feedback from users or leave reviews after your own interactions.",
-      action: "reviews",
-      enabled: false,
-      fee: 0,
+      enabled: true
     },
     {
       icon: <FiHelpCircle />,
       label: "FAQ",
       desc: "Frequently Asked Questions",
       action: "faq",
-      enabled: false,
-      fee: 0,
+      enabled: true
     },
   ];
 
@@ -93,7 +87,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
 
       {/* Actions list */}
       <div className="flex flex-col space-y-4 w-full max-w-md">
-        {actions.map(({ icon, label, desc, action, enabled, fee }, idx) => {
+        {actions.map(({ icon, label, desc, action, enabled }, idx) => {
           const isOpen = openDesc === action;
 
           return (
