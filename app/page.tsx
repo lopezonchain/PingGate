@@ -7,7 +7,7 @@ export async function generateMetadata({ searchParams }: { searchParams: { [key:
 
   return {
     title: "PingGate",
-    description: "Get paid to receive messages. Offer consulting, mentorship, or support through direct, wallet-based chats using XMTP (end to end encrypted)",
+    description: "Chat wallet to wallet. Monetize your inbox. Offer consulting, reviews, mentorship, or support through direct, wallet-based chats using XMTP (end to end encrypted)",
     other: {
       "fc:frame": JSON.stringify({
         version: "next",
