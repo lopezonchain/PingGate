@@ -253,7 +253,7 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
 
           return (
             <div key={idStr} className="bg-[#1a1725] rounded-lg overflow-hidden">
-              {/* Aquí usamos toggle en lugar de setExpanded directamente */}
+
               <div
                 className="p-4 flex justify-between items-center cursor-pointer hover:bg-[#231c32]"
                 onClick={() => toggle(svc.id)}
