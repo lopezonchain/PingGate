@@ -14,7 +14,7 @@ export async function generateMetadata({
   const peerWallet = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   const url = `https://pinggate.lopezonchain.xyz/users/${peerWallet}`;
 
-  // Fetch Farcaster name (o fallback a wallet truncada)
+  // Fetch Farcaster name (o fallback a wallet truncada) usando import dinámico
   const { WarpcastService } = await import("../../services/warpcastService");
   const svc = new WarpcastService();
   const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
