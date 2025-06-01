@@ -49,7 +49,7 @@ export default function ExploreScreen({ onBack }: ExploreScreenProps) {
                 const ids = sellers.map(addr => `farcaster,${addr}`);
 
                 let bioProfiles: Web3BioProfile[] = [];
-                try { bioProfiles = await warp.getWeb3BioProfilesDirect(ids); } catch { }
+                try { bioProfiles = await warp.getWeb3BioProfiles(ids); } catch { }
 
                 const bioMap: Record<string, Web3BioProfile> = {};
                 bioProfiles.forEach(p => {
