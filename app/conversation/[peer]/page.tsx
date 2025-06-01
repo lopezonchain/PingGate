@@ -11,8 +11,15 @@ export async function generateMetadata({
   params,
 }: GenerateMetaProps): Promise<Metadata> {
   const raw = params.peer;
-  const peer = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
-  const fullUrl = `https://pinggate.lopezonchain.xyz/conversation/${peer}`;
+  const peerWallet = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
+  const fullUrl = `https://pinggate.lopezonchain.xyz/conversation/${peerWallet}`;
+
+  const peer = (async () => {
+    const svc = new (require("../../../services/warpcastService").WarpcastService)();
+    const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
+    const name = bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+    return name.length > 29 ? name.slice(0, 29) + "..." : name;
+  })();
 
   return {
     title: `Conversation • ${peer}`,
@@ -26,7 +33,7 @@ export async function generateMetadata({
           action: {
             type: "launch_frame",
             url: fullUrl,
-            name: `Conversation • ${peer}`,
+            name: `Pîng ${peer}`,
             splashImageUrl: "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
             splashBackgroundColor: "#17101f",
           },
