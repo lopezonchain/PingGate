@@ -15,7 +15,7 @@ export async function generateMetadata({
   const fullUrl = `https://pinggate.lopezonchain.xyz/conversation/${peerWallet}`;
 
   const peer = (async () => {
-    const svc = new (require("../../../services/warpcastService").WarpcastService)();
+    const svc = new (require("../../services/warpcastService").WarpcastService)();
     const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
     const name = bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
     return name.length > 29 ? name.slice(0, 29) + "..." : name;
