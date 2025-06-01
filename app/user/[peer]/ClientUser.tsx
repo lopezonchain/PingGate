@@ -60,7 +60,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
         const ids = [`farcaster,${normalizedPeer}`];
         let bioProfiles: Web3BioProfile[] = [];
         try {
-          bioProfiles = await warp.getWeb3BioProfilesDirect(ids);
+          bioProfiles = await warp.getWeb3BioProfiles(ids);
         } catch {
           bioProfiles = [];
         }

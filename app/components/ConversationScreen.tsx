@@ -56,7 +56,7 @@ export default function ConversationScreen({
       const addr = peerAddress.toLowerCase();
       try {
         const ids = [`farcaster,${addr}`];
-        const profiles = await warpcast.getWeb3BioProfilesDirect(ids);
+        const profiles = await warpcast.getWeb3BioProfiles(ids);
         const aliasMap: Record<string, Web3BioProfile> = {};
         profiles.forEach((p) =>
           p.aliases?.forEach((alias) => {

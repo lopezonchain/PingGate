@@ -189,33 +189,5 @@ export class WarpcastService {
     return res.json() as Promise<Web3BioProfile[]>;
   }
 
-  async getWeb3BioProfilesDirect(ids: string[]): Promise<Web3BioProfile[]> {
-  // 1) Serializa el array completo
-  const json = JSON.stringify(ids);
-  // 2) URL-encode de la cadena JSON
-  const encoded = encodeURIComponent(json);
-  // 3) Úsalo como único segmento en el path
-  const url = `${this.web3BioBase}/profile/batch/${encoded}`;
-
-  // 4) Inserta aquí tu API key (la guardamos en una variable de entorno)
-  const apiKey = process.env.WEB3BIO_API_KEY;
-  if (!apiKey) {
-    throw new Error("Falta la variable de entorno WEB3BIO_API_KEY");
-  }
-
-  // 5) Llama a fetch incluyendo X-API-KEY: Bearer {API_KEY}
-  const res = await fetch(url, {
-    headers: {
-      "X-API-KEY": `Bearer ${apiKey}`,
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error(`Web3.bio API error: ${res.status}`);
-  }
-  return res.json() as Promise<Web3BioProfile[]>;
-}
-
-
 
 }
