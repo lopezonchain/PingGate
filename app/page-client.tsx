@@ -24,7 +24,7 @@ import {
 } from "@coinbase/onchainkit/wallet";
 import { sdk } from '@farcaster/frame-sdk';
 
-import { base,baseSepolia, monadTestnet} from "wagmi/chains";
+import { base,baseSepolia} from "wagmi/chains";
 import PingGateHome from "./components/PingGateHome";
 import InboxScreen from "./components/InboxScreen";
 import MyPlansScreen from "./components/MyServicesScreen";
@@ -38,7 +38,6 @@ export type WarpView = "home" | "inbox" | "myplans" | "explore" | "reviews" | "f
 const chainOptions = [
   { label: "Sepolia", chain: baseSepolia },
   { label: "Base", chain: base },
-  { label: "Monad Testnet", chain: monadTestnet }
 ] as const;
 
 
