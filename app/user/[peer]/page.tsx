@@ -11,8 +11,15 @@ export async function generateMetadata({
   params,
 }: GenerateMetaProps): Promise<Metadata> {
   const raw = params.peer;
-  const peer = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
-  const url = `https://pinggate.lopezonchain.xyz/users/${peer}`;
+  const peerWallet = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
+  const url = `https://pinggate.lopezonchain.xyz/users/${peerWallet}`;
+
+  // Fetch Farcaster name (o fallback a wallet truncada)
+  const { WarpcastService } = await import("../../services/warpcastService");
+  const svc = new WarpcastService();
+  const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
+  const displayName = bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+  const peer = displayName.length > 29 ? displayName.slice(0, 29) + "..." : displayName;
 
   return {
     title: `User Profile • ${peer}`,
