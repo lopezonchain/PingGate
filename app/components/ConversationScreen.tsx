@@ -288,7 +288,7 @@ export default function ConversationScreen({
               onClick={() => router.push(`/user/${peerAddress}`)}
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded text-white"
             >
-              Go to this user's services
+              Go to this user&apos;s services
             </button>
             <button
               onClick={onBack}

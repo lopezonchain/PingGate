@@ -348,7 +348,7 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
                   <div>
                     <p className="font-semibold">{svc.title}</p>
                     <p className="text-xs text-gray-400">
-                      Sold: {soldCount} · Revenue: {revenue} ETH · Rating: {avg}
+                      Sold: {soldCount} · Revenue: {revenue} ETH
                       /5
                     </p>
                   </div>
@@ -376,6 +376,7 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
 
                 {isOpen && (
                   <div className="p-4 border-t border-gray-700 space-y-2">
+                    Rating: {avg}
                     {reviewList.length > 0 ? (
                       reviewList.map((r, i) => (
                         <div key={i} className="bg-[#2a2438] p-2 rounded">
