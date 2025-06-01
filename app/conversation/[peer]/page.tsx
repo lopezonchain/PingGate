@@ -2,21 +2,16 @@
 import dynamic from "next/dynamic";
 import type { Metadata } from "next";
 
-const ClientConversation = dynamic<{ peerAddress: string }>(
-  () => import("./ClientConversation"),
-  { ssr: false }
-);
-
 interface GenerateMetaProps {
   params: { peer: string | string[] };
 }
 
+// 1) Este archivo NO lleva "use client"
 export async function generateMetadata({
   params,
 }: GenerateMetaProps): Promise<Metadata> {
-  // Nos aseguramos de obtener un string, incluso si params.peer es arreglo
   const raw = params.peer;
-  const peer = Array.isArray(raw) && raw.length > 0 ? raw[0] : raw;
+  const peer = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   const fullUrl = `https://pinggate.lopezonchain.xyz/conversation/${peer}`;
 
   return {
@@ -41,15 +36,20 @@ export async function generateMetadata({
   };
 }
 
+// 2) Componente de servidor que importa dinámicamente el cliente
+const ClientConversation = dynamic<{ peerAddress: string }>(
+  () => import("./ClientConversation"),
+  { ssr: false }
+);
+
 export default function ConversationPage({
   params,
 }: {
   params: { peer: string | string[] };
 }) {
   const raw = params.peer;
-  const peer =
-    Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
-
+  const peer = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   if (!peer) return null;
+
   return <ClientConversation peerAddress={peer} />;
 }

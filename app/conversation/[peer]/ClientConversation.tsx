@@ -1,8 +1,10 @@
 // app/conversation/[peer]/ClientConversation.tsx
 "use client";
 
+import React from "react";
 import { useRouter } from "next/navigation";
-import ConversationScreen from "../../components/ConversationScreen";
+import ConversationScreen from "../../components/ConversationScreen"; 
+// ^ Ajusta la ruta según dónde esté ConversationScreen 
 
 interface ClientProps {
   peerAddress: string;

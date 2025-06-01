@@ -1,19 +1,18 @@
-// app/user/[peer]/page.tsx
+// app/users/[peer]/page.tsx
 import dynamic from "next/dynamic";
 import type { Metadata } from "next";
-import { useParams } from "next/navigation";
-
-const UserProfileApp = dynamic(() => import("./ClientUser"), { ssr: false });
 
 interface GenerateMetaProps {
-  params: { peer: string };
+  params: { peer: string | string[] };
 }
 
+// 1) Este page.tsx NO debe llevar "use client" ni usar useParams
 export async function generateMetadata({
   params,
 }: GenerateMetaProps): Promise<Metadata> {
-  const peer = params.peer;
-  const url = `https://pinggate.lopezonchain.xyz/user/${peer}`;
+  const raw = params.peer;
+  const peer = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
+  const url = `https://pinggate.lopezonchain.xyz/users/${peer}`;
 
   return {
     title: `User Profile • ${peer}`,
@@ -37,18 +36,20 @@ export async function generateMetadata({
   };
 }
 
-export default function UserProfilePage() {
-  const params = useParams();
+// 2) Aquí hacemos dynamic import de la parte cliente
+const ClientUser = dynamic<{ peerAddress: string }>(
+  () => import("./ClientUser"),
+  { ssr: false }
+);
+
+export default function UserProfilePage({
+  params,
+}: {
+  params: { peer: string | string[] };
+}) {
   const raw = params.peer;
+  const peer = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
+  if (!peer) return null;
 
-  // Hacer la comprobación en dos pasos para que TS entienda que peerAddress es string
-  let peerAddress: string;
-  if (Array.isArray(raw)) {
-    peerAddress = raw[0];
-  } else {
-    peerAddress = raw;
-  }
-
-  if (!peerAddress) return null;
-  return <UserProfileApp peerAddress={peerAddress} />;
+  return <ClientUser peerAddress={peer} />;
 }
