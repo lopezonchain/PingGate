@@ -1,6 +1,4 @@
 // app/user/[peer]/page.tsx
-"use client";
-
 import dynamic from "next/dynamic";
 import type { Metadata } from "next";
 import { useParams } from "next/navigation";
