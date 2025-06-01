@@ -29,7 +29,7 @@ export async function generateMetadata({
         version: "next",
         imageUrl: "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
         button: {
-          title: "User • ${peer}",
+          title: `User • ${peer}`,
           action: {
             type: "launch_frame",
             url,
