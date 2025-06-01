@@ -48,6 +48,7 @@ interface SaleRecord {
   timestamp: bigint;
 }
 
+
 export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
@@ -349,7 +350,6 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
                     <p className="font-semibold">{svc.title}</p>
                     <p className="text-xs text-gray-400">
                       Sold: {soldCount} · Revenue: {revenue} ETH
-                      /5
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -376,7 +376,7 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
 
                 {isOpen && (
                   <div className="p-4 border-t border-gray-700 space-y-2">
-                    Rating: {avg}
+                    Average: {avg}/5
                     {reviewList.length > 0 ? (
                       reviewList.map((r, i) => (
                         <div key={i} className="bg-[#2a2438] p-2 rounded">
