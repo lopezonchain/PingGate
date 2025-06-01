@@ -189,20 +189,5 @@ export class WarpcastService {
     return res.json() as Promise<Web3BioProfile[]>;
   }
 
-  async getWeb3BioProfilesDirect(ids: string[]): Promise<Web3BioProfile[]> {
-    // 1) Serializa el array completo
-    const json = JSON.stringify(ids);
-    // 2) URL-encode de la cadena JSON
-    const encoded = encodeURIComponent(json);
-    // 3) Úsalo como único segment en el path
-    const url = `${this.web3BioBase}/profile/batch/${encoded}`;
-
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`Web3.bio API error: ${res.status}`);
-    }
-    return res.json() as Promise<Web3BioProfile[]>;
-  }
-
 
 }
