@@ -7,10 +7,15 @@ import { useWalletClient } from "wagmi";
 import { FiArrowLeft, FiFile } from "react-icons/fi";
 import { useXmtpClient } from "../hooks/useXmtpClient";
 import { resolveNameLabel } from "../services/resolveNameLabel";
+import {
+  getServicesBy,
+  getPurchasesBy,
+} from "../services/contractService";
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import MessageInput, { XMTPAttachment } from "./MessageInput";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
+import { useRouter } from "next/navigation";
 
 interface ConversationScreenProps {
   peerAddress: string;
@@ -25,39 +30,26 @@ export default function ConversationScreen({
   const { xmtpClient } = useXmtpClient();
   const myAddress = walletClient?.account.address.toLowerCase() || "";
   const warpcast = new WarpcastService();
-  const { context } = useMiniKit();
+  const router = useRouter();
 
+  // Display name and avatar
   const [displayName, setDisplayName] = useState<string>(peerAddress);
-  const [profile, setProfile] = useState<Web3BioProfile>();
+  const [profile, setProfile] = useState<Web3BioProfile | null>(null);
+
+  // Gating state
+  const [checkedGate, setCheckedGate] = useState(false);
+  const [hasPeerServices, setHasPeerServices] = useState(false);
+  const [hasPurchasedService, setHasPurchasedService] = useState(false);
+
+  // Messages
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Full image or file text
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  const attachmentToUrl = (att: XMTPAttachment): string => {
-    if (typeof att.data === "string") {
-      return `data:${att.mimeType};base64,${att.data}`;
-    }
-    const bytes = att.data instanceof Uint8Array
-      ? att.data
-      : Array.isArray(att.data)
-      ? Uint8Array.from(att.data as number[])
-      : new Uint8Array(att.data as ArrayBuffer);
-    return URL.createObjectURL(new Blob([bytes], { type: att.mimeType }));
-  };
-
-  const handleAttachmentClick = async (att: XMTPAttachment) => {
-    if (att.mimeType.startsWith("image/")) {
-      setFullImageSrc(attachmentToUrl(att));
-    } else {
-      const url = attachmentToUrl(att);
-      const resp = await fetch(url);
-      const text = await resp.text();
-      setFullFileText(text);
-    }
-  };
-
+  // Fetch Farcaster/ENS profile
   useEffect(() => {
     let active = true;
     (async () => {
@@ -78,21 +70,90 @@ export default function ConversationScreen({
           setDisplayName(prof.displayName);
           return;
         }
-      } catch {}
-      if(!displayName){
-        try {
-        const ens = await resolveNameLabel(addr);
-        if (active && ens) setDisplayName(ens);
       } catch {
-        if (active) setDisplayName(peerAddress);
+        // ignore
       }
+      if (active) {
+        try {
+          const ens = await resolveNameLabel(addr);
+          if (ens) {
+            setDisplayName(ens);
+            return;
+          }
+        } catch {
+          // ignore
+        }
+        setDisplayName(peerAddress);
       }
     })();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [peerAddress, warpcast]);
 
+  // Check if conversation is gated
   useEffect(() => {
-    if (!xmtpClient) return;
+    if (!walletClient) return;
+    let active = true;
+
+    (async () => {
+      const addrPeer = peerAddress as `0x${string}`;
+      const addrMe = myAddress as `0x${string}`;
+
+      // Get services sold by peer
+      let peerServiceIds: bigint[] = [];
+      try {
+        peerServiceIds = await getServicesBy(addrPeer);
+      } catch {
+        peerServiceIds = [];
+      }
+      if (!active) return;
+
+      if (peerServiceIds.length === 0) {
+        setHasPeerServices(false);
+        setHasPurchasedService(true);
+        setCheckedGate(true);
+        return;
+      }
+
+      setHasPeerServices(true);
+
+      // Check if user purchased any of peer's services
+      let myPurchaseIds: bigint[] = [];
+      try {
+        myPurchaseIds = await getPurchasesBy(addrMe);
+      } catch {
+        myPurchaseIds = [];
+      }
+      if (!active) return;
+
+      const setPeerIds = new Set(peerServiceIds.map((b) => b.toString()));
+      let purchased = false;
+      for (const pid of myPurchaseIds) {
+        if (setPeerIds.has(pid.toString())) {
+          purchased = true;
+          break;
+        }
+      }
+      setHasPurchasedService(purchased);
+      setCheckedGate(true);
+    })().catch(console.error);
+
+    return () => {
+      active = false;
+    };
+  }, [peerAddress, walletClient, myAddress]);
+
+  // Load messages if gating is passed
+  useEffect(() => {
+    if (
+      !xmtpClient ||
+      !checkedGate ||
+      (hasPeerServices && !hasPurchasedService)
+    ) {
+      return;
+    }
+
     let active = true;
     let stream: AsyncIterable<DecodedMessage>;
 
@@ -104,6 +165,7 @@ export default function ConversationScreen({
       });
       if (!active) return;
       setMessages(initial.slice().reverse());
+
       stream = await convo.streamMessages();
       for await (const msg of stream) {
         if (!active) break;
@@ -117,8 +179,9 @@ export default function ConversationScreen({
         (stream as any).return();
       }
     };
-  }, [xmtpClient, peerAddress]);
+  }, [xmtpClient, peerAddress, checkedGate, hasPeerServices, hasPurchasedService]);
 
+  // Scroll to bottom when messages update
   useEffect(() => {
     const c = scrollContainerRef.current;
     if (c) {
@@ -128,13 +191,10 @@ export default function ConversationScreen({
     }
   }, [messages]);
 
+  // Send a new message
   const handleSend = async (text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peerAddress);
-    /*const lastMsg = messages[messages.length - 1];
-    const lastSent = lastMsg?.sent?.getTime() ?? 0;
-    const now = Date.now();
-    const THIRTY_MIN = 30 * 60 * 1000;*/
 
     if (typeof text === "string") {
       await convo.send(text);
@@ -142,8 +202,7 @@ export default function ConversationScreen({
       await convo.send(text, { contentType: ContentTypeAttachment });
     }
 
-    //if (lastSent && now - lastSent < THIRTY_MIN) return;
-
+    // Optional notification
     let fid = 0;
     if (profile?.social?.uid) {
       fid = profile.social.uid;
@@ -151,7 +210,7 @@ export default function ConversationScreen({
       try {
         fid = await warpcast.getFidByName(peerAddress);
       } catch {
-        return;
+        // ignore
       }
     }
 
@@ -161,8 +220,8 @@ export default function ConversationScreen({
     } catch {
       myName = myAddress;
     }
-    const sender = context?.user?.displayName ?? myName;
-    const title = `New ping from ${sender}`;
+
+    const title = `New ping from ${myName}`;
     const body =
       typeof text === "string"
         ? text
@@ -179,8 +238,74 @@ export default function ConversationScreen({
     }).catch(console.error);
   };
 
+  // Convert attachment to URL
+  const attachmentToUrl = (att: XMTPAttachment): string => {
+    if (typeof att.data === "string") {
+      return `data:${att.mimeType};base64,${att.data}`;
+    }
+    const bytes =
+      att.data instanceof Uint8Array
+        ? att.data
+        : Array.isArray(att.data)
+        ? Uint8Array.from(att.data as number[])
+        : new Uint8Array(att.data as ArrayBuffer);
+    return URL.createObjectURL(new Blob([bytes], { type: att.mimeType }));
+  };
+
+  // Handle clicking on an attachment
+  const handleAttachmentClick = async (att: XMTPAttachment) => {
+    if (att.mimeType.startsWith("image/")) {
+      setFullImageSrc(attachmentToUrl(att));
+    } else {
+      const url = attachmentToUrl(att);
+      const resp = await fetch(url);
+      const text = await resp.text();
+      setFullFileText(text);
+    }
+  };
+
+  // Show loading screen while checking
+  if (!checkedGate) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-[#0f0d14] text-white">
+        <span className="text-gray-400">Loading...</span>
+      </div>
+    );
+  }
+
+  // Show modal if gated and not purchased
+  if (hasPeerServices && !hasPurchasedService) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
+        <div className="bg-[#1a1725] text-white p-6 rounded-lg max-w-sm w-full mx-4">
+          <h2 className="text-xl font-semibold">Gated Chat</h2>
+          <p className="mt-2">
+            This user has a private chat. To continue, please purchase their
+            service first.
+          </p>
+          <div className="mt-4 flex flex-col space-y-2">
+            <button
+              onClick={() => router.push(`/user/${peerAddress}`)}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded text-white"
+            >
+              Go to this user's services
+            </button>
+            <button
+              onClick={onBack}
+              className="px-4 py-2 text-gray-400 hover:underline"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render chat if not gated or already purchased
   return (
     <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
+      {/* Header */}
       <div className="flex items-center px-4 py-2 border-b border-gray-700">
         <button
           onClick={onBack}
@@ -200,6 +325,7 @@ export default function ConversationScreen({
         </h2>
       </div>
 
+      {/* Messages list */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div
           ref={scrollContainerRef}
@@ -239,9 +365,7 @@ export default function ConversationScreen({
                     ) : (
                       <>
                         <FiFile className="w-6 h-6 text-gray-300" />
-                        <span className="truncate text-sm">
-                          {att.filename}
-                        </span>
+                        <span className="truncate text-sm">{att.filename}</span>
                       </>
                     )}
                   </div>
@@ -255,11 +379,14 @@ export default function ConversationScreen({
             );
           })}
         </div>
+
+        {/* Input area */}
         <div className="border-t border-gray-700 p-4">
-          <MessageInput onSend={(t) => handleSend(t)} inConversation={true}/>
+          <MessageInput onSend={(t) => handleSend(t)} inConversation={true} />
         </div>
       </div>
 
+      {/* Full-screen image preview */}
       {fullImageSrc && (
         <div
           className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
@@ -273,6 +400,7 @@ export default function ConversationScreen({
         </div>
       )}
 
+      {/* Full-screen file text */}
       {fullFileText && (
         <div
           className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"

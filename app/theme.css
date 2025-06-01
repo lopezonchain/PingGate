@@ -7,7 +7,7 @@
 /* Todas las variables definidas en <body> para cubrir toda la aplicación */
 body {
   /* Tokens de PingGate (Dark Mode) */
-  --pg-bg: #1a1725 !important;
+  --pg-bg: #0f0d14 !important;
   --pg-fg: #ececec !important;
   --pg-fg-muted: #949494 !important;
   --pg-accent: #8565CB !important;

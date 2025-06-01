@@ -24,7 +24,7 @@ import {
   getCreationFee,
   getEditFee,
 } from "../services/contractService";
-import { base } from "viem/chains";
+import { base, baseSepolia } from "viem/chains";
 
 interface MyServicesScreenProps {
   onBack: () => void;
@@ -286,7 +286,6 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
                 </div>
               </div>
 
-              {/* Sólo renderizamos y mostramos reviews si isOpen es true */}
               {isOpen && (
                 <div className="p-4 border-t border-gray-700 space-y-2">
                   {reviewList.length > 0 ? (

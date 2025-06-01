@@ -1,4 +1,3 @@
-// src/components/InboxScreen.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -11,6 +10,7 @@ import { resolveNameLabel } from "../services/resolveNameLabel";
 import {
   getPurchasesBy as fetchPurchasedServiceIds,
   getSalesBy as fetchSalesRecords,
+  getServicesBy as fetchServiceIdsBySeller,
   getService as fetchServiceDetails,
   resolveRecipient,
 } from "../services/contractService";
@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import MessageInput, { XMTPAttachment } from "./MessageInput";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
+import { formatEther } from "ethers";
 
 interface InboxScreenProps {
   onBack: () => void;
@@ -44,13 +45,12 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const myAddr = walletClient?.account.address.toLowerCase() || "";
   const warpcast = new WarpcastService();
 
-  // Mi nombre: Farcaster > ENS > abreviatura de wallet
+  // Resolve own display name
   const [myName, setMyName] = useState<string>("");
   useEffect(() => {
     if (!myAddr) return;
     let active = true;
     (async () => {
-      // 1) Intento Farcaster
       try {
         const [prof] = await warpcast.getWeb3BioProfiles([`farcaster,${myAddr}`]);
         if (active && prof?.displayName) {
@@ -58,7 +58,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           return;
         }
       } catch {}
-      // 2) ENS
       try {
         const ens = await resolveNameLabel(myAddr);
         if (active && ens) {
@@ -66,7 +65,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           return;
         }
       } catch {}
-      // 3) fallback
       if (active) {
         setMyName(abbreviateAddress(myAddr));
       }
@@ -74,10 +72,13 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     return () => { active = false };
   }, [myAddr, warpcast]);
 
-  // — State hooks —
+  // State hooks
   const [conversations, setConversations] = useState<ExtendedConversation[]>([]);
   const [purchasedPeers, setPurchasedPeers] = useState<Set<string>>(new Set());
   const [soldPeers, setSoldPeers] = useState<Set<string>>(new Set());
+  const [spentByPeer, setSpentByPeer] = useState<Record<string, bigint>>({});
+  const [earnedFromPeer, setEarnedFromPeer] = useState<Record<string, bigint>>({});
+  const [gatedPeers, setGatedPeers] = useState<Set<string>>(new Set());
   const [loadingList, setLoadingList] = useState(true);
 
   const [profilesMap, setProfilesMap] = useState<Record<string, any>>({});
@@ -122,7 +123,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   };
 
-  // 1️⃣ Carga inicial de conversaciones
+  // 1️⃣ Load conversations
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
@@ -148,24 +149,38 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     return () => { active = false };
   }, [xmtpClient, myAddr]);
 
-  // 2️⃣ Purchases & Sales
+  // 2️⃣ Load purchases & sales with amounts
   useEffect(() => {
     if (!walletClient) return;
     (async () => {
+      // Purchases → Experts
+      const spentMap: Record<string, bigint> = {};
       const buyerIds = await fetchPurchasedServiceIds(walletClient.account.address);
-      const pSet = new Set<string>();
       for (const id of buyerIds) {
         const svc = await fetchServiceDetails(id);
-        pSet.add(svc.seller.toLowerCase());
+        const seller = svc.seller.toLowerCase();
+        const price = BigInt(svc.price);
+        spentMap[seller] = (spentMap[seller] || BigInt(0)) + price;
       }
-      setPurchasedPeers(pSet);
+      setSpentByPeer(spentMap);
+      setPurchasedPeers(new Set(Object.keys(spentMap)));
 
+      // Sales → Clients
+      const earnedMap: Record<string, bigint> = {};
       const sales = await fetchSalesRecords(walletClient.account.address);
-      setSoldPeers(new Set(sales.map((r) => r.buyer.toLowerCase())));
+      for (const sale of sales) {
+        const buyer = sale.buyer.toLowerCase();
+        // 1) fetchServiceDetails para leer el precio real en wei
+        const svc = await fetchServiceDetails(sale.serviceId);
+        const price: bigint = BigInt(svc.price);
+        earnedMap[buyer] = (earnedMap[buyer] || BigInt(0)) + price;
+      }
+      setEarnedFromPeer(earnedMap);
+      setSoldPeers(new Set(Object.keys(earnedMap)));
     })();
   }, [walletClient]);
 
-  // 3️⃣ Lookup perfiles Farcaster + ENS
+  // 3️⃣ Build Farcaster + ENS profiles
   useEffect(() => {
     if (conversations.length === 0) return;
     const peers = Array.from(new Set(conversations.map((c) => c.peerAddress.toLowerCase())));
@@ -200,7 +215,33 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     })();
   }, [conversations, warpcast]);
 
-  // 4️⃣ Stream global de mensajes
+  // 4️⃣ Build gatedPeers set: those with active services
+  useEffect(() => {
+    if (!walletClient || conversations.length === 0) return;
+    const peers = Array.from(new Set(conversations.map((c) => c.peerAddress.toLowerCase())));
+    let active = true;
+    (async () => {
+      const gp = new Set<string>();
+      for (const peer of peers) {
+        try {
+          const ids = await fetchServiceIdsBySeller(peer as `0x${string}`);
+          for (const sid of ids) {
+            const svc = await fetchServiceDetails(sid);
+            if (svc.active) {
+              gp.add(peer);
+              break;
+            }
+          }
+        } catch {
+          // ignore errors
+        }
+      }
+      if (active) setGatedPeers(gp);
+    })();
+    return () => { active = false };
+  }, [conversations, walletClient]);
+
+  // 5️⃣ Stream all messages to update timestamps
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
@@ -224,7 +265,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     return () => { active = false };
   }, [xmtpClient, myAddr]);
 
-  // 5️⃣ Mensajes de conversación expandida
+  // 6️⃣ Load messages for expanded conversation
   useEffect(() => {
     if (!xmtpClient || !expanded) return;
     let active = true;
@@ -248,23 +289,15 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     return () => { active = false };
   }, [xmtpClient, expanded]);
 
-  // Envío + notificación (usa siempre myName resuelto)
+  // Send message + notification
   const handleSend = async (peer: string, text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peer);
-    const conv = conversations.find((c) => c.peerAddress.toLowerCase() === peer);
-    const lastSent = conv?.updatedAt;
-    const now = new Date();
-    const THIRTY_MIN = 30 * 60 * 1000;
-
     if (typeof text === "string") {
       await convo.send(text);
     } else {
       await convo.send(text, { contentType: ContentTypeAttachment });
     }
-
-    //if (lastSent && now.getTime() - lastSent.getTime() < THIRTY_MIN) return;
-
     const profile = profilesMap[peer];
     let fid = 0;
     if ((profile as Web3BioProfile).social?.uid) {
@@ -274,11 +307,8 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         fid = await warpcast.getFidByName(peer);
       } catch {}
     }
-
-    // Título usando myName resuelto
     const title = `New ping from ${myName}`;
     const bodyText = typeof text === "string" ? text : (text as XMTPAttachment).filename;
-
     fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -290,7 +320,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }).catch(console.error);
   };
 
-  // Nuevo hilo
+  // Start new conversation
   const handleCreate = async () => {
     setSending(true);
     setErr(null);
@@ -303,9 +333,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       setShowComposer(false);
       setTo("");
       setBody("");
-
       const profile = profilesMap[addr];
-
       let fid = 0;
       if ((profile as Web3BioProfile).social?.uid) {
         fid = (profile as Web3BioProfile).social.uid;
@@ -314,11 +342,8 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           fid = await warpcast.getFidByName(addr);
         } catch {}
       }
-      
-      // Título usando myName resuelto
       const title = `New ping from ${myName}`;
       const bodyText = typeof body === "string" ? body : (body as XMTPAttachment).filename;
-
       fetch("/api/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -335,6 +360,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   };
 
+  // Filter based on tab
   const filtered = conversations.filter((c) => {
     const peer = c.peerAddress.toLowerCase();
     if (tab === "sales") return soldPeers.has(peer);
@@ -342,7 +368,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     return true;
   });
 
-  if (loadingList)
+  if (loadingList) {
     return (
       <>
         <div className="flex-1 flex items-center justify-center text-gray-400 mt-16 mb-8">
@@ -366,9 +392,11 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               your messages, to decrypt them for reading. All messages are
               secured and wallet2wallet encrypted, this means only you and your
               conversation partner can view the content.
-              <a className="block p-3 mt-3 bg-[#0F0D14]"
+              <a
+                className="block p-3 mt-3 bg-[#0F0D14]"
                 href="https://docs.xmtp.org/intro/intro"
-                target="_blank">
+                target="_blank"
+              >
                 More info (What is XMTP? Official docs)
               </a>
             </p>
@@ -376,6 +404,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         )}
       </>
     );
+  }
 
   return (
     <div className="flex-1 flex flex-col min-h-0 max-h-[99%] bg-[#0f0d14] text-white relative">
@@ -401,7 +430,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               }
             `}
           >
-            {t === "sales" ? "Clients" : t === "purchases" ? "Bought" : "All"}
+            {t === "sales" ? "Clients" : t === "purchases" ? "Experts" : "All"}
           </button>
         ))}
       </div>
@@ -417,17 +446,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             : abbreviateAddress(peer);
           const avatarUrl = profile?.avatar || null;
           const isOpen = expanded === peer;
-          const isSale = tab === "sales";
-          const isPurchase = tab === "purchases";
-          const count = isSale
-            ? soldPeers.has(peer)
-              ? 1
-              : 0
-            : isPurchase
-            ? purchasedPeers.has(peer)
-              ? 1
-              : 0
-            : 0;
+          const isGated = gatedPeers.has(peer) && !purchasedPeers.has(peer);
 
           return (
             <motion.div
@@ -439,7 +458,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             >
               <div
                 className="p-4 hover:bg-[#231c32] cursor-pointer"
-                onClick={() => setExpanded(isOpen ? null : peer)}
+                onClick={() => {
+                  if (isGated) return;
+                  setExpanded(isOpen ? null : peer);
+                }}
               >
                 <div className="flex items-center space-x-2 mb-2">
                   {avatarUrl && (
@@ -451,19 +473,37 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                   )}
                   <span className="font-semibold">{label}</span>
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-2">
                   <p className="text-xs text-gray-400">
                     {conv.updatedAt?.toLocaleString() || "No messages"}
                   </p>
-                  <div className="flex items-center space-x-2">
-                    {conv.hasUnread && <span className="text-yellow-400">📩</span>}
-                    {(isSale || isPurchase) && (
-                      <span className="text-xs text-gray-500">
-                        {isSale ? `Sold: ${count}` : `Bought: ${count}`}
-                      </span>
-                    )}
-                    <FiMessageCircle className="text-lg text-gray-300" />
+                  <FiMessageCircle className="text-lg text-gray-300" />
+                </div>
+
+                {isGated && (
+                  <div className="mb-2 flex items-center space-x-2">
+                    <span className="text-xs text-yellow-400">Expert (Gated Chat)</span>
+                    <button
+                      onClick={() => router.push(`/users/${peer}`)}
+                      className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded"
+                    >
+                      View Services
+                    </button>
                   </div>
+                )}
+
+                <div className="flex items-center space-x-2">
+                  {conv.hasUnread && <span className="text-yellow-400">📩</span>}
+                  {purchasedPeers.has(peer) && (
+                    <span className="px-2 py-0.5 bg-blue-600 text-xs rounded-full">
+                      Expert • {formatEther(spentByPeer[peer] || BigInt(0))} ETH
+                    </span>
+                  )}
+                  {soldPeers.has(peer) && (
+                    <span className="px-2 py-0.5 bg-green-600 text-xs rounded-full">
+                      Client • {formatEther(earnedFromPeer[peer] || BigInt(0))} ETH
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -524,7 +564,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                         </div>
                       );
                     })}
-                  <MessageInput onSend={(t) => handleSend(peer, t)} inConversation={false}/>
+                  <MessageInput onSend={(t) => handleSend(peer, t)} inConversation={false} />
                 </div>
               )}
             </motion.div>
