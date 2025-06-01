@@ -179,14 +179,15 @@ export class WarpcastService {
     const json = JSON.stringify(ids);
     // 2) URL-encode de la cadena JSON
     const encoded = encodeURIComponent(json);
-    // 3) Úsalo como único segment en el path
-    const url = `${this.web3BioBase}/profile/batch/${encoded}`;
+    // 3) Llama a tu endpoint interno en Next.js (proxy)
+    const url = `/api/warpcast-proxy?ids=${encoded}`;
 
     const res = await fetch(url);
     if (!res.ok) {
-      throw new Error(`Web3.bio API error: ${res.status}`);
+      throw new Error(`Web3.bio proxy error: ${res.status}`);
     }
     return res.json() as Promise<Web3BioProfile[]>;
   }
+
 
 }
