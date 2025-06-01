@@ -1,24 +1,22 @@
 // app/conversation/[peer]/page.tsx
-
 import dynamic from "next/dynamic";
 import type { Metadata } from "next";
 
-// 1) Importamos dinámicamente el componente cliente (ConversationScreen),
-//    para que ‘page.tsx’ pueda seguir siendo un servidor/router.
-//    El componente real, que usa useRouter(), estará en ClientConversation.tsx.
-const ClientConversation = dynamic(
+const ClientConversation = dynamic<{ peerAddress: string }>(
   () => import("./ClientConversation"),
   { ssr: false }
 );
 
 interface GenerateMetaProps {
-  params: { peer: string };
+  params: { peer: string | string[] };
 }
 
 export async function generateMetadata({
   params,
 }: GenerateMetaProps): Promise<Metadata> {
-  const peer = params.peer;
+  // Nos aseguramos de obtener un string, incluso si params.peer es arreglo
+  const raw = params.peer;
+  const peer = Array.isArray(raw) && raw.length > 0 ? raw[0] : raw;
   const fullUrl = `https://pinggate.lopezonchain.xyz/conversation/${peer}`;
 
   return {
@@ -43,14 +41,15 @@ export async function generateMetadata({
   };
 }
 
-// 2) Este es el componente “servidor” que Next renderiza para /conversation/[peer].
-//    Recibe `params.peer` y lo pasa a ClientConversation, que es 100% cliente.
 export default function ConversationPage({
   params,
 }: {
-  params: { peer: string };
+  params: { peer: string | string[] };
 }) {
-  const peer = params.peer;
+  const raw = params.peer;
+  const peer =
+    Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
+
   if (!peer) return null;
   return <ClientConversation peerAddress={peer} />;
 }

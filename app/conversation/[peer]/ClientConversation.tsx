@@ -2,8 +2,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import ConversationScreen from "../../components/ConversationScreen"; 
-// ← Ajusta la ruta si tu componente está en otro sitio.
+import ConversationScreen from "../../components/ConversationScreen";
 
 interface ClientProps {
   peerAddress: string;
