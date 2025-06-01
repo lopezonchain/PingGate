@@ -57,7 +57,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     ;(async () => {
       // 1) Intento Farcaster
       try {
-        const [prof] = await warpcast.getWeb3BioProfiles([`farcaster,${myAddr}`]);
+        const [prof] = await warpcast.getWeb3BioProfilesDirect([`farcaster,${myAddr}`]);
         if (active && prof?.displayName) {
           setMyName(prof.displayName);
           return;
@@ -227,7 +227,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
       // 3.1) Intentamos Farcaster primero
       try {
-        const bioProfiles = await warpcast.getWeb3BioProfiles(ids);
+        const bioProfiles = await warpcast.getWeb3BioProfilesDirect(ids);
         const aliasMap: Record<string, Web3BioProfile> = {};
         bioProfiles.forEach((p) =>
           p.aliases?.forEach((alias) => {
