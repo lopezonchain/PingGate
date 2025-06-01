@@ -1,4 +1,4 @@
-// app/users/[peer]/page.tsx
+// app/user/[peer]/page.tsx
 import dynamic from "next/dynamic";
 import type { Metadata } from "next";
 
@@ -6,7 +6,6 @@ interface GenerateMetaProps {
   params: { peer: string | string[] };
 }
 
-// 1) Este page.tsx NO debe llevar "use client" ni usar useParams
 export async function generateMetadata({
   params,
 }: GenerateMetaProps): Promise<Metadata> {
@@ -14,11 +13,17 @@ export async function generateMetadata({
   const peerWallet = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   const url = `https://pinggate.lopezonchain.xyz/user/${peerWallet}`;
 
-  // Fetch Farcaster name (o fallback a wallet truncada) usando import dinámico
-  const { WarpcastService } = await import("../../services/warpcastService");
-  const svc = new WarpcastService();
-  const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
-  const displayName = bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+  // Intentamos obtener nombre de Farcaster; si falla, usamos wallet truncada.
+  let displayName: string;
+  try {
+    const { WarpcastService } = await import("../../services/warpcastService");
+    const svc = new WarpcastService();
+    const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
+    displayName = bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+  } catch {
+    displayName = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+  }
+
   const peer = displayName.length > 22 ? displayName.slice(0, 22) + "..." : displayName;
 
   return {
@@ -43,7 +48,6 @@ export async function generateMetadata({
   };
 }
 
-// 2) Aquí hacemos dynamic import de la parte cliente
 const ClientUser = dynamic<{ peerAddress: string }>(
   () => import("./ClientUser"),
   { ssr: false }

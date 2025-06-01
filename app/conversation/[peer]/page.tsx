@@ -14,11 +14,21 @@ export async function generateMetadata({
   const peerWallet = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   const fullUrl = `https://pinggate.lopezonchain.xyz/conversation/${peerWallet}`;
 
-  // Fetch Farcaster name (o fallback a wallet truncada) usando import dinámico
-  const { WarpcastService } = await import("../../services/warpcastService");
-  const svc = new WarpcastService();
-  const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
-  const nameOrWallet = bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+  // Intentamos obtener el nombre de Farcaster; si da error (403 u otro), usamos la wallet truncada.
+  let nameOrWallet: string;
+  try {
+    const { WarpcastService } = await import("../../services/warpcastService");
+    const svc = new WarpcastService();
+    const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
+    if (bio?.displayName) {
+      nameOrWallet = bio.displayName;
+    } else {
+      nameOrWallet = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+    }
+  } catch {
+    nameOrWallet = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+  }
+
   const peer = nameOrWallet.length > 24 ? nameOrWallet.slice(0, 24) + "..." : nameOrWallet;
 
   return {
