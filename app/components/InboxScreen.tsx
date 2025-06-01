@@ -1,6 +1,7 @@
+// src/components/InboxScreen.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Conversation, DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
 import { useWalletClient } from "wagmi";
 import { FiFile, FiHelpCircle, FiMenu, FiMessageCircle, FiPlus } from "react-icons/fi";
@@ -43,36 +44,51 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const { data: walletClient } = useWalletClient();
   const { xmtpClient, error: xmtpError } = useXmtpClient();
   const myAddr = walletClient?.account.address.toLowerCase() || "";
-  const warpcast = new WarpcastService();
 
-  // Resolve own display name
+  // Creamos WarpcastService SOLO una vez
+  const warpcast = useMemo(() => new WarpcastService(), []);
+
+  //— Resolución de mi nombre (Farcaster → ENS → fallback)
   const [myName, setMyName] = useState<string>("");
   useEffect(() => {
     if (!myAddr) return;
     let active = true;
-    (async () => {
+
+    ;(async () => {
+      // 1) Intento Farcaster
       try {
         const [prof] = await warpcast.getWeb3BioProfiles([`farcaster,${myAddr}`]);
         if (active && prof?.displayName) {
           setMyName(prof.displayName);
           return;
         }
-      } catch {}
+      } catch {
+        // si falla, seguimos
+      }
+
+      // 2) ENS
       try {
         const ens = await resolveNameLabel(myAddr);
         if (active && ens) {
           setMyName(ens);
           return;
         }
-      } catch {}
+      } catch {
+        // si falla, usamos fallback
+      }
+
+      // 3) fallback: abreviar dirección
       if (active) {
         setMyName(abbreviateAddress(myAddr));
       }
     })();
-    return () => { active = false };
+
+    return () => {
+      active = false;
+    };
   }, [myAddr, warpcast]);
 
-  // State hooks
+  //— Estado principal
   const [conversations, setConversations] = useState<ExtendedConversation[]>([]);
   const [purchasedPeers, setPurchasedPeers] = useState<Set<string>>(new Set());
   const [soldPeers, setSoldPeers] = useState<Set<string>>(new Set());
@@ -92,7 +108,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const [err, setErr] = useState<string | null>(null);
 
   const [tab, setTab] = useState<Tab>("all");
-
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
 
@@ -108,8 +123,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     } else {
       bytes = new Uint8Array(att.data as ArrayBuffer);
     }
-    const blob = new Blob([bytes], { type: att.mimeType });
-    return URL.createObjectURL(blob);
+    return URL.createObjectURL(new Blob([bytes], { type: att.mimeType }));
   };
 
   const handleAttachmentClick = async (att: XMTPAttachment) => {
@@ -123,11 +137,12 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   };
 
-  // 1️⃣ Load conversations
+  // 1️⃣ Carga inicial de conversaciones XMTP
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
-    (async () => {
+
+    ;(async () => {
       setLoadingList(true);
       const list = await xmtpClient.conversations.list();
       const metas = await Promise.all(
@@ -140,88 +155,136 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         updatedAt: metas[i][0]?.sent ?? null,
         hasUnread: metas[i][0]?.senderAddress.toLowerCase() !== myAddr,
       }));
+
       enriched.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
       if (active) {
         setConversations(enriched);
         setLoadingList(false);
       }
     })();
-    return () => { active = false };
+
+    return () => {
+      active = false;
+    };
   }, [xmtpClient, myAddr]);
 
-  // 2️⃣ Load purchases & sales with amounts
+  // 2️⃣ Compras y ventas (amounts) → purchasedPeers, soldPeers
   useEffect(() => {
     if (!walletClient) return;
-    (async () => {
-      // Purchases → Experts
+    let active = true;
+
+    ;(async () => {
+      // ── Purchases → Experts ──
       const spentMap: Record<string, bigint> = {};
       const buyerIds = await fetchPurchasedServiceIds(walletClient.account.address);
+
       for (const id of buyerIds) {
         const svc = await fetchServiceDetails(id);
         const seller = svc.seller.toLowerCase();
         const price = BigInt(svc.price);
         spentMap[seller] = (spentMap[seller] || BigInt(0)) + price;
       }
-      setSpentByPeer(spentMap);
-      setPurchasedPeers(new Set(Object.keys(spentMap)));
 
-      // Sales → Clients
+      if (active) {
+        setSpentByPeer(spentMap);
+        setPurchasedPeers(new Set(Object.keys(spentMap)));
+      }
+
+      // ── Sales → Clients ──
       const earnedMap: Record<string, bigint> = {};
       const sales = await fetchSalesRecords(walletClient.account.address);
+
       for (const sale of sales) {
         const buyer = sale.buyer.toLowerCase();
-        // 1) fetchServiceDetails para leer el precio real en wei
         const svc = await fetchServiceDetails(sale.serviceId);
         const price: bigint = BigInt(svc.price);
         earnedMap[buyer] = (earnedMap[buyer] || BigInt(0)) + price;
       }
-      setEarnedFromPeer(earnedMap);
-      setSoldPeers(new Set(Object.keys(earnedMap)));
+
+      if (active) {
+        setEarnedFromPeer(earnedMap);
+        setSoldPeers(new Set(Object.keys(earnedMap)));
+      }
     })();
+
+    return () => {
+      active = false;
+    };
   }, [walletClient]);
 
-  // 3️⃣ Build Farcaster + ENS profiles
+  // 3️⃣ Perfiles Farcaster + ENS para cada peer (basado en “conversations”)
   useEffect(() => {
     if (conversations.length === 0) return;
-    const peers = Array.from(new Set(conversations.map((c) => c.peerAddress.toLowerCase())));
+    let active = true;
+
+    const peers = Array.from(
+      new Set(conversations.map((c) => c.peerAddress.toLowerCase()))
+    );
     const ids = peers.map((addr) => `farcaster,${addr}`);
-    (async () => {
-      const newProfiles: Record<string, any> = {};
+
+    ;(async () => {
+      const newProfiles: Record<string, Web3BioProfile | { displayName: string; avatar: string | null }> = {};
+
+      // 3.1) Intentamos Farcaster primero
       try {
-        const profiles = await warpcast.getWeb3BioProfiles(ids);
+        const bioProfiles = await warpcast.getWeb3BioProfiles(ids);
         const aliasMap: Record<string, Web3BioProfile> = {};
-        profiles.forEach((p) =>
+        bioProfiles.forEach((p) =>
           p.aliases?.forEach((alias) => {
             const [, id] = alias.split(",");
             aliasMap[id.toLowerCase()] = p;
           })
         );
         peers.forEach((addr) => {
-          if (aliasMap[addr]) newProfiles[addr] = aliasMap[addr];
+          if (aliasMap[addr]) {
+            newProfiles[addr] = aliasMap[addr];
+          }
         });
-      } catch {}
+      } catch {
+        // ignoramos errores de Farcaster
+      }
+
+      // 3.2) Para cada peer sin perfil, intentamos ENS
       await Promise.all(
         peers.map(async (addr) => {
           if (newProfiles[addr]) return;
           try {
             const ens = await resolveNameLabel(addr);
-            newProfiles[addr] = { displayName: ens || abbreviateAddress(addr), avatar: null };
+            newProfiles[addr] = {
+              displayName: ens || abbreviateAddress(addr),
+              avatar: null,
+            };
           } catch {
-            newProfiles[addr] = { displayName: abbreviateAddress(addr), avatar: null };
+            newProfiles[addr] = {
+              displayName: abbreviateAddress(addr),
+              avatar: null,
+            };
           }
         })
       );
-      setProfilesMap(newProfiles);
+
+      if (active) {
+        setProfilesMap(newProfiles);
+      }
     })();
+
+    return () => {
+      active = false;
+    };
   }, [conversations, warpcast]);
 
-  // 4️⃣ Build gatedPeers set: those with active services
+  // 4️⃣ Construir gatedPeers: quienes tienen servicios activos
   useEffect(() => {
     if (!walletClient || conversations.length === 0) return;
-    const peers = Array.from(new Set(conversations.map((c) => c.peerAddress.toLowerCase())));
     let active = true;
-    (async () => {
+
+    const peers = Array.from(
+      new Set(conversations.map((c) => c.peerAddress.toLowerCase()))
+    );
+
+    ;(async () => {
       const gp = new Set<string>();
+
       for (const peer of peers) {
         try {
           const ids = await fetchServiceIdsBySeller(peer as `0x${string}`);
@@ -233,24 +296,32 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             }
           }
         } catch {
-          // ignore errors
+          // ignoramos cualquier error por peer
         }
       }
-      if (active) setGatedPeers(gp);
+
+      if (active) {
+        setGatedPeers(gp);
+      }
     })();
-    return () => { active = false };
+
+    return () => {
+      active = false;
+    };
   }, [conversations, walletClient]);
 
-  // 5️⃣ Stream all messages to update timestamps
+  // 5️⃣ Stream global de mensajes (actualiza updatedAt y hasUnread)
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
-    (async () => {
+
+    ;(async () => {
       const stream = await xmtpClient.conversations.streamAllMessages();
       for await (const msg of stream) {
         if (!active) break;
         const peer = msg.conversation.peerAddress.toLowerCase();
         const isMe = msg.senderAddress.toLowerCase() === myAddr;
+
         setConversations((prev) =>
           prev
             .map((c) =>
@@ -258,25 +329,35 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                 ? { ...c, updatedAt: msg.sent, hasUnread: !isMe }
                 : c
             )
-            .sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()))
+            .sort((a, b) =>
+              (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
+            )
         );
       }
     })().catch(console.error);
-    return () => { active = false };
+
+    return () => {
+      active = false;
+    };
   }, [xmtpClient, myAddr]);
 
-  // 6️⃣ Load messages for expanded conversation
+  // 6️⃣ Mensajes de conversación expandida
   useEffect(() => {
     if (!xmtpClient || !expanded) return;
     let active = true;
-    (async () => {
+
+    ;(async () => {
       const convo = await xmtpClient.conversations.newConversation(expanded);
       const initial = await convo.messages({
         limit: 5,
         direction: SortDirection.SORT_DIRECTION_DESCENDING,
       });
       if (!active) return;
-      setMessages((prev) => ({ ...prev, [expanded]: initial.slice().reverse() }));
+      setMessages((prev) => ({
+        ...prev,
+        [expanded]: initial.slice().reverse(),
+      }));
+
       const stream = await convo.streamMessages();
       for await (const msg of stream) {
         if (!active) break;
@@ -286,10 +367,13 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         }));
       }
     })().catch(console.error);
-    return () => { active = false };
+
+    return () => {
+      active = false;
+    };
   }, [xmtpClient, expanded]);
 
-  // Send message + notification
+  //️ Envío + notificación
   const handleSend = async (peer: string, text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peer);
@@ -298,6 +382,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     } else {
       await convo.send(text, { contentType: ContentTypeAttachment });
     }
+
     const profile = profilesMap[peer];
     let fid = 0;
     if ((profile as Web3BioProfile).social?.uid) {
@@ -305,10 +390,14 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     } else {
       try {
         fid = await warpcast.getFidByName(peer);
-      } catch {}
+      } catch {
+        /* no hacemos nada si falla */
+      }
     }
+
     const title = `New ping from ${myName}`;
     const bodyText = typeof text === "string" ? text : (text as XMTPAttachment).filename;
+
     fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -320,19 +409,22 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }).catch(console.error);
   };
 
-  // Start new conversation
+  // Nuevo hilo
   const handleCreate = async () => {
     setSending(true);
     setErr(null);
     try {
       if (!xmtpClient) throw new Error("XMTP not ready");
       if (!to || !body) throw new Error("Fill all fields");
+
       const addr = await resolveRecipient(to);
       const convo = await xmtpClient.conversations.newConversation(addr);
       await convo.send(body);
+
       setShowComposer(false);
       setTo("");
       setBody("");
+
       const profile = profilesMap[addr];
       let fid = 0;
       if ((profile as Web3BioProfile).social?.uid) {
@@ -340,10 +432,14 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       } else {
         try {
           fid = await warpcast.getFidByName(addr);
-        } catch {}
+        } catch {
+          /* */
+        }
       }
+
       const title = `New ping from ${myName}`;
       const bodyText = typeof body === "string" ? body : (body as XMTPAttachment).filename;
+
       fetch("/api/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -360,7 +456,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   };
 
-  // Filter based on tab
+  // Filtrado según pestaña
   const filtered = conversations.filter((c) => {
     const peer = c.peerAddress.toLowerCase();
     if (tab === "sales") return soldPeers.has(peer);
@@ -442,9 +538,9 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           const peer = conv.peerAddress.toLowerCase();
           const profile = profilesMap[peer];
           const label = profile
-            ? abbreviateAddress(profile.displayName)
+            ? abbreviateAddress((profile as any).displayName)
             : abbreviateAddress(peer);
-          const avatarUrl = profile?.avatar || null;
+          const avatarUrl = (profile as any)?.avatar || null;
           const isOpen = expanded === peer;
           const isGated = gatedPeers.has(peer) && !purchasedPeers.has(peer);
 
@@ -459,7 +555,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               <div
                 className="p-4 hover:bg-[#231c32] cursor-pointer"
                 onClick={() => {
-                  if (isGated) return;
+                  if (isGated) return; // no abrir si está gateado y no comprado
                   setExpanded(isOpen ? null : peer);
                 }}
               >
@@ -482,7 +578,9 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
                 {isGated && (
                   <div className="mb-2 flex items-center space-x-2">
-                    <span className="text-xs text-yellow-400">Expert (Gated Chat)</span>
+                    <span className="text-xs text-yellow-400">
+                      Expert (Gated Chat)
+                    </span>
                     <button
                       onClick={() => router.push(`/users/${peer}`)}
                       className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded"
