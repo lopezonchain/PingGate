@@ -14,19 +14,7 @@ export async function generateMetadata({
   const fullUrl = `https://pinggate.lopezonchain.xyz/conversation/${peerWallet}`;
 
   // Intentamos obtener nombre de Farcaster, si falla (CORS o API 403) usamos wallet truncada
-  let nameOrWallet: string;
-  try {
-    const { WarpcastService } = await import("../../services/warpcastService");
-    const svc = new WarpcastService();
-    const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
-    nameOrWallet = bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
-  } catch {
-    nameOrWallet = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
-  }
-
-  const peer = nameOrWallet.length > 24
-    ? nameOrWallet.slice(0, 24) + "..."
-    : nameOrWallet;
+  const peer = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
 
   return {
     title: `Conversation • ${peer}`,
