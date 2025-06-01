@@ -1,4 +1,4 @@
-// app/users/[peer]/ClientUser.tsx
+// app/user/[peer]/ClientUser.tsx
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";

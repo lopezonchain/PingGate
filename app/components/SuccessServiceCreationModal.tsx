@@ -28,7 +28,7 @@ export default function SuccessServiceCreationModal({
   }, []);
 
   const goToServices = () => {
-    router.push(`/users/${sellerAddress}`);
+    router.push(`/user/${sellerAddress}`);
   };
 
   return (

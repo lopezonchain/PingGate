@@ -1,4 +1,4 @@
-// app/users/[peer]/page.tsx
+// app/user/[peer]/page.tsx
 "use client";
 
 import dynamic from "next/dynamic";
@@ -15,7 +15,7 @@ export async function generateMetadata({
   params,
 }: GenerateMetaProps): Promise<Metadata> {
   const peer = params.peer;
-  const url = `https://pinggate.lopezonchain.xyz/users/${peer}`;
+  const url = `https://pinggate.lopezonchain.xyz/user/${peer}`;
 
   return {
     title: `User Profile • ${peer}`,

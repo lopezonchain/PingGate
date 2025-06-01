@@ -282,7 +282,7 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
   const handleShare = async () => {
     try {
       const svc = new WarpcastService();
-      const link = `https://your-app-domain.com/users/${sellerAddress}`;
+      const link = `https://your-app-domain.com/user/${sellerAddress}`;
       //await svc.createPost(link); // assume createPost publishes text
       toast.success("Shared on Farcaster");
     } catch (e: any) {

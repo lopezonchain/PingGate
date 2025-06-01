@@ -582,7 +582,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                       Expert (Gated Chat)
                     </span>
                     <button
-                      onClick={() => router.push(`/users/${peer}`)}
+                      onClick={() => router.push(`/user/${peer}`)}
                       className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded"
                     >
                       View Services
