@@ -1,4 +1,4 @@
-// app/user/[peer]/page.tsx
+// app/users/[peer]/page.tsx
 import dynamic from "next/dynamic";
 import type { Metadata } from "next";
 
@@ -13,7 +13,7 @@ export async function generateMetadata({
   const peerWallet = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   const url = `https://pinggate.lopezonchain.xyz/user/${peerWallet}`;
 
-  // Intentamos obtener nombre de Farcaster; si falla, usamos wallet truncada.
+  // Intentamos obtener nombre de Farcaster, si falla usamos wallet truncada
   let displayName: string;
   try {
     const { WarpcastService } = await import("../../services/warpcastService");
@@ -24,7 +24,9 @@ export async function generateMetadata({
     displayName = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
   }
 
-  const peer = displayName.length > 22 ? displayName.slice(0, 22) + "..." : displayName;
+  const peer = displayName.length > 22
+    ? displayName.slice(0, 22) + "..."
+    : displayName;
 
   return {
     title: `User Profile • ${peer}`,

@@ -6,7 +6,6 @@ interface GenerateMetaProps {
   params: { peer: string | string[] };
 }
 
-// 1) Este archivo NO lleva "use client"
 export async function generateMetadata({
   params,
 }: GenerateMetaProps): Promise<Metadata> {
@@ -14,22 +13,20 @@ export async function generateMetadata({
   const peerWallet = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   const fullUrl = `https://pinggate.lopezonchain.xyz/conversation/${peerWallet}`;
 
-  // Intentamos obtener el nombre de Farcaster; si da error (403 u otro), usamos la wallet truncada.
+  // Intentamos obtener nombre de Farcaster, si falla (CORS o API 403) usamos wallet truncada
   let nameOrWallet: string;
   try {
     const { WarpcastService } = await import("../../services/warpcastService");
     const svc = new WarpcastService();
     const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
-    if (bio?.displayName) {
-      nameOrWallet = bio.displayName;
-    } else {
-      nameOrWallet = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
-    }
+    nameOrWallet = bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
   } catch {
     nameOrWallet = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
   }
 
-  const peer = nameOrWallet.length > 24 ? nameOrWallet.slice(0, 24) + "..." : nameOrWallet;
+  const peer = nameOrWallet.length > 24
+    ? nameOrWallet.slice(0, 24) + "..."
+    : nameOrWallet;
 
   return {
     title: `Conversation • ${peer}`,
@@ -53,7 +50,6 @@ export async function generateMetadata({
   };
 }
 
-// 2) Componente de servidor que importa dinámicamente el cliente
 const ClientConversation = dynamic<{ peerAddress: string }>(
   () => import("./ClientConversation"),
   { ssr: false }
