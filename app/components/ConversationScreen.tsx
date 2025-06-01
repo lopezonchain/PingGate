@@ -52,6 +52,8 @@ export default function ConversationScreen({
   // Fetch Farcaster/ENS profile
   useEffect(() => {
     let active = true;
+    const warpcast = new WarpcastService();
+
     (async () => {
       const addr = peerAddress.toLowerCase();
       try {
@@ -86,10 +88,12 @@ export default function ConversationScreen({
         setDisplayName(peerAddress);
       }
     })();
+
     return () => {
       active = false;
     };
-  }, [peerAddress, warpcast]);
+  }, [peerAddress]);
+
 
   // Check if conversation is gated
   useEffect(() => {
