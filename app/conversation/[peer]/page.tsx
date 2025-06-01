@@ -18,7 +18,7 @@ export async function generateMetadata({
   try {
     const { WarpcastService } = await import("../../services/warpcastService");
     const svc = new WarpcastService();
-    const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
+    const [bio] = await svc.getWeb3BioProfilesDirect([`farcaster,${peerWallet}`]);
     nameOrWallet = bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
   } catch {
     nameOrWallet = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
