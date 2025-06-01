@@ -19,21 +19,21 @@ export async function generateMetadata({
   const svc = new WarpcastService();
   const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
   const nameOrWallet = bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
-  const peer = nameOrWallet.length > 29 ? nameOrWallet.slice(0, 29) + "..." : nameOrWallet;
+  const peer = nameOrWallet.length > 24 ? nameOrWallet.slice(0, 24) + "..." : nameOrWallet;
 
   return {
     title: `Conversation • ${peer}`,
-    description: `Encrypted chat with ${peer}`,
+    description: `Wallet to wallet chat with ${peer}`,
     other: {
       "fc:frame": JSON.stringify({
         version: "next",
         imageUrl: "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
         button: {
-          title: "Launch PingGate 💬",
+          title: `Pîng ${peer}`,
           action: {
             type: "launch_frame",
             url: fullUrl,
-            name: `Pîng ${peer}`,
+            name: `Ping ${peer}`,
             splashImageUrl: "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
             splashBackgroundColor: "#17101f",
           },
