@@ -267,7 +267,7 @@ export async function submitReview(
 }
 
 /**
- * Fetch the on-chain creation fee (in wei)
+ * Fetch the onchain creation fee (in wei)
  */
 export async function getCreationFee(): Promise<bigint> {
   return publicClient.readContract({
@@ -277,7 +277,7 @@ export async function getCreationFee(): Promise<bigint> {
 }
 
 /**
- * Fetch the on-chain edit fee (in wei)
+ * Fetch the onchain edit fee (in wei)
  */
 export async function getEditFee(): Promise<bigint> {
   return publicClient.readContract({
