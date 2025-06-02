@@ -51,49 +51,9 @@ export default function ConversationScreen({
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
 
-  // — Display error
-  const [displayError, setDisplayError] = useState<string | null>(null);
-
   // =========================
-  // 1️⃣  If no walletClient, show "Connect Wallet"
-  // =========================
-  if (!walletClient && !walletLoading) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0d14] text-white p-4">
-        <p className="mb-4 text-gray-400">
-          To view this conversation, please connect your wallet.
-        </p>
-        {connectors.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => connect({ connector: c })}
-            className="px-4 py-2 mb-2 bg-purple-600 hover:bg-purple-700 rounded text-white"
-          >
-            Connect with {c.name}
-          </button>
-        ))}
-        {walletLoading && (
-          <p className="text-gray-400 mt-2">Loading wallet…</p>
-        )}
-      </div>
-    );
-  }
-
-  // 2️⃣  If walletClient exists but xmtpClient not ready, show loading
-  if (walletClient && !xmtpClient) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0d14] text-white p-4">
-        <p className="text-gray-400 mb-2">Initializing secure chat (XMTP)…</p>
-        {xmtpError && (
-          <p className="text-red-500">
-            Error connecting to XMTP: {xmtpError}
-          </p>
-        )}
-      </div>
-    );
-  }
-
   // 3️⃣  Fetch Farcaster/ENS profile
+  // =========================
   useEffect(() => {
     let active = true;
     const warp = new WarpcastService();
@@ -138,7 +98,9 @@ export default function ConversationScreen({
     };
   }, [peerAddress]);
 
+  // =========================
   // 4️⃣  Check gating (peer services + purchases)
+  // =========================
   useEffect(() => {
     if (!walletClient) return;
     let active = true;
@@ -187,7 +149,9 @@ export default function ConversationScreen({
     };
   }, [peerAddress, walletClient, myAddress]);
 
+  // =========================
   // 5️⃣  Load XMTP messages if gating passed
+  // =========================
   useEffect(() => {
     if (
       !xmtpClient ||
@@ -224,7 +188,9 @@ export default function ConversationScreen({
     };
   }, [xmtpClient, peerAddress, checkedGate, hasPeerServices, hasPurchasedService]);
 
+  // =========================
   // 6️⃣  Auto-scroll when messages update
+  // =========================
   useEffect(() => {
     const c = scrollContainerRef.current;
     if (c) {
@@ -234,7 +200,9 @@ export default function ConversationScreen({
     }
   }, [messages]);
 
+  // =========================
   // 7️⃣  Send a new message
+  // =========================
   const handleSend = async (text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peerAddress);
@@ -308,7 +276,44 @@ export default function ConversationScreen({
   // Render conditional
   // =========================
 
-  // 1) Loading while gating check is in progress
+  // 1) If no walletClient and not loading, show "Connect Wallet"
+  if (!walletClient && !walletLoading) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0d14] text-white p-4">
+        <p className="mb-4 text-gray-400">
+          To view this conversation, please connect your wallet.
+        </p>
+        {connectors.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => connect({ connector: c })}
+            className="px-4 py-2 mb-2 bg-purple-600 hover:bg-purple-700 rounded text-white"
+          >
+            Connect with {c.name}
+          </button>
+        ))}
+        {walletLoading && (
+          <p className="text-gray-400 mt-2">Loading wallet…</p>
+        )}
+      </div>
+    );
+  }
+
+  // 2) If walletClient exists but xmtpClient not ready, show loading
+  if (walletClient && !xmtpClient) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0d14] text-white p-4">
+        <p className="text-gray-400 mb-2">Initializing secure chat (XMTP)…</p>
+        {xmtpError && (
+          <p className="text-red-500">
+            Error connecting to XMTP: {xmtpError}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // 3) Loading while gating check is in progress
   if (!checkedGate) {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#0f0d14] text-white">
@@ -317,7 +322,7 @@ export default function ConversationScreen({
     );
   }
 
-  // 2) If gated and not purchased, show gated modal
+  // 4) If gated and not purchased, show gated modal
   if (hasPeerServices && !hasPurchasedService) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
@@ -346,7 +351,7 @@ export default function ConversationScreen({
     );
   }
 
-   // 3) Full chat render
+  // 5) Full chat render
   return (
     <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
       {/* Header */}
