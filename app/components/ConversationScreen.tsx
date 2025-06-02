@@ -16,8 +16,26 @@ import MessageInput, { XMTPAttachment } from "./MessageInput";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
 import { useRouter } from "next/navigation";
-import { sdk } from '@farcaster/frame-sdk';
+import { sdk } from "@farcaster/frame-sdk";
 
+// -------------------------
+// Hook simple para detectar iframe
+// -------------------------
+function useIsInIframe() {
+  const [inIframe, setInIframe] = useState(false);
+  useEffect(() => {
+    try {
+      setInIframe(window.self !== window.top);
+    } catch {
+      setInIframe(true);
+    }
+  }, []);
+  return inIframe;
+}
+
+// -------------------------
+// Componente principal
+// -------------------------
 interface ConversationScreenProps {
   peerAddress: string;
   onBack: () => void;
@@ -42,33 +60,63 @@ export default function ConversationScreen({
   const [hasPeerServices, setHasPeerServices] = useState(false);
   const [hasPurchasedService, setHasPurchasedService] = useState(false);
 
-  // Messages
+  // Mensajes
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Full image or file text
+  // Preview de attachments
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
 
+  // Farcaster Frame / Wallet
   const { setFrameReady, isFrameReady } = useMiniKit();
+  const [hasRequestedSign, setHasRequestedSign] = useState(false);
+  const [signError, setSignError] = useState<string | null>(null);
 
+  const inIframe = useIsInIframe();
+
+  // -------------------------
+  // 1) Inicializar Frame + solicitar firma
+  // -------------------------
   useEffect(() => {
-    if (!isFrameReady) setFrameReady();
-    (async () => {
-      await sdk.actions.ready({ disableNativeGestures: true });
-    })();
-  }, [isFrameReady, setFrameReady]);
+    // Activar MiniKit
+    if (!isFrameReady) {
+      setFrameReady();
+    }
 
-  // Fetch Farcaster/ENS profile
+    // Una vez FrameKit está listo, notificar y pedir sign-in
+    if (isFrameReady && !hasRequestedSign && inIframe) {
+      (async () => {
+        try {
+          // a) Notificamos a Frame SDK que la UI está lista
+          await sdk.actions.ready({ disableNativeGestures: true });
+          // b) Solicitud de firma de usuario
+          await sdk.actions.signIn();
+          // c) Marcamos que ya pedimos la firma
+          setHasRequestedSign(true);
+        } catch (err: any) {
+          console.error("Error al solicitar firma en Frame:", err);
+          setSignError(
+            err?.message ||
+              "No se pudo conectar al Frame Wallet. Abre en un navegador."
+          );
+        }
+      })();
+    }
+  }, [isFrameReady, inIframe, hasRequestedSign, setFrameReady]);
+
+  // -------------------------
+  // 2) Cargar perfil Farcaster/ENS (igual que antes)
+  // -------------------------
   useEffect(() => {
     let active = true;
-    const warpcast = new WarpcastService();
+    const warp = new WarpcastService();
 
     (async () => {
       const addr = peerAddress.toLowerCase();
       try {
         const ids = [`farcaster,${addr}`];
-        const profiles = await warpcast.getWeb3BioProfiles(ids);
+        const profiles = await warp.getWeb3BioProfiles(ids);
         const aliasMap: Record<string, Web3BioProfile> = {};
         profiles.forEach((p) =>
           p.aliases?.forEach((alias) => {
@@ -104,17 +152,26 @@ export default function ConversationScreen({
     };
   }, [peerAddress]);
 
-
-  // Check if conversation is gated
+  // -------------------------
+  // 3) Check de “gating” (servicios + compras)
+  // -------------------------
   useEffect(() => {
-    if (!walletClient) return;
-    let active = true;
+    // Si estamos en un iframe *sin* wallet válido, lo saltamos
+    if (inIframe && !walletClient) {
+      // Consideramos “pasado” el gating: usuario no puede chatear en iframe
+      setCheckedGate(true);
+      return;
+    }
 
+    // Si no hay walletClient aún, esperamos
+    if (!walletClient) return;
+
+    let active = true;
     (async () => {
       const addrPeer = peerAddress as `0x${string}`;
       const addrMe = myAddress as `0x${string}`;
 
-      // Get services sold by peer
+      // 3.1) Obtener servicios vendidos por peer
       let peerServiceIds: bigint[] = [];
       try {
         peerServiceIds = await getServicesBy(addrPeer);
@@ -123,6 +180,7 @@ export default function ConversationScreen({
       }
       if (!active) return;
 
+      // Si el peer no vende servicios, no hay gating
       if (peerServiceIds.length === 0) {
         setHasPeerServices(false);
         setHasPurchasedService(true);
@@ -132,7 +190,7 @@ export default function ConversationScreen({
 
       setHasPeerServices(true);
 
-      // Check if user purchased any of peer's services
+      // 3.2) Verificar compras de usuario en esos servicios
       let myPurchaseIds: bigint[] = [];
       try {
         myPurchaseIds = await getPurchasesBy(addrMe);
@@ -156,15 +214,18 @@ export default function ConversationScreen({
     return () => {
       active = false;
     };
-  }, [peerAddress, walletClient, myAddress]);
+  }, [peerAddress, walletClient, myAddress, inIframe]);
 
-  // Load messages if gating is passed
+  // -------------------------
+  // 4) Cargar mensajes XMTP si pasa el gating
+  // -------------------------
   useEffect(() => {
-    if (
-      !xmtpClient ||
-      !checkedGate ||
-      (hasPeerServices && !hasPurchasedService)
-    ) {
+    // Si hay error de signIn en Frame o estamos en iframe sin firma, no cargamos
+    if (signError || (inIframe && !hasRequestedSign)) {
+      return;
+    }
+    // Si gating no terminado o no tenemos xmtpClient, no cargamos
+    if (!xmtpClient || !checkedGate || (hasPeerServices && !hasPurchasedService)) {
       return;
     }
 
@@ -193,9 +254,20 @@ export default function ConversationScreen({
         (stream as any).return();
       }
     };
-  }, [xmtpClient, peerAddress, checkedGate, hasPeerServices, hasPurchasedService]);
+  }, [
+    xmtpClient,
+    peerAddress,
+    checkedGate,
+    hasPeerServices,
+    hasPurchasedService,
+    inIframe,
+    hasRequestedSign,
+    signError,
+  ]);
 
-  // Scroll to bottom when messages update
+  // -------------------------
+  // 5) Scroll automático cuando llegan mensajes
+  // -------------------------
   useEffect(() => {
     const c = scrollContainerRef.current;
     if (c) {
@@ -205,7 +277,9 @@ export default function ConversationScreen({
     }
   }, [messages]);
 
-  // Send a new message
+  // -------------------------
+  // 6) Función para enviar mensajes
+  // -------------------------
   const handleSend = async (text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peerAddress);
@@ -216,7 +290,7 @@ export default function ConversationScreen({
       await convo.send(text, { contentType: ContentTypeAttachment });
     }
 
-    // Optional notification
+    // Notificación opcional …
     let fid = 0;
     if (profile?.social?.uid) {
       fid = profile.social.uid;
@@ -252,7 +326,9 @@ export default function ConversationScreen({
     }).catch(console.error);
   };
 
-  // Convert attachment to URL
+  // -------------------------
+  // Funciones para attachments
+  // -------------------------
   const attachmentToUrl = (att: XMTPAttachment): string => {
     if (typeof att.data === "string") {
       return `data:${att.mimeType};base64,${att.data}`;
@@ -261,12 +337,11 @@ export default function ConversationScreen({
       att.data instanceof Uint8Array
         ? att.data
         : Array.isArray(att.data)
-          ? Uint8Array.from(att.data as number[])
-          : new Uint8Array(att.data as ArrayBuffer);
+        ? Uint8Array.from(att.data as number[])
+        : new Uint8Array(att.data as ArrayBuffer);
     return URL.createObjectURL(new Blob([bytes], { type: att.mimeType }));
   };
 
-  // Handle clicking on an attachment
   const handleAttachmentClick = async (att: XMTPAttachment) => {
     if (att.mimeType.startsWith("image/")) {
       setFullImageSrc(attachmentToUrl(att));
@@ -278,16 +353,50 @@ export default function ConversationScreen({
     }
   };
 
-  // Show loading screen while checking
-  if (!checkedGate) {
+  // -------------------------
+  // Render condicional
+  // -------------------------
+  // 1) Si hubo error en signIn dentro del iframe
+  if (signError) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#0f0d14] text-white">
-        <span className="text-gray-400">Loading...</span>
+      <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0d14] text-white p-4">
+        <p className="text-red-500 mb-4">
+          {signError}
+        </p>
+        <button
+          onClick={() =>
+            window.open(
+              `https://pinggate.lopezonchain.xyz/conversation/${peerAddress}`,
+              "_blank"
+            )
+          }
+          className="px-4 py-2 bg-purple-600 rounded text-white"
+        >
+          Abrir en nueva pestaña
+        </button>
       </div>
     );
   }
 
-  // Show modal if gated and not purchased
+  // 2) Si seguimos en iframe y todavía no pedimos la firma, mostramos loading
+  if (inIframe && !hasRequestedSign) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-[#0f0d14] text-white">
+        <p className="text-gray-400">Esperando firma en Frame…</p>
+      </div>
+    );
+  }
+
+  // 3) Si gating no terminó, mostramos loading
+  if (!checkedGate) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-[#0f0d14] text-white">
+        <span className="text-gray-400">Loading…</span>
+      </div>
+    );
+  }
+
+  // 4) Si gated pero no comprado, mostramos modal
   if (hasPeerServices && !hasPurchasedService) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
@@ -316,7 +425,7 @@ export default function ConversationScreen({
     );
   }
 
-  // Render chat if not gated or already purchased
+  // 5) Render de la conversación completa
   return (
     <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
       {/* Header */}
@@ -349,9 +458,9 @@ export default function ConversationScreen({
             const isMe = m.senderAddress.toLowerCase() === myAddress;
             const time = m.sent
               ? m.sent.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
               : "";
             const isAtt =
               typeof m.content !== "string" && (m.content as any).data;
@@ -360,8 +469,9 @@ export default function ConversationScreen({
             return (
               <div
                 key={i}
-                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
-                  }`}
+                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${
+                  isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
+                }`}
                 style={{ hyphens: "auto" }}
               >
                 {att ? (
