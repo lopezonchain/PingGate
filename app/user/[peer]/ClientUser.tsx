@@ -1,21 +1,24 @@
 // app/users/[peer]/ClientUser.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useWalletClient } from "wagmi";
-import { FiArrowLeft, FiUser } from "react-icons/fi";
+import { FiArrowLeft, FiShoppingCart, FiUser } from "react-icons/fi";
 import toast from "react-hot-toast";
 import { ethers } from "ethers";
 import {
   getServicesBy,
   getService,
   purchaseService,
+  publicClient,
 } from "../../services/contractService";
 import { resolveEnsName } from "../../services/nameResolver";
 import { WarpcastService, Web3BioProfile } from "../../services/warpcastService";
-import { sdk } from '@farcaster/frame-sdk';
+import { sdk } from "@farcaster/frame-sdk";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
+import LoadingOverlay from "../../components/LoadingOverlay";
+import SuccessModal from "../../components/SuccessModal";
 
 interface ServiceDetails {
   id: bigint;
@@ -51,7 +54,9 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
   const [loadingServices, setLoadingServices] = useState(true);
   const [processingId, setProcessingId] = useState<bigint | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { setFrameReady, isFrameReady, context } = useMiniKit();
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const { setFrameReady, isFrameReady } = useMiniKit();
 
   useEffect(() => {
     if (!isFrameReady) setFrameReady();
@@ -59,9 +64,8 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
       await sdk.actions.ready({ disableNativeGestures: true });
     })();
   }, [isFrameReady, setFrameReady]);
-  
 
-  // 1) Cargar perfil Farcaster / ENS
+  // Load Farcaster/ENS profile
   useEffect(() => {
     if (!normalizedPeer) return;
     let active = true;
@@ -91,7 +95,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
           });
           return;
         }
-        // Si no hay Farcaster, intentar ENS
+        // If no Farcaster name, try ENS
         try {
           const ens = await resolveEnsName(normalizedPeer);
           if (ens && active) {
@@ -103,10 +107,10 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
             return;
           }
         } catch {
-          // ignore
+          // ignore ENS failure
         }
       } catch {
-        // ignore
+        // ignore errors
       } finally {
         if (active) setLoadingProfile(false);
       }
@@ -116,7 +120,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
     };
   }, [normalizedPeer]);
 
-  // 2) Cargar servicios del usuario
+  // Load services offered by peer
   useEffect(() => {
     if (!normalizedPeer) return;
     let active = true;
@@ -133,7 +137,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
         if (active) setServices(loaded);
       } catch (e: any) {
         console.error(e);
-        if (active) setError("Failed to load services.");
+        if (active) setError("Failed to load services");
       } finally {
         if (active) setLoadingServices(false);
       }
@@ -143,40 +147,44 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
     };
   }, [normalizedPeer]);
 
-  // 3) Fuerza red Base antes de transacciones
+  // Ensure network is Base before writing
   const ensureBase = async () => {
     if (!walletClient) throw new Error("Wallet not connected");
-    // ID oficial de Base mainnet es 8453 (ver documentación)
     if (walletClient.chain?.id !== 8453) {
       await walletClient.switchChain({ id: 8453 });
     }
   };
 
-  // 4) Comprar servicio
+  // Handle service purchase with publicClient.waitForTransactionReceipt
   const handlePurchase = async (svc: ServiceDetails) => {
     if (!walletClient) {
-      toast.error("Connect your wallet first.");
+      toast.error("Connect your wallet first");
       return;
     }
     setError(null);
     setProcessingId(svc.id);
     try {
       await ensureBase();
-      await purchaseService(walletClient, svc.id, svc.price);
-      toast.success("Service purchased.");
-      router.push(`/conversation/${normalizedPeer}`);
+      const hash = await purchaseService(walletClient, svc.id, svc.price);
+      await publicClient.waitForTransactionReceipt({ hash });
+      setShowSuccess(true);
     } catch (e: any) {
       console.error(e);
-      toast.error(e.message || "Purchase failed.");
+      toast.error(e.message || "Purchase failed");
     } finally {
       setProcessingId(null);
     }
   };
 
+  const handleCloseSuccess = () => {
+    setShowSuccess(false);
+    router.push(`/conversation/${normalizedPeer}`);
+  };
+
   if (!normalizedPeer) {
     return (
       <div className="h-full flex items-center justify-center bg-[#0f0d14] text-white">
-        <p className="text-gray-400">Invalid address.</p>
+        <p className="text-gray-400">Invalid address</p>
       </div>
     );
   }
@@ -222,7 +230,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
       ) : error ? (
         <p className="mb-4 text-red-500">{error}</p>
       ) : services.length === 0 ? (
-        <p className="text-gray-400">No active services found.</p>
+        <p className="text-gray-400">No active services found</p>
       ) : (
         <ul className="space-y-6 flex-1 overflow-y-auto px-2 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
           {services.map((svc) => (
@@ -241,12 +249,24 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
                   disabled={processingId === svc.id}
                   className="inline-flex items-center px-5 py-2 bg-purple-600 hover:bg-purple-700 rounded-full transition disabled:opacity-50"
                 >
+                  {processingId === svc.id && (
+                    <FiShoppingCart className="mr-2 animate-spin" />
+                  )}
                   {processingId === svc.id ? "Processing…" : "Buy"}
                 </button>
               </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {processingId && <LoadingOverlay />}
+
+      {showSuccess && (
+        <SuccessModal
+          peerAddress={normalizedPeer}
+          onClose={handleCloseSuccess}
+        />
       )}
     </div>
   );

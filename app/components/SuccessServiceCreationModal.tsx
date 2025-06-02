@@ -43,7 +43,7 @@ export default function SuccessServiceCreationModal({
         <FiCheckCircle size={64} className="text-green-500" />
       </div>
       <p className="text-center text-gray-300 mb-6">
-        Your new service is live and your PingGate chat is now gated.
+        Your new service is live!
       </p>
       <button
         onClick={goToServices}

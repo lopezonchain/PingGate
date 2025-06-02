@@ -10,7 +10,7 @@ const CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_PING_GATE_CONTRACT! as `0x${string}`;
 
 // Public read‐only client
-const publicClient = createPublicClient({
+export const publicClient = createPublicClient({
   chain: base,
   transport: http(
     "https://base.llamarpc.com"

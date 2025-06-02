@@ -1,7 +1,7 @@
 // src/screens/MyServicesScreen.tsx
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useAccount, useWalletClient } from "wagmi";
 import {
   FiArrowLeft,
@@ -25,8 +25,10 @@ import {
   getEditFee,
 } from "../services/contractService";
 import { base } from "viem/chains";
+import { createPublicClient, http } from "viem";
 import { WarpcastService } from "../services/warpcastService";
 import SuccessServiceCreationModal from "../components/SuccessServiceCreationModal";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 interface MyServicesScreenProps {
   onBack: () => void;
@@ -48,6 +50,10 @@ interface SaleRecord {
   timestamp: bigint;
 }
 
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http("https://base.llamarpc.com"),
+});
 
 export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
   const { address } = useAccount();
@@ -76,6 +82,9 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
   const [editFee, setEditFee] = useState<bigint>(BigInt(3500000000000000));
   const [sendingCreate, setSendingCreate] = useState(false);
   const [sendingEditId, setSendingEditId] = useState<bigint | null>(null);
+
+  // Overlay state
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
 
   // Error modal state
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -225,6 +234,7 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
     setSendingCreate(true);
     setErrorMessage("");
     setShowErrorModal(false);
+    setShowLoadingOverlay(true);
 
     try {
       if (!newTitle.trim() || !newDesc.trim()) {
@@ -246,7 +256,8 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
       if (newDurationUnit === "weeks") seconds = durationNum * 7 * 24 * 3600;
 
       await ensureBase();
-      await createService(
+      // send transaction
+      const tx = await createService(
         walletClient,
         newTitle.trim(),
         newDesc.trim(),
@@ -254,6 +265,8 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
         seconds,
         creationFee
       );
+      // wait for confirmation
+      await publicClient.waitForTransactionReceipt({ hash: tx });
       toast.success("Service created");
 
       if (isMounted.current) {
@@ -275,21 +288,18 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
         setShowErrorModal(true);
       }
     } finally {
-      if (isMounted.current) setSendingCreate(false);
+      if (isMounted.current) {
+        setSendingCreate(false);
+        setShowLoadingOverlay(false);
+      }
     }
   };
 
-  const handleShare = async () => {
-    try {
-      const svc = new WarpcastService();
-      const link = `https://your-app-domain.com/user/${sellerAddress}`;
-      //await svc.createPost(link); // assume createPost publishes text
-      toast.success("Shared on Farcaster");
-    } catch (e: any) {
-      console.error(e);
-      toast.error("Failed to share");
-    }
-  };
+  const handleShare = useCallback(() => {
+    const text = `Try PingGate 💬 Chat privately with wallet to wallet encryption. Monetize your inbox or message experts onchain! Powered by @xmtp @base & @farcaster and created by @lopezonchain.eth ✨ https://pinggate.lopezonchain.xyz`;
+    const url = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank");
+  }, []);
 
   if (loading) {
     return (
@@ -501,6 +511,9 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
           onShare={handleShare}
         />
       )}
+
+      {/* Loading Overlay */}
+      {showLoadingOverlay && <LoadingOverlay onClose={() => setShowLoadingOverlay(false)} />}
     </div>
   );
 }
