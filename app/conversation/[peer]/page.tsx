@@ -1,6 +1,7 @@
 // app/conversation/[peer]/page.tsx
 import dynamic from "next/dynamic";
 import type { Metadata } from "next";
+import React from "react";
 
 interface GenerateMetaProps {
   params: { peer: string | string[] };
@@ -10,10 +11,11 @@ export async function generateMetadata({
   params,
 }: GenerateMetaProps): Promise<Metadata> {
   const raw = params.peer;
-  const peerWallet = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
+  const peerWallet =
+    Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   const fullUrl = `https://pinggate.lopezonchain.xyz/conversation/${peerWallet}`;
 
-  // Intentamos obtener nombre de Farcaster, si falla (CORS o API 403) usamos wallet truncada
+  // Usamos nombre truncado para el título/meta
   const peer = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
 
   return {
@@ -38,9 +40,21 @@ export async function generateMetadata({
   };
 }
 
+// Fallback para mostrar mientras React carga el bundle
+function LoadingConversation() {
+  return (
+    <div className="flex-1 flex items-center justify-center bg-[#0f0d14] text-white">
+      <p className="text-gray-400">Cargando conversación…</p>
+    </div>
+  );
+}
+
 const ClientConversation = dynamic<{ peerAddress: string }>(
   () => import("./ClientConversation"),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => <LoadingConversation />,
+  }
 );
 
 export default function ConversationPage({
@@ -49,7 +63,8 @@ export default function ConversationPage({
   params: { peer: string | string[] };
 }) {
   const raw = params.peer;
-  const peer = Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
+  const peer =
+    Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   if (!peer) return null;
 
   return <ClientConversation peerAddress={peer} />;
