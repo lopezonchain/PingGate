@@ -67,7 +67,7 @@ const faqs: FAQ[] = [
   {
     question: "How do reviews work?",
     answer:
-      "After buying a service, a Client can leave a rating and comment. Reviews help other people know which Experts are reliable.",
+      "After buying a service, a Client can leave a rating and comment. Reviews help other people know which Experts are reliable. And gives info to the expert about the experience offered.",
   },
   {
     question: "How do I find services or Experts?",
