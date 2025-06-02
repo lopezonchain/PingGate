@@ -1,12 +1,9 @@
 // app/conversation/[peer]/ClientConversation.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import ConversationScreen from "../../components/ConversationScreen"; 
-
-import { sdk } from '@farcaster/frame-sdk';
-import { useMiniKit } from "@coinbase/onchainkit/minikit";
 
 interface ClientProps {
   peerAddress: string;
