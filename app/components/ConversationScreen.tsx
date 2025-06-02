@@ -24,18 +24,18 @@ export default function ConversationScreen({
 }: ConversationScreenProps) {
   const router = useRouter();
 
-  // 1) Wagmi: walletClient y método para conectar
+  // 1) Wagmi: walletClient and connect
   const { data: walletClient, isLoading: walletLoading } = useWalletClient();
   const { connect, connectors } = useConnect();
 
-  // 2) XMTP: hook que expone xmtpClient y xmtpError
+  // 2) XMTP: hook that provides xmtpClient and xmtpError
   const { xmtpClient, error: xmtpError } = useXmtpClient();
 
   const myAddress = walletClient?.account.address.toLowerCase() || "";
   const warpcast = React.useMemo(() => new WarpcastService(), []);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // — Display name y avatar
+  // — Display name and avatar
   const [displayName, setDisplayName] = useState<string>(peerAddress);
   const [profile, setProfile] = useState<Web3BioProfile | null>(null);
 
@@ -44,24 +44,24 @@ export default function ConversationScreen({
   const [hasPeerServices, setHasPeerServices] = useState(false);
   const [hasPurchasedService, setHasPurchasedService] = useState(false);
 
-  // — Mensajes
+  // — Messages
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
 
-  // — Preview de attachments
+  // — Preview for attachments
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
 
-  // — Error de conexión XMTP
+  // — Display error
   const [displayError, setDisplayError] = useState<string | null>(null);
 
   // =========================
-  // 1️⃣  Si no hay walletClient, mostramos "Connect Wallet"
+  // 1️⃣  If no walletClient, show "Connect Wallet"
   // =========================
   if (!walletClient && !walletLoading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0d14] text-white p-4">
         <p className="mb-4 text-gray-400">
-          Para ver esta conversación necesitas conectar tu wallet.
+          To view this conversation, please connect your wallet.
         </p>
         {connectors.map((c) => (
           <button
@@ -69,24 +69,24 @@ export default function ConversationScreen({
             onClick={() => connect({ connector: c })}
             className="px-4 py-2 mb-2 bg-purple-600 hover:bg-purple-700 rounded text-white"
           >
-            Conectar con {c.name}
+            Connect with {c.name}
           </button>
         ))}
         {walletLoading && (
-          <p className="text-gray-400 mt-2">Cargando wallet…</p>
+          <p className="text-gray-400 mt-2">Loading wallet…</p>
         )}
       </div>
     );
   }
 
-  // 2️⃣  Si hay walletClient pero XMTP no está listo, mostramos Loading mientras xmtpClient llega
+  // 2️⃣  If walletClient exists but xmtpClient not ready, show loading
   if (walletClient && !xmtpClient) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0d14] text-white p-4">
-        <p className="text-gray-400 mb-2">Inicializando chat seguro (XMTP)…</p>
+        <p className="text-gray-400 mb-2">Initializing secure chat (XMTP)…</p>
         {xmtpError && (
           <p className="text-red-500">
-            Error conectando a XMTP: {xmtpError}
+            Error connecting to XMTP: {xmtpError}
           </p>
         )}
       </div>
@@ -117,7 +117,7 @@ export default function ConversationScreen({
           return;
         }
       } catch {
-        // ignorar
+        // ignore
       }
       if (active) {
         try {
@@ -127,7 +127,7 @@ export default function ConversationScreen({
             return;
           }
         } catch {
-          // ignorar
+          // ignore
         }
         setDisplayName(peerAddress);
       }
@@ -138,7 +138,7 @@ export default function ConversationScreen({
     };
   }, [peerAddress]);
 
-  // 4️⃣  Check de “gating” (servicios + compras)
+  // 4️⃣  Check gating (peer services + purchases)
   useEffect(() => {
     if (!walletClient) return;
     let active = true;
@@ -147,7 +147,7 @@ export default function ConversationScreen({
       const addrPeer = peerAddress as `0x${string}`;
       const addrMe = myAddress as `0x${string}`;
 
-      // 4.1) Obtener servicios del peer
+      // 4.1) Get services sold by peer
       let peerServiceIds: bigint[] = [];
       try {
         peerServiceIds = await getServicesBy(addrPeer);
@@ -164,7 +164,7 @@ export default function ConversationScreen({
       }
       setHasPeerServices(true);
 
-      // 4.2) Obtener compras mías
+      // 4.2) Check if user purchased any of the peer's services
       let myPurchaseIds: bigint[] = [];
       try {
         myPurchaseIds = await getPurchasesBy(addrMe);
@@ -187,7 +187,7 @@ export default function ConversationScreen({
     };
   }, [peerAddress, walletClient, myAddress]);
 
-  // 5️⃣  Cargar mensajes XMTP si pasa gating
+  // 5️⃣  Load XMTP messages if gating passed
   useEffect(() => {
     if (
       !xmtpClient ||
@@ -224,7 +224,7 @@ export default function ConversationScreen({
     };
   }, [xmtpClient, peerAddress, checkedGate, hasPeerServices, hasPurchasedService]);
 
-  // 6️⃣  Scroll automático cuando llegan mensajes
+  // 6️⃣  Auto-scroll when messages update
   useEffect(() => {
     const c = scrollContainerRef.current;
     if (c) {
@@ -234,7 +234,7 @@ export default function ConversationScreen({
     }
   }, [messages]);
 
-  // 7️⃣  Envío de nuevos mensajes
+  // 7️⃣  Send a new message
   const handleSend = async (text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
     const convo = await xmtpClient.conversations.newConversation(peerAddress);
@@ -245,7 +245,7 @@ export default function ConversationScreen({
       await convo.send(text, { contentType: ContentTypeAttachment });
     }
 
-    // Notificación opcional…
+    // Optional notification…
     let fid = 0;
     if (profile?.social?.uid) {
       fid = profile.social.uid;
@@ -253,7 +253,7 @@ export default function ConversationScreen({
       try {
         fid = await warpcast.getFidByName(peerAddress);
       } catch {
-        /* ignorar */
+        /* ignore */
       }
     }
 
@@ -264,7 +264,7 @@ export default function ConversationScreen({
       myName = myAddress;
     }
 
-    const title = `New ping from ${myName}`;
+    const title = `New message from ${myName}`;
     const bodyText =
       typeof text === "string" ? text : (text as XMTPAttachment).filename;
 
@@ -279,7 +279,7 @@ export default function ConversationScreen({
     }).catch(console.error);
   };
 
-  // — Funciones para attachments
+  // — Functions for attachments
   const attachmentToUrl = (att: XMTPAttachment): string => {
     if (typeof att.data === "string") {
       return `data:${att.mimeType};base64,${att.data}`;
@@ -305,10 +305,10 @@ export default function ConversationScreen({
   };
 
   // =========================
-  // Render condicional
+  // Render conditional
   // =========================
 
-  // 1) Loading de gating antes de terminar la comprobación
+  // 1) Loading while gating check is in progress
   if (!checkedGate) {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#0f0d14] text-white">
@@ -317,28 +317,28 @@ export default function ConversationScreen({
     );
   }
 
-  // 2) Si gated y no se compró el servicio, mostrar modal de gated
+  // 2) If gated and not purchased, show gated modal
   if (hasPeerServices && !hasPurchasedService) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
         <div className="bg-[#1a1725] text-white p-6 rounded-lg max-w-sm w-full mx-4">
           <h2 className="text-xl font-semibold">Gated Chat</h2>
           <p className="mt-2">
-            Este usuario tiene un chat privado. Para continuar, compra su servicio
-            primero.
+            This user has a private chat. To continue, please purchase their
+            service first.
           </p>
           <div className="mt-4 flex flex-col space-y-2">
             <button
               onClick={() => router.push(`/user/${peerAddress}`)}
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded text-white"
             >
-              Ver servicios de este usuario
+              View this user’s services
             </button>
             <button
               onClick={onBack}
               className="px-4 py-2 text-gray-400 hover:underline"
             >
-              Volver
+              Go Back
             </button>
           </div>
         </div>
@@ -346,7 +346,7 @@ export default function ConversationScreen({
     );
   }
 
-  // 3) Render completo de chat ya desbloqueado
+   // 3) Full chat render
   return (
     <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
       {/* Header */}
