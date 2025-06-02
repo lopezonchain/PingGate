@@ -12,6 +12,8 @@ import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import MessageInput, { XMTPAttachment } from "./MessageInput";
 import { useRouter } from "next/navigation";
 import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
+import { useMiniKit } from "@coinbase/onchainkit/minikit";
+import sdk from "@farcaster/frame-sdk";
 
 interface ConversationScreenProps {
   peerAddress: string;
@@ -51,8 +53,18 @@ export default function ConversationScreen({
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
 
+  const { setFrameReady, isFrameReady } = useMiniKit();
+
+  useEffect(() => {
+    if (!isFrameReady) setFrameReady();
+    (async () => {
+      await sdk.actions.ready({ disableNativeGestures: true });
+    })();
+  }, [isFrameReady, setFrameReady]);
+
+
   // =========================
-  // 3️⃣  Fetch Farcaster/ENS profile
+  // Fetch Farcaster/ENS profile
   // =========================
   useEffect(() => {
     let active = true;
@@ -99,7 +111,7 @@ export default function ConversationScreen({
   }, [peerAddress]);
 
   // =========================
-  // 4️⃣  Check gating (peer services + purchases)
+  // Check gating (peer services + purchases)
   // =========================
   useEffect(() => {
     if (!walletClient) return;
@@ -109,7 +121,7 @@ export default function ConversationScreen({
       const addrPeer = peerAddress as `0x${string}`;
       const addrMe = myAddress as `0x${string}`;
 
-      // 4.1) Get services sold by peer
+      // Get services sold by peer
       let peerServiceIds: bigint[] = [];
       try {
         peerServiceIds = await getServicesBy(addrPeer);
@@ -126,7 +138,7 @@ export default function ConversationScreen({
       }
       setHasPeerServices(true);
 
-      // 4.2) Check if user purchased any of the peer's services
+      // Check if user purchased any of the peer's services
       let myPurchaseIds: bigint[] = [];
       try {
         myPurchaseIds = await getPurchasesBy(addrMe);
@@ -150,7 +162,7 @@ export default function ConversationScreen({
   }, [peerAddress, walletClient, myAddress]);
 
   // =========================
-  // 5️⃣  Load XMTP messages if gating passed
+  // Load XMTP messages if gating passed
   // =========================
   useEffect(() => {
     if (
@@ -189,7 +201,7 @@ export default function ConversationScreen({
   }, [xmtpClient, peerAddress, checkedGate, hasPeerServices, hasPurchasedService]);
 
   // =========================
-  // 6️⃣  Auto-scroll when messages update
+  // Auto-scroll when messages update
   // =========================
   useEffect(() => {
     const c = scrollContainerRef.current;
@@ -201,7 +213,7 @@ export default function ConversationScreen({
   }, [messages]);
 
   // =========================
-  // 7️⃣  Send a new message
+  // Send a new message
   // =========================
   const handleSend = async (text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
@@ -256,8 +268,8 @@ export default function ConversationScreen({
       att.data instanceof Uint8Array
         ? att.data
         : Array.isArray(att.data)
-        ? Uint8Array.from(att.data as number[])
-        : new Uint8Array(att.data as ArrayBuffer);
+          ? Uint8Array.from(att.data as number[])
+          : new Uint8Array(att.data as ArrayBuffer);
     return URL.createObjectURL(new Blob([bytes], { type: att.mimeType }));
   };
 
@@ -276,7 +288,7 @@ export default function ConversationScreen({
   // Render conditional
   // =========================
 
-  // 1) If no walletClient and not loading, show "Connect Wallet"
+  // If no walletClient and not loading, show "Connect Wallet"
   if (!walletClient && !walletLoading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0d14] text-white p-4">
@@ -299,7 +311,7 @@ export default function ConversationScreen({
     );
   }
 
-  // 2) If walletClient exists but xmtpClient not ready, show loading
+  // If walletClient exists but xmtpClient not ready, show loading
   if (walletClient && !xmtpClient) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0d14] text-white p-4">
@@ -313,7 +325,7 @@ export default function ConversationScreen({
     );
   }
 
-  // 3) Loading while gating check is in progress
+  // Loading while gating check is in progress
   if (!checkedGate) {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#0f0d14] text-white">
@@ -322,7 +334,7 @@ export default function ConversationScreen({
     );
   }
 
-  // 4) If gated and not purchased, show gated modal
+  // If gated and not purchased, show gated modal
   if (hasPeerServices && !hasPurchasedService) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
@@ -351,7 +363,7 @@ export default function ConversationScreen({
     );
   }
 
-  // 5) Full chat render
+  // Full chat render
   return (
     <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
       {/* Header */}
@@ -384,9 +396,9 @@ export default function ConversationScreen({
             const isMe = m.senderAddress.toLowerCase() === myAddress;
             const time = m.sent
               ? m.sent.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
+                hour: "2-digit",
+                minute: "2-digit",
+              })
               : "";
             const isAtt =
               typeof m.content !== "string" && (m.content as any).data;
@@ -395,9 +407,8 @@ export default function ConversationScreen({
             return (
               <div
                 key={i}
-                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${
-                  isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
-                }`}
+                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
+                  }`}
                 style={{ hyphens: "auto" }}
               >
                 {att ? (
