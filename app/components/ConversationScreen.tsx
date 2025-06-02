@@ -11,6 +11,7 @@ import { getServicesBy, getPurchasesBy } from "../services/contractService";
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import MessageInput, { XMTPAttachment } from "./MessageInput";
 import { useRouter } from "next/navigation";
+import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
 
 interface ConversationScreenProps {
   peerAddress: string;
@@ -85,7 +86,7 @@ export default function ConversationScreen({
         <p className="text-gray-400 mb-2">Inicializando chat seguro (XMTP)…</p>
         {xmtpError && (
           <p className="text-red-500">
-            Error conectando a XMTP: {xmtpError.message || xmtpError}
+            Error conectando a XMTP: {xmtpError}
           </p>
         )}
       </div>
