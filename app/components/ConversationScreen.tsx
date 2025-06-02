@@ -91,7 +91,7 @@ export default function ConversationScreen({
           // a) Notificamos a Frame SDK que la UI está lista
           await sdk.actions.ready({ disableNativeGestures: true });
           // b) Solicitud de firma de usuario
-          await sdk.actions.signIn();
+          //await sdk.actions.signIn();
           // c) Marcamos que ya pedimos la firma
           setHasRequestedSign(true);
         } catch (err: any) {
