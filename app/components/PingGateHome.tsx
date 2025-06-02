@@ -38,8 +38,15 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
     {
       icon: <FiSearch />,
       label: "Explore",
-      desc: "Browse services. Pay and directly get 1 to 1 chat access!",
+      desc: "Browse services. Find Experts. Select your preferred option and directly get 1 to 1 chat access!",
       action: "explore",
+      enabled: true
+    },
+    {
+      icon: <FiPlusCircle />,
+      label: "My Services",
+      desc: "Monetize your Inbox. Create and manage your own Services.",
+      action: "myplans",
       enabled: true
     },
     {
@@ -47,13 +54,6 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
       label: "Reviews",
       desc: "Leave reviews of services you bought, check or edit previous ones.",
       action: "reviews",
-      enabled: true
-    },
-    {
-      icon: <FiPlusCircle />,
-      label: "My Services",
-      desc: "Create and manage your own paid DM or consultation offerings.",
-      action: "myplans",
       enabled: true
     },
     {
