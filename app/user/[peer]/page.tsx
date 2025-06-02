@@ -11,10 +11,10 @@ export async function generateMetadata({
   params,
 }: GenerateMetaProps): Promise<Metadata> {
   const raw = params.peer;
-  const peer =
+  const peerWallet =
     Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
-  const url = `https://pinggate.lopezonchain.xyz/user/${peer}`;
-
+  const url = `https://pinggate.lopezonchain.xyz/user/${peerWallet}`;
+const peer = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
   return {
     title: `User Profile • ${peer}`,
     description: `View services offered by ${peer}`,
