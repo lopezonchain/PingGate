@@ -15,22 +15,39 @@ export async function generateMetadata({
     Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   const fullUrl = `https://pinggate.lopezonchain.xyz/conversation/${peerWallet}`;
 
-  // Usamos nombre truncado para el título/meta
-  const peer = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+  // Resolver nombre con Web3.bio (o fallback truncado)
+  let displayName: string;
+  try {
+    const { WarpcastService } = await import("../../services/warpcastService");
+    const svc = new WarpcastService();
+    const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
+    displayName = bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+  } catch {
+    displayName = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+  }
+
+  // Construir etiqueta "PING {name} 💬" con máximo 32 caracteres
+  let label = `PING ${displayName} 💬`;
+  if (label.length > 32) {
+    // recortamos para que queden 29 chars + "..."
+    const maxNameLen = 32 - "PING  💬".length - 3; // 3 puntos
+    const truncated = displayName.slice(0, maxNameLen);
+    label = `PING ${truncated}... 💬`;
+  }
 
   return {
-    title: `Conversation • ${peer}`,
-    description: `Wallet to wallet chat with ${peer}`,
+    title: `PingGate 💬`,
+    description: `Wallet to wallet chat with ${displayName}`,
     other: {
       "fc:frame": JSON.stringify({
         version: "next",
         imageUrl: "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
         button: {
-          title: `Ping ${peer}`,
+          title: label,
           action: {
             type: "launch_frame",
             url: fullUrl,
-            name: `Ping ${peer}`,
+            name: label,
             splashImageUrl: "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
             splashBackgroundColor: "#17101f",
           },
