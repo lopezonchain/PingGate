@@ -15,25 +15,25 @@ export async function generateMetadata({
     Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   const url = `https://pinggate.lopezonchain.xyz/user/${peerWallet}`;
 
-  // Resolver nombre y avatar con Web3.bio
+  // Resolver nombre y avatar con Web3.bio. Si falla o no hay avatar, usar logo por defecto.
   let displayName: string;
   let avatarUrl: string | null = null;
   try {
     const { WarpcastService } = await import("../../services/warpcastService");
     const svc = new WarpcastService();
     const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
-    displayName = bio?.displayName ||
-      `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+    displayName =
+      bio?.displayName || `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
     avatarUrl = bio?.avatar || null;
   } catch {
     displayName = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
   }
 
-  // Truncar si excede 22 caracteres
+  // Truncar a 22 caracteres + "..." si es necesario
   const peerLabel =
     displayName.length > 22 ? displayName.slice(0, 22) + "..." : displayName;
 
-  // Si no hay avatar, usar logo por defecto
+  // Si no hay avatar válido, caer a la imagen fija
   const imageUrl =
     avatarUrl || "https://pinggate.lopezonchain.xyz/PingGateLogo.png";
 
@@ -59,7 +59,7 @@ export async function generateMetadata({
   };
 }
 
-// Fallback para mostrar mientras React carga el bundle
+// Fallback mientras carga React
 function LoadingUser() {
   return (
     <div className="h-full flex items-center justify-center bg-[#0f0d14] text-white">
