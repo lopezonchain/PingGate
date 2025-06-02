@@ -14,21 +14,43 @@ export async function generateMetadata({
   const peerWallet =
     Array.isArray(raw) && raw.length > 0 ? raw[0] : (raw as string);
   const url = `https://pinggate.lopezonchain.xyz/user/${peerWallet}`;
-const peer = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+
+  // Resolver nombre y avatar con Web3.bio
+  let displayName: string;
+  let avatarUrl: string | null = null;
+  try {
+    const { WarpcastService } = await import("../../services/warpcastService");
+    const svc = new WarpcastService();
+    const [bio] = await svc.getWeb3BioProfiles([`farcaster,${peerWallet}`]);
+    displayName = bio?.displayName ||
+      `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+    avatarUrl = bio?.avatar || null;
+  } catch {
+    displayName = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
+  }
+
+  // Truncar si excede 22 caracteres
+  const peerLabel =
+    displayName.length > 22 ? displayName.slice(0, 22) + "..." : displayName;
+
+  // Si no hay avatar, usar logo por defecto
+  const imageUrl =
+    avatarUrl || "https://pinggate.lopezonchain.xyz/PingGateLogo.png";
+
   return {
-    title: `User Profile • ${peer}`,
-    description: `View services offered by ${peer}`,
+    title: `User Profile • ${peerLabel}`,
+    description: `View services offered by ${peerLabel}`,
     other: {
       "fc:frame": JSON.stringify({
         version: "next",
-        imageUrl: "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
+        imageUrl,
         button: {
-          title: `User • ${peer}`,
+          title: `Check my PingGate Services!!`,
           action: {
             type: "launch_frame",
             url,
-            name: `User • ${peer}`,
-            splashImageUrl: "https://pinggate.lopezonchain.xyz/PingGateLogo.png",
+            name: `Check my PingGate Services!!`,
+            splashImageUrl: imageUrl,
             splashBackgroundColor: "#17101f",
           },
         },
@@ -41,7 +63,7 @@ const peer = `${peerWallet.slice(0, 6)}…${peerWallet.slice(-4)}`;
 function LoadingUser() {
   return (
     <div className="h-full flex items-center justify-center bg-[#0f0d14] text-white">
-      <p className="text-gray-400">Cargando perfil…</p>
+      <p className="text-gray-400">Loading profile…</p>
     </div>
   );
 }
