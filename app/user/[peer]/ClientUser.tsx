@@ -14,6 +14,8 @@ import {
 } from "../../services/contractService";
 import { resolveEnsName } from "../../services/nameResolver";
 import { WarpcastService, Web3BioProfile } from "../../services/warpcastService";
+import { sdk } from '@farcaster/frame-sdk';
+import { useMiniKit } from "@coinbase/onchainkit/minikit";
 
 interface ServiceDetails {
   id: bigint;
@@ -49,6 +51,15 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
   const [loadingServices, setLoadingServices] = useState(true);
   const [processingId, setProcessingId] = useState<bigint | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { setFrameReady, isFrameReady, context } = useMiniKit();
+
+  useEffect(() => {
+    if (!isFrameReady) setFrameReady();
+    (async () => {
+      await sdk.actions.ready({ disableNativeGestures: true });
+    })();
+  }, [isFrameReady, setFrameReady]);
+  
 
   // 1) Cargar perfil Farcaster / ENS
   useEffect(() => {
