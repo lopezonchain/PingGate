@@ -16,6 +16,7 @@ import MessageInput, { XMTPAttachment } from "./MessageInput";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
 import { useRouter } from "next/navigation";
+import { sdk } from '@farcaster/frame-sdk';
 
 interface ConversationScreenProps {
   peerAddress: string;
@@ -48,6 +49,15 @@ export default function ConversationScreen({
   // Full image or file text
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
+
+  const { setFrameReady, isFrameReady } = useMiniKit();
+
+  useEffect(() => {
+    if (!isFrameReady) setFrameReady();
+    (async () => {
+      await sdk.actions.ready({ disableNativeGestures: true });
+    })();
+  }, [isFrameReady, setFrameReady]);
 
   // Fetch Farcaster/ENS profile
   useEffect(() => {
@@ -251,8 +261,8 @@ export default function ConversationScreen({
       att.data instanceof Uint8Array
         ? att.data
         : Array.isArray(att.data)
-        ? Uint8Array.from(att.data as number[])
-        : new Uint8Array(att.data as ArrayBuffer);
+          ? Uint8Array.from(att.data as number[])
+          : new Uint8Array(att.data as ArrayBuffer);
     return URL.createObjectURL(new Blob([bytes], { type: att.mimeType }));
   };
 
@@ -339,9 +349,9 @@ export default function ConversationScreen({
             const isMe = m.senderAddress.toLowerCase() === myAddress;
             const time = m.sent
               ? m.sent.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
+                hour: "2-digit",
+                minute: "2-digit",
+              })
               : "";
             const isAtt =
               typeof m.content !== "string" && (m.content as any).data;
@@ -350,9 +360,8 @@ export default function ConversationScreen({
             return (
               <div
                 key={i}
-                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${
-                  isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
-                }`}
+                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
+                  }`}
                 style={{ hyphens: "auto" }}
               >
                 {att ? (

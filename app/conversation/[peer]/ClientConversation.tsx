@@ -13,17 +13,7 @@ interface ClientProps {
 }
 
 export default function ClientConversation({ peerAddress }: ClientProps) {
-  const router = useRouter();
-
-  const { setFrameReady, isFrameReady } = useMiniKit();
-  
-    useEffect(() => {
-      if (!isFrameReady) setFrameReady();
-      (async () => {
-        await sdk.actions.ready({ disableNativeGestures: true });
-      })();
-    }, [isFrameReady, setFrameReady]);
-    
+  const router = useRouter();    
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#0f0d14]">
