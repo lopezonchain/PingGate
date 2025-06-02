@@ -71,9 +71,9 @@ export default function MyServicesScreen({ onBack }: MyServicesScreenProps) {
     "days" | "hours" | "weeks"
   >("days");
   const [creationFee, setCreationFee] = useState<bigint>(
-    BigInt(1000000000000000)
+    BigInt(7000000000000000)
   );
-  const [editFee, setEditFee] = useState<bigint>(BigInt(0));
+  const [editFee, setEditFee] = useState<bigint>(BigInt(3500000000000000));
   const [sendingCreate, setSendingCreate] = useState(false);
   const [sendingEditId, setSendingEditId] = useState<bigint | null>(null);
 
