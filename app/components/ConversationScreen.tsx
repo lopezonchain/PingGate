@@ -237,14 +237,7 @@ export default function ConversationScreen({
       }
     }
 
-    let myName: string;
-    try {
-      myName = await resolveNameLabel(myAddress);
-    } catch {
-      myName = myAddress;
-    }
-
-    const title = `New message from ${myName}`;
+    const title = `New ping from ${displayName}!`;
     const bodyText =
       typeof text === "string" ? text : (text as XMTPAttachment).filename;
 
