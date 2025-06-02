@@ -281,29 +281,6 @@ export default function ConversationScreen({
   // Render conditional
   // =========================
 
-  // If no walletClient and not loading, show "Connect Wallet"
-  if (!walletClient && !walletLoading) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0d14] text-white p-4">
-        <p className="mb-4 text-gray-400">
-          To view this conversation, please connect your wallet.
-        </p>
-        {connectors.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => connect({ connector: c })}
-            className="px-4 py-2 mb-2 bg-purple-600 hover:bg-purple-700 rounded text-white"
-          >
-            Connect with {c.name}
-          </button>
-        ))}
-        {walletLoading && (
-          <p className="text-gray-400 mt-2">Loading wallet…</p>
-        )}
-      </div>
-    );
-  }
-
   // If walletClient exists but xmtpClient not ready, show loading
   if (walletClient && !xmtpClient) {
     return (
