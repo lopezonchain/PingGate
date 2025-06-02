@@ -61,7 +61,6 @@ export async function generateMetadata({
 function LoadingConversation() {
   return (
     <div className="flex-1 flex items-center justify-center bg-[#0f0d14] text-white">
-      <p className="text-gray-400">Loading Conversation…</p>
     </div>
   );
 }
