@@ -330,7 +330,7 @@ export default function ConversationScreen({
       }
     }
 
-    const title = `New ping from ${myName}!`;
+    const title = `New ping from ${myName}`;
     const bodyText =
       typeof text === "string" ? text : (text as XMTPAttachment).filename;
 

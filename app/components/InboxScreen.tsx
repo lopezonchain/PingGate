@@ -36,6 +36,7 @@ import MessageInput, { XMTPAttachment } from "./MessageInput";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
 import { formatEther } from "ethers";
+import FaqList from "./FAQList";
 
 interface InboxScreenProps {
   onBack: () => void;
@@ -784,148 +785,177 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       {xmtpError && <p className="text-red-500 text-center mb-2">{xmtpError}</p>}
 
       <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
-        {filtered.map((conv, idx) => {
-          // Ya estamos seguros de que peerWalletAddress existe, porque filtramos antes.
-          const peer = conv.peerWalletAddress!.toLowerCase();
-          const profile = profilesMap[peer];
-          const label = profile
-            ? abbreviateAddress((profile as any).displayName)
-            : abbreviateAddress(peer);
-          const avatarUrl = (profile as any)?.avatar || null;
-          const isOpen = expanded === peer;
-          const isGated = gatedPeers.has(peer) && !purchasedPeers.has(peer);
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center text-center mt-8 space-y-6 px-4">
+            <div className="text-gray-400 text-lg font-semibold">
+              You don’t have any conversations on this device yet.
+            </div>
 
-          return (
-            <motion.div
-              key={peer}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.05 }}
-              className="bg-[#1a1725] rounded-xl overflow-hidden"
+            <button
+              onClick={() => setShowComposer(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg text-lg font-medium"
             >
-              <div
-                className="p-4 hover:bg-[#231c32] cursor-pointer"
-                onClick={() => {
-                  if (isGated) return; // no abrir si está “gated” y no comprado
-                  setExpanded(isOpen ? null : peer);
-                }}
+              Create Ping
+            </button>
+
+            <div className="w-full max-w-2xl mt-6">
+              <FaqList />
+            </div>
+          </div>
+        ) : (
+          filtered.map((conv, idx) => {
+            const peer = conv.peerWalletAddress!.toLowerCase();
+            const profile = profilesMap[peer];
+            const label = profile
+              ? abbreviateAddress((profile as any).displayName)
+              : abbreviateAddress(peer);
+            const avatarUrl = (profile as any)?.avatar || null;
+            const isOpen = expanded === peer;
+            const isGated = gatedPeers.has(peer) && !purchasedPeers.has(peer);
+
+            return (
+              <motion.div
+                key={peer}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="bg-[#1a1725] rounded-xl overflow-hidden"
               >
-                <div className="flex items-center space-x-2 mb-2">
-                  {avatarUrl && (
-                    <img
-                      src={avatarUrl}
-                      alt=""
-                      className="w-5 h-5 rounded-full object-cover"
-                    />
+                <div
+                  className="p-4 hover:bg-[#231c32] cursor-pointer"
+                  onClick={() => {
+                    if (isGated) return;
+                    setExpanded(isOpen ? null : peer);
+                  }}
+                >
+                  <div className="flex items-center space-x-2 mb-2">
+                    {avatarUrl && (
+                      <img
+                        src={avatarUrl}
+                        alt=""
+                        className="w-5 h-5 rounded-full object-cover"
+                      />
+                    )}
+                    <span className="font-semibold">{label}</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-xs text-gray-400">
+                      {conv.updatedAt?.toLocaleString() || "No messages"}
+                    </p>
+                    <FiMessageCircle className="text-lg text-gray-300" />
+                  </div>
+
+                  {isGated && (
+                    <div className="mb-2 flex items-center space-x-2">
+                      <span className="text-xs text-yellow-400">
+                        Expert (Gated Chat)
+                      </span>
+                      <button
+                        onClick={() => router.push(`/user/${peer}`)}
+                        className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded"
+                      >
+                        View Services
+                      </button>
+                    </div>
                   )}
-                  <span className="font-semibold">{label}</span>
-                </div>
-                <div className="flex justify-between items-center mb-2">
-                  <p className="text-xs text-gray-400">
-                    {conv.updatedAt?.toLocaleString() || "No messages"}
-                  </p>
-                  <FiMessageCircle className="text-lg text-gray-300" />
+
+                  <div className="flex items-center space-x-2">
+                    {conv.hasUnread && <span className="text-yellow-400">📩</span>}
+                    {purchasedPeers.has(peer) && (
+                      <span className="px-2 py-0.5 bg-blue-600 text-xs rounded-full">
+                        Expert • {formatEther(spentByPeer[peer] || BigInt(0))} ETH
+                      </span>
+                    )}
+                    {soldPeers.has(peer) && (
+                      <span className="px-2 py-0.5 bg-green-600 text-xs rounded-full">
+                        Client • {formatEther(earnedFromPeer[peer] || BigInt(0))} ETH
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                {isGated && (
-                  <div className="mb-2 flex items-center space-x-2">
-                    <span className="text-xs text-yellow-400">
-                      Expert (Gated Chat)
-                    </span>
-                    <button
-                      onClick={() => router.push(`/user/${peer}`)}
-                      className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded"
+                {isOpen && (
+                  <div className="px-4 pb-4 space-y-2 max-h-[50%] overflow-y-auto">
+                    <div
+                      onClick={() => router.push(`/conversation/${peer}`)}
+                      className="cursor-pointer text-md p-2 rounded-lg bg-[#2a2438] border border-purple-600 hover:bg-[#3a3345] flex justify-center"
                     >
-                      View Services
-                    </button>
+                      Open FULL conversation
+                    </div>
+
+                    {(messages[peer] || [])
+                      .slice(-5)
+                      .map((m, i) => {
+                        const contenido = m.content;
+                        const isString = typeof contenido === "string";
+                        const isAttachment =
+                          !isString && (contenido as any).data !== undefined;
+
+                        return (
+                          <div
+                            key={i}
+                            className={`flex flex-col max-w-[80%] break-words py-1 px-3 rounded-lg ${m.senderInboxId === myInboxId
+                                ? "bg-purple-600 ml-auto"
+                                : "bg-[#2a2438]"
+                              }`}
+                          >
+                            {isAttachment ? (
+                              <div
+                                className="flex items-center space-x-2 cursor-pointer"
+                                onClick={() =>
+                                  handleAttachmentClick(contenido as XMTPAttachment)
+                                }
+                              >
+                                {(contenido as XMTPAttachment).mimeType.startsWith(
+                                  "image/"
+                                ) ? (
+                                  <img
+                                    src={attachmentToUrl(contenido as XMTPAttachment)}
+                                    alt={(contenido as XMTPAttachment).filename}
+                                    className="max-h-40 object-contain rounded"
+                                  />
+                                ) : (
+                                  <>
+                                    <FiFile className="w-6 h-6 text-gray-300" />
+                                    <span className="truncate text-sm">
+                                      {(contenido as XMTPAttachment).filename}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            ) : isString ? (
+                              <div className="text-center break-words">
+                                {contenido}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-400 italic">
+                                Conversation started
+                              </div>
+                            )}
+
+                            <span className="text-[10px] text-gray-300 text-right">
+                              {m.sentAtNs
+                                ? new Date(
+                                  Number(m.sentAtNs / BigInt(1e6))
+                                ).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                                : ""}
+                            </span>
+                          </div>
+                        );
+                      })}
+
+                    <MessageInput onSend={(t) => handleSend(peer, t)} />
                   </div>
                 )}
-
-                <div className="flex items-center space-x-2">
-                  {conv.hasUnread && <span className="text-yellow-400">📩</span>}
-                  {purchasedPeers.has(peer) && (
-                    <span className="px-2 py-0.5 bg-blue-600 text-xs rounded-full">
-                      Expert • {formatEther(spentByPeer[peer] || BigInt(0))} ETH
-                    </span>
-                  )}
-                  {soldPeers.has(peer) && (
-                    <span className="px-2 py-0.5 bg-green-600 text-xs rounded-full">
-                      Client • {formatEther(earnedFromPeer[peer] || BigInt(0))} ETH
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {isOpen && (
-                <div className="px-4 pb-4 space-y-2 max-h-[50%] overflow-y-auto">
-                  <div
-                    onClick={() => router.push(`/conversation/${peer}`)}
-                    className="cursor-pointer text-md p-2 rounded-lg bg-[#2a2438] border border-purple-600 hover:bg-[#3a3345] flex justify-center"
-                  >
-                    Open FULL conversation
-                  </div>
-
-                  {(messages[peer] || [])
-                    .slice(-5)
-                    .map((m, i) => {
-                      const contenido = m.content;
-                      const isString = typeof contenido === "string";
-                      const isAttachment =
-                        !isString && (contenido as any).data !== undefined;
-
-                      return (
-                        <div key={i} className={`flex flex-col max-w-[80%] break-words py-1 px-3 rounded-lg ${m.senderInboxId === myInboxId ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
-                          }`}>
-                          {isAttachment ? (
-                            <div
-                              className="flex items-center space-x-2 cursor-pointer"
-                              onClick={() => handleAttachmentClick(contenido as XMTPAttachment)}
-                            >
-                              {(contenido as XMTPAttachment).mimeType.startsWith("image/") ? (
-                                <img
-                                  src={attachmentToUrl(contenido as XMTPAttachment)}
-                                  alt={(contenido as XMTPAttachment).filename}
-                                  className="max-h-40 object-contain rounded"
-                                />
-                              ) : (
-                                <>
-                                  <FiFile className="w-6 h-6 text-gray-300" />
-                                  <span className="truncate text-sm">
-                                    {(contenido as XMTPAttachment).filename}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          ) : isString ? (
-                            // si es un string válido, lo mostramos
-                            <div className="text-center break-words">{contenido}</div>
-                          ) : (
-                            // en este punto `contenido` es un objeto “evento de sistema”
-                            <div className="text-xs text-gray-400 italic">
-                              {/* Puedes personalizar este mensaje o incluso JSON.stringify */}
-                              {`Conversation started`/* [Evento de sistema: ${JSON.stringify(contenido)}] */}
-                            </div>
-                          )}
-
-                          <span className="text-[10px] text-gray-300 text-right">
-                            {m.sentAtNs
-                              ? new Date(Number(m.sentAtNs / BigInt(1e6))).toLocaleTimeString(
-                                [],
-                                { hour: "2-digit", minute: "2-digit" }
-                              )
-                              : ""}
-                          </span>
-                        </div>
-                      );
-                    })}
-
-                  <MessageInput onSend={(t) => handleSend(peer, t)}/>
-                </div>
-              )}
-            </motion.div>
-          );
-        })}
+              </motion.div>
+            );
+          })
+        )}
       </div>
+
 
       <button
         onClick={() => setShowComposer(true)}
