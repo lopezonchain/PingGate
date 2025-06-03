@@ -27,6 +27,12 @@ interface ConversationScreenProps {
   onBack: () => void;
 }
 
+function abbreviateAddress(addr: string) {
+  const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(addr);
+  if (!isEthAddress) return addr;
+  return addr.slice(0, 7) + "…" + addr.slice(-5);
+}
+
 export default function ConversationScreen({
   peerAddress,
   onBack,
@@ -48,6 +54,8 @@ export default function ConversationScreen({
   // — Nombre a mostrar y avatar
   const [displayName, setDisplayName] = useState<string>(peerAddress);
   const [profile, setProfile] = useState<Web3BioProfile | null>(null);
+
+  const [myName, setMyName] = useState<string>(peerAddress);
 
   // — Estado de “gating”
   const [checkedGate, setCheckedGate] = useState(false);
@@ -82,6 +90,42 @@ export default function ConversationScreen({
       }
     })();
   }, [xmtpClient]);
+
+  useEffect(() => {
+    const myAddr = walletClient?.account.address;
+      if (!myAddr) return;
+      let active = true;
+  
+      (async () => {
+        try {
+          const [prof] = await warpcast.getWeb3BioProfiles([`farcaster,${myAddr}`]);
+          if (active && prof?.displayName) {
+            setMyName(prof.displayName);
+            return;
+          }
+        } catch {
+          // Ignorar
+        }
+  
+        try {
+          const ens = await resolveNameLabel(myAddr);
+          if (active && ens) {
+            setMyName(ens);
+            return;
+          }
+        } catch {
+          // Ignorar
+        }
+  
+        if (active) {
+          setMyName(abbreviateAddress(myAddr));
+        }
+      })();
+  
+      return () => {
+        active = false;
+      };
+    }, [walletClient, warpcast]);
 
   // =========================
   // Cargar perfil Farcaster/ENS
@@ -286,7 +330,7 @@ export default function ConversationScreen({
       }
     }
 
-    const title = `New ping from ${displayName}!`;
+    const title = `New ping from ${myName}!`;
     const bodyText =
       typeof text === "string" ? text : (text as XMTPAttachment).filename;
 
