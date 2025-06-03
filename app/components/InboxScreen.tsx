@@ -412,38 +412,52 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
   // — 5️⃣ Stream global de mensajes (solo actualiza updatedAt / hasUnread para conversaciones ya cargadas)
   useEffect(() => {
-    if (!xmtpClient) return;
-    let active = true;
+  if (!xmtpClient) return;
+  let active = true;
 
-    (async () => {
-      const streamAll = await xmtpClient.conversations.streamAllMessages();
-      for await (const msg of streamAll as AsyncStream<DecodedMessage>) {
-        if (!active) break;
-        // Encontramos la conversación cuyo “topic” sea msg.conversationId
-        const conv = conversations.find((c) => c.id === msg?.conversationId);
-        if (!conv) continue;
+  (async () => {
+    const streamAll = await xmtpClient.conversations.streamAllMessages();
+    for await (const msg of streamAll as AsyncStream<DecodedMessage>) {
+      if (!active) break;
 
+      // NOTA: no usamos `conversations.find` aquí sino que lo
+      // haremos dentro del functional update
+      setConversations((prevConvs) => {
+        // 1) Buscamos el índice de la conversación a actualizar
+        const idx = prevConvs.findIndex((c) => c.id === msg?.conversationId);
+        if (idx < 0) {
+          // Si no existe en el listado actual, devolvemos prevConvs sin cambios
+          return prevConvs;
+        }
+
+        // 2) Calculamos si el mensaje vino de mí o del otro
         const isMe = msg?.senderInboxId === myInboxId;
-        setConversations((prev) =>
-          prev
-            .map((c) =>
-              c.id === msg?.conversationId
-                ? ({
-                  ...c,
-                  updatedAt: new Date(Number(msg.sentAtNs / BigInt(1e6))),
-                  hasUnread: !isMe,
-                } as ExtendedConversation)
-                : c
-            )
-            .sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0))
-        );
-      }
-    })().catch(console.error);
+        const sentAt = msg?.sentAtNs != undefined ? Number(msg?.sentAtNs / BigInt(1e6)) : 0;
+        const updatedConv = {
+          ...prevConvs[idx],
+          updatedAt: new Date(sentAt),
+          hasUnread: !isMe,
+        } as ExtendedConversation;
 
-    return () => {
-      active = false;
-    };
-  }, [xmtpClient, myInboxId, conversations]);
+        // 3) Creamos un nuevo array con ese elemento modificado
+        const newConvs = [
+          ...prevConvs.slice(0, idx),
+          updatedConv,
+          ...prevConvs.slice(idx + 1),
+        ];
+
+        // 4) Reordenamos por `updatedAt` descendente
+        newConvs.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
+        return newConvs;
+      });
+    }
+  })().catch(console.error);
+
+  return () => {
+    active = false;
+  };
+}, [xmtpClient, myInboxId]);
+
 
   // — 6️⃣ Cargar mensajes de la conversación “expanded” (igual que antes, usando peerInboxId para crear el DM)
   useEffect(() => {
@@ -746,10 +760,11 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                 <div className="px-4 pb-4 space-y-2 max-h-[50%] overflow-y-auto">
                   <div
                     onClick={() => router.push(`/conversation/${peer}`)}
-                    className="cursor-pointer italic text-sm p-2 rounded-lg bg-[#2a2438] hover:bg-[#3a3345] flex justify-center"
+                    className="cursor-pointer text-md p-2 rounded-lg bg-[#2a2438] border border-purple-600 hover:bg-[#3a3345] flex justify-center"
                   >
-                    Open full conversation
+                    Open FULL conversation
                   </div>
+
                   {(messages[peer] || [])
                     .slice(-5)
                     .map((m, i) => {
@@ -759,10 +774,9 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                         !isString && (contenido as any).data !== undefined;
 
                       return (
-                        <div key={i} className={`flex flex-col max-w-[80%] py-1 px-3 rounded-lg ${m.senderInboxId === myInboxId ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
+                        <div key={i} className={`flex flex-col max-w-[80%] break-words py-1 px-3 rounded-lg ${m.senderInboxId === myInboxId ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
                           }`}>
                           {isAttachment ? (
-                            // …igual que antes, renderizas imagen o ícono/filename…
                             <div
                               className="flex items-center space-x-2 cursor-pointer"
                               onClick={() => handleAttachmentClick(contenido as XMTPAttachment)}
@@ -784,12 +798,12 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                             </div>
                           ) : isString ? (
                             // si es un string válido, lo mostramos
-                            <div className="text-center">{contenido}</div>
+                            <div className="text-center break-words">{contenido}</div>
                           ) : (
                             // en este punto `contenido` es un objeto “evento de sistema”
                             <div className="text-xs text-gray-400 italic">
                               {/* Puedes personalizar este mensaje o incluso JSON.stringify */}
-                              {`[Evento de sistema: ${JSON.stringify(contenido)}]`}
+                              {`Conversation started`/* [Evento de sistema: ${JSON.stringify(contenido)}] */}
                             </div>
                           )}
 
