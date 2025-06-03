@@ -75,7 +75,6 @@ export default function ConversationScreen({
 
     (async () => {
       try {
-        // Esto devuelve algo como { inboxId: "ba81…", /* … más campos … */ }
         const { inboxId } = await xmtpClient.preferences.inboxState();
         setMyInboxId(inboxId);
       } catch (err) {
