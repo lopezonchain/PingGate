@@ -170,7 +170,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   };
 
-    // Cargar conversaciones iniciales XMTP y extraer inbox ID → walletAddress
+  // Cargar conversaciones iniciales XMTP y extraer inbox ID → walletAddress
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
@@ -267,12 +267,15 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
     (async () => {
       const streamDms = await xmtpClient.conversations.streamDms();
-      for await (const newConv of streamDms as AsyncStream<Dm>) {
+      for await (const maybeConv of streamDms as AsyncStream<Dm>) {
         if (!active) break;
 
-        // Cada vez que llega un DM nuevo, lo enriquecemos igual que en la carga inicial
+        // 1) Descartar el caso "undefined"
+        if (!maybeConv) continue;
+        const newConv = maybeConv; // ahora TS sabe que es Dm
+
         try {
-          // 1) peerInbox
+          // 2) peerInbox
           let peerInbox: string | undefined;
           try {
             peerInbox = await newConv.peerInboxId();
@@ -280,7 +283,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             peerInbox = undefined;
           }
 
-          // 2) peerWallet
+          // 3) peerWallet
           let peerWallet: string | undefined;
           if (peerInbox) {
             try {
@@ -302,7 +305,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             }
           }
 
-          // 3) último mensaje (puede que aún no haya ninguno)
+          // 4) último mensaje (puede que aún no haya ninguno)
           const metas = await newConv.messages({
             limit: BigInt(1),
             direction: SortDirection.Descending,
@@ -316,14 +319,15 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             ? lastMsg.senderInboxId !== myInboxId
             : false;
 
-          // 4) extender la instancia
-          const ext = newConv as ExtendedConversation;
+          // 5) Crear un ExtendedConversation basado en newConv
+          //    ─ en lugar de "as ExtendedConversation" a secas, usamos Object.create
+          const ext = Object.create(newConv) as ExtendedConversation;
           ext.updatedAt = updatedAt;
           ext.hasUnread = hasUnread;
           ext.peerInboxId = peerInbox;
           ext.peerWalletAddress = peerWallet;
 
-          // 5) Añadir al estado, comprobando que no exista ya
+          // 6) Añadir al estado, comprobando que no exista ya
           setConversations((prev) => {
             const exists = prev.find((c) => c.id === ext.id);
             if (exists) return prev;
@@ -334,7 +338,6 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             return newList;
           });
         } catch (e) {
-          // Si algo falla enriqueciendo, lo ignoramos pero no detenemos el stream
           console.error("Error al procesar nueva conversación", e);
         }
       }
@@ -496,51 +499,51 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
   // — 5️⃣ Stream global de mensajes (solo actualiza updatedAt / hasUnread para conversaciones ya cargadas)
   useEffect(() => {
-  if (!xmtpClient) return;
-  let active = true;
+    if (!xmtpClient) return;
+    let active = true;
 
-  (async () => {
-    const streamAll = await xmtpClient.conversations.streamAllMessages();
-    for await (const msg of streamAll as AsyncStream<DecodedMessage>) {
-      if (!active) break;
+    (async () => {
+      const streamAll = await xmtpClient.conversations.streamAllMessages();
+      for await (const msg of streamAll as AsyncStream<DecodedMessage>) {
+        if (!active) break;
 
-      // NOTA: no usamos `conversations.find` aquí sino que lo
-      // haremos dentro del functional update
-      setConversations((prevConvs) => {
-        // 1) Buscamos el índice de la conversación a actualizar
-        const idx = prevConvs.findIndex((c) => c.id === msg?.conversationId);
-        if (idx < 0) {
-          // Si no existe en el listado actual, devolvemos prevConvs sin cambios
-          return prevConvs;
-        }
+        // NOTA: no usamos `conversations.find` aquí sino que lo
+        // haremos dentro del functional update
+        setConversations((prevConvs) => {
+          // 1) Buscamos el índice de la conversación a actualizar
+          const idx = prevConvs.findIndex((c) => c.id === msg?.conversationId);
+          if (idx < 0) {
+            // Si no existe en el listado actual, devolvemos prevConvs sin cambios
+            return prevConvs;
+          }
 
-        // 2) Calculamos si el mensaje vino de mí o del otro
-        const isMe = msg?.senderInboxId === myInboxId;
-        const sentAt = msg?.sentAtNs != undefined ? Number(msg?.sentAtNs / BigInt(1e6)) : 0;
-        const updatedConv = {
-          ...prevConvs[idx],
-          updatedAt: new Date(sentAt),
-          hasUnread: !isMe,
-        } as ExtendedConversation;
+          // 2) Calculamos si el mensaje vino de mí o del otro
+          const isMe = msg?.senderInboxId === myInboxId;
+          const sentAt = msg?.sentAtNs != undefined ? Number(msg?.sentAtNs / BigInt(1e6)) : 0;
+          const updatedConv = {
+            ...prevConvs[idx],
+            updatedAt: new Date(sentAt),
+            hasUnread: !isMe,
+          } as ExtendedConversation;
 
-        // 3) Creamos un nuevo array con ese elemento modificado
-        const newConvs = [
-          ...prevConvs.slice(0, idx),
-          updatedConv,
-          ...prevConvs.slice(idx + 1),
-        ];
+          // 3) Creamos un nuevo array con ese elemento modificado
+          const newConvs = [
+            ...prevConvs.slice(0, idx),
+            updatedConv,
+            ...prevConvs.slice(idx + 1),
+          ];
 
-        // 4) Reordenamos por `updatedAt` descendente
-        newConvs.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
-        return newConvs;
-      });
-    }
-  })().catch(console.error);
+          // 4) Reordenamos por `updatedAt` descendente
+          newConvs.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
+          return newConvs;
+        });
+      }
+    })().catch(console.error);
 
-  return () => {
-    active = false;
-  };
-}, [xmtpClient, myInboxId]);
+    return () => {
+      active = false;
+    };
+  }, [xmtpClient, myInboxId]);
 
 
   // — 6️⃣ Cargar mensajes de la conversación “expanded” (igual que antes, usando peerInboxId para crear el DM)
