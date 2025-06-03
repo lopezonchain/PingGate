@@ -2,7 +2,14 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { DecodedMessage, SortDirection } from "@xmtp/xmtp-js";
+import {
+  AsyncStream,
+  Client,
+  ConsentState,
+  type DecodedMessage,
+  IdentifierKind,
+  SortDirection,
+} from "@xmtp/browser-sdk";
 import { useWalletClient, useConnect } from "wagmi";
 import { FiArrowLeft, FiFile } from "react-icons/fi";
 import { useXmtpClient } from "../hooks/useXmtpClient";
@@ -16,7 +23,7 @@ import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import sdk from "@farcaster/frame-sdk";
 
 interface ConversationScreenProps {
-  peerAddress: string;
+  peerAddress: string; // Puedes pasar aquí el inboxId o la dirección ETH del peer
   onBack: () => void;
 }
 
@@ -26,35 +33,49 @@ export default function ConversationScreen({
 }: ConversationScreenProps) {
   const router = useRouter();
 
-  // 1) Wagmi: walletClient and connect
+  // 1) Wagmi: walletClient y connect
   const { data: walletClient, isLoading: walletLoading } = useWalletClient();
   const { connect, connectors } = useConnect();
 
-  // 2) XMTP: hook that provides xmtpClient and xmtpError
+  // 2) XMTP: hook que nos da xmtpClient y xmtpError
   const { xmtpClient, error: xmtpError } = useXmtpClient();
+  const [myInboxId, setMyInboxId] = useState<string>("");
 
   const myAddress = walletClient?.account.address.toLowerCase() || "";
   const warpcast = React.useMemo(() => new WarpcastService(), []);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // — Display name and avatar
+  // — Nombre a mostrar y avatar
   const [displayName, setDisplayName] = useState<string>(peerAddress);
   const [profile, setProfile] = useState<Web3BioProfile | null>(null);
 
-  // — Gating state
+  // — Estado de “gating”
   const [checkedGate, setCheckedGate] = useState(false);
   const [hasPeerServices, setHasPeerServices] = useState(false);
   const [hasPurchasedService, setHasPurchasedService] = useState(false);
 
-  // — Messages
+  // — Mensajes
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
 
-  // — Preview for attachments
+  // — Preview para adjuntos
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
 
-  const { setFrameReady, isFrameReady } = useMiniKit();
+  useEffect(() => {
+    if (!xmtpClient) return;
 
+    (async () => {
+      try {
+        // Esto devuelve algo como { inboxId: "ba81…", /* … más campos … */ }
+        const { inboxId } = await xmtpClient.preferences.inboxState();
+        setMyInboxId(inboxId);
+      } catch (err) {
+        console.error("Couldn't get inboxId:", err);
+      }
+    })();
+  }, [xmtpClient]);
+
+  const { setFrameReady, isFrameReady } = useMiniKit();
   useEffect(() => {
     if (!isFrameReady) setFrameReady();
     (async () => {
@@ -62,9 +83,8 @@ export default function ConversationScreen({
     })();
   }, [isFrameReady, setFrameReady]);
 
-
   // =========================
-  // Fetch Farcaster/ENS profile
+  // Cargar perfil Farcaster/ENS
   // =========================
   useEffect(() => {
     let active = true;
@@ -89,7 +109,7 @@ export default function ConversationScreen({
           return;
         }
       } catch {
-        // ignore
+        // ignorar
       }
       if (active) {
         try {
@@ -99,7 +119,7 @@ export default function ConversationScreen({
             return;
           }
         } catch {
-          // ignore
+          // ignorar
         }
         setDisplayName(peerAddress);
       }
@@ -111,7 +131,7 @@ export default function ConversationScreen({
   }, [peerAddress]);
 
   // =========================
-  // Check gating (peer services + purchases)
+  // Chequear gating (servicios del peer + compras propias)
   // =========================
   useEffect(() => {
     if (!walletClient) return;
@@ -121,7 +141,7 @@ export default function ConversationScreen({
       const addrPeer = peerAddress as `0x${string}`;
       const addrMe = myAddress as `0x${string}`;
 
-      // Get services sold by peer
+      // 1) Obtener IDs de servicios que vende el peer
       let peerServiceIds: bigint[] = [];
       try {
         peerServiceIds = await getServicesBy(addrPeer);
@@ -138,7 +158,7 @@ export default function ConversationScreen({
       }
       setHasPeerServices(true);
 
-      // Check if user purchased any of the peer's services
+      // 2) Chequear si yo compré alguno
       let myPurchaseIds: bigint[] = [];
       try {
         myPurchaseIds = await getPurchasesBy(addrMe);
@@ -162,46 +182,71 @@ export default function ConversationScreen({
   }, [peerAddress, walletClient, myAddress]);
 
   // =========================
-  // Load XMTP messages if gating passed
+  // Cargar mensajes XMTP si pasamos el gating
   // =========================
   useEffect(() => {
-    if (
-      !xmtpClient ||
-      !checkedGate ||
-      (hasPeerServices && !hasPurchasedService)
-    ) {
+  if (
+    !xmtpClient ||
+    !checkedGate ||
+    (hasPeerServices && !hasPurchasedService)
+  ) {
+    return;
+  }
+
+  let active = true;
+  let stream: AsyncStream<DecodedMessage> | undefined;
+
+  (async () => {
+    // 1) Primero: verificar si el peer está reachable en XMTP
+    const canPeer = await xmtpClient.canMessage([
+      { identifier: peerAddress, identifierKind: "Ethereum" }
+    ]);
+
+    if (!canPeer) {
+      console.warn("Peer no está en XMTP; no hay conversación posible");
       return;
     }
 
-    let active = true;
-    let stream: AsyncIterable<DecodedMessage>;
+    // 2) Sincronizar todas las conversaciones para asegurarnos de ver el 'welcome'
+    await xmtpClient.conversations.syncAll([ConsentState.Allowed]);
 
-    (async () => {
-      const convo = await xmtpClient.conversations.newConversation(peerAddress);
-      const initial = await convo.messages({
-        limit: 50,
-        direction: SortDirection.SORT_DIRECTION_DESCENDING,
-      });
-      if (!active) return;
-      setMessages(initial.slice().reverse());
-
-      stream = await convo.streamMessages();
-      for await (const msg of stream) {
-        if (!active) break;
-        setMessages((prev) => [...prev, msg]);
-      }
-    })().catch(console.error);
-
-    return () => {
-      active = false;
-      if (stream && typeof (stream as any).return === "function") {
-        (stream as any).return();
-      }
+    // 3) Ahora sí: obtenemos (o creamos) el DM de dos miembros
+    const peerIdentifier = {
+      identifier: peerAddress,
+      identifierKind: "Ethereum" as IdentifierKind,
     };
-  }, [xmtpClient, peerAddress, checkedGate, hasPeerServices, hasPurchasedService]);
+    const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
+
+    // 4) Cargar mensajes iniciales (descendentes) y revertir el array
+    const initial = await convo.messages({
+      limit: BigInt(50),
+      direction: SortDirection.Descending,
+    });
+    if (!active) return;
+    setMessages(initial.slice().reverse());
+
+    // 5) Abrir el stream de nuevos mensajes
+    stream = await convo.stream();
+    const iterableStream = stream as unknown as AsyncIterable<DecodedMessage>;
+
+    for await (const msg of iterableStream) {
+      if (!active) break;
+      setMessages((prev) => [...prev, msg]);
+    }
+  })().catch(console.error);
+
+  return () => {
+    active = false;
+    if (stream && typeof (stream as any).return === "function") {
+      (stream as any).return();
+    }
+  };
+}, [xmtpClient, peerAddress, checkedGate, hasPeerServices, hasPurchasedService]);
+
+
 
   // =========================
-  // Auto-scroll when messages update
+  // Auto-scroll cuando cambian los mensajes
   // =========================
   useEffect(() => {
     const c = scrollContainerRef.current;
@@ -213,19 +258,23 @@ export default function ConversationScreen({
   }, [messages]);
 
   // =========================
-  // Send a new message
+  // Enviar un nuevo mensaje
   // =========================
   const handleSend = async (text: string | XMTPAttachment) => {
     if (!xmtpClient || !text) return;
-    const convo = await xmtpClient.conversations.newConversation(peerAddress);
+    const peerIdentifier = {
+      identifier: peerAddress,
+      identifierKind: "Ethereum" as IdentifierKind,
+    };
+    const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
 
     if (typeof text === "string") {
       await convo.send(text);
     } else {
-      await convo.send(text, { contentType: ContentTypeAttachment });
+      await convo.send(text, ContentTypeAttachment);
     }
 
-    // Optional notification…
+    // Opcional: enviar notificación
     let fid = 0;
     if (profile?.social?.uid) {
       fid = profile.social.uid;
@@ -233,7 +282,7 @@ export default function ConversationScreen({
       try {
         fid = await warpcast.getFidByName(peerAddress);
       } catch {
-        /* ignore */
+        /* ignorar */
       }
     }
 
@@ -252,7 +301,7 @@ export default function ConversationScreen({
     }).catch(console.error);
   };
 
-  // — Functions for attachments
+  // — Helpers para attachments
   const attachmentToUrl = (att: XMTPAttachment): string => {
     if (typeof att.data === "string") {
       return `data:${att.mimeType};base64,${att.data}`;
@@ -261,8 +310,8 @@ export default function ConversationScreen({
       att.data instanceof Uint8Array
         ? att.data
         : Array.isArray(att.data)
-          ? Uint8Array.from(att.data as number[])
-          : new Uint8Array(att.data as ArrayBuffer);
+        ? Uint8Array.from(att.data as number[])
+        : new Uint8Array(att.data as ArrayBuffer);
     return URL.createObjectURL(new Blob([bytes], { type: att.mimeType }));
   };
 
@@ -278,10 +327,10 @@ export default function ConversationScreen({
   };
 
   // =========================
-  // Render conditional
+  // Render condicional
   // =========================
 
-  // If walletClient exists but xmtpClient not ready, show loading
+  // Si walletClient existe pero xmtpClient aún no, mostramos loading
   if (walletClient && !xmtpClient) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-[#0f0d14] text-white p-4">
@@ -295,7 +344,7 @@ export default function ConversationScreen({
     );
   }
 
-  // Loading while gating check is in progress
+  // Mientras chequeamos el gating, mostramos loading
   if (!checkedGate) {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#0f0d14] text-white">
@@ -304,7 +353,7 @@ export default function ConversationScreen({
     );
   }
 
-  // If gated and not purchased, show gated modal
+  // Si está gated y no compramos, mostramos modal de gated
   if (hasPeerServices && !hasPurchasedService) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
@@ -333,7 +382,9 @@ export default function ConversationScreen({
     );
   }
 
-  // Full chat render
+  // =================================
+  // Render principal del chat completo
+  // =================================
   return (
     <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
       {/* Header */}
@@ -356,29 +407,30 @@ export default function ConversationScreen({
         </h2>
       </div>
 
-      {/* Messages list */}
+      {/* Lista de mensajes */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500"
         >
           {messages.map((m, i) => {
-            const isMe = m.senderAddress.toLowerCase() === myAddress;
-            const time = m.sent
-              ? m.sent.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
+            // Aquí comparamos con la propiedad senderInboxId
+            const isMe = m.senderInboxId === myInboxId;
+            const time = m.sentAtNs
+              ? new Date(Number(m.sentAtNs / BigInt(1000000))).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
               : "";
-            const isAtt =
-              typeof m.content !== "string" && (m.content as any).data;
+            const isAtt = typeof m.content !== "string" && (m.content as any).data;
             const att = isAtt ? (m.content as XMTPAttachment) : null;
 
             return (
               <div
                 key={i}
-                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
-                  }`}
+                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${
+                  isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
+                }`}
                 style={{ hyphens: "auto" }}
               >
                 {att ? (
@@ -395,12 +447,16 @@ export default function ConversationScreen({
                     ) : (
                       <>
                         <FiFile className="w-6 h-6 text-gray-300" />
-                        <span className="truncate text-sm">{att.filename}</span>
+                        <span className="truncate text-sm">
+                          {att.filename}
+                        </span>
                       </>
                     )}
                   </div>
                 ) : (
-                  <div className="text-center">{m.content}</div>
+                  <div className="text-center">
+                    {typeof m.content === "string" ? m.content : ""}
+                  </div>
                 )}
                 <span className="text-[10px] text-gray-300 text-right">
                   {time}
@@ -410,13 +466,13 @@ export default function ConversationScreen({
           })}
         </div>
 
-        {/* Input area */}
+        {/* Área de input */}
         <div className="border-t border-gray-700 p-4">
           <MessageInput onSend={(t) => handleSend(t)} inConversation={true} />
         </div>
       </div>
 
-      {/* Full-screen image preview */}
+      {/* Preview de imagen a pantalla completa */}
       {fullImageSrc && (
         <div
           className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"
@@ -430,7 +486,7 @@ export default function ConversationScreen({
         </div>
       )}
 
-      {/* Full-screen file text */}
+      {/* Preview de texto de archivo a pantalla completa */}
       {fullFileText && (
         <div
           className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"
