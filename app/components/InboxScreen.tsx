@@ -516,7 +516,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             return prevConvs;
           }
 
-          // 2) Calculamos si el mensaje vino de mí o del otro
+          // Calculamos si el mensaje vino de mí o del otro
           const isMe = msg?.senderInboxId === myInboxId;
           const sentAt = msg?.sentAtNs != undefined ? Number(msg?.sentAtNs / BigInt(1e6)) : 0;
           const updatedConv = {
@@ -525,14 +525,14 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             hasUnread: !isMe,
           } as ExtendedConversation;
 
-          // 3) Creamos un nuevo array con ese elemento modificado
+          // Creamos un nuevo array con ese elemento modificado
           const newConvs = [
             ...prevConvs.slice(0, idx),
             updatedConv,
             ...prevConvs.slice(idx + 1),
           ];
 
-          // 4) Reordenamos por `updatedAt` descendente
+          // Reordenamos por `updatedAt` descendente
           newConvs.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
           return newConvs;
         });
@@ -623,7 +623,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     const bodyText =
       typeof text === "string" ? text : (text as XMTPAttachment).filename;
 
-    fetch("/api/notify", {
+    const res = await fetch("/api/notify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -631,7 +631,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         notification: { title, body: bodyText },
         targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
       }),
-    }).catch(console.error);
+    });
+    if (!res.ok) {
+      console.error(`Notify failed: ${res.status} ${res.statusText}`);
+    }
   };
 
   // ✉️ Nuevo hilo (“composer”)
@@ -671,7 +674,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       const title = `New ping from ${myName}`;
       const bodyText = body;
 
-      fetch("/api/notify", {
+      const res = await fetch("/api/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -679,7 +682,11 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           notification: { title, body: bodyText },
           targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
         }),
-      }).catch(console.error);
+      });
+      if (!res.ok) {
+        console.error(`Notify failed: ${res.status} ${res.statusText}`);
+      }
+
     } catch (e: any) {
       setErr(e.message);
     } finally {
