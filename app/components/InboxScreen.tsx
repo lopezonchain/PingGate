@@ -42,7 +42,6 @@ interface InboxScreenProps {
   onBack: () => void;
 }
 
-// — Extendemos Conversation para incluir inboxId y walletAddress
 interface ExtendedConversation extends Conversation {
   updatedAt?: Date;
   hasUnread?: boolean;
@@ -730,13 +729,16 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               </h2>
             </div>
             <p>
-              This chat uses XMTP to send and receive messages. XMTP requires a
+              Welcome to PingGate!! This is a chat-based marketplace where you can just chat or monetize your Inbox by offering services.
+              <br />
+              <br />
+              We use a very nice protocol for messaging called XMTP. XMTP requires a
               signature the first time you join it so you can start using it,
-              but don&apos;t worry, this is completely free.
+              but don&apos;t worry, this is completely free!
               <br />
               <br />
               An additional signature could be needed when you access back to
-              your messages from a new device, or after memory cleans.
+              your inbox from a new device, or after memory cleans.
               This is needed to decrypt your messages, as they are
               secured and wallet2wallet encrypted.
               <a
@@ -968,7 +970,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       {showComposer && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-40 flex items-center justify-center">
           <div className="bg-[#1a1725] p-6 rounded-xl w-full max-w-md space-y-4">
-            <h3 className="text-lg font-bold text-white">New Conversation</h3>
+            <h3 className="text-lg font-bold text-white">New Ping / Chat</h3>
             {err && <p className="text-red-400">{err}</p>}
             <input
               type="text"
