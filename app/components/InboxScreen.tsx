@@ -617,13 +617,13 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             <p>
               This chat uses XMTP to send and receive messages. XMTP requires a
               signature the first time you join it so you can start using it,
-              but don&apos;t worry, this is completamente free.
+              but don&apos;t worry, this is completely free.
               <br />
               <br />
-              An additional signature is needed each time you access back to
-              your messages, to decrypt them for reading. All messages are
-              secured and wallet2wallet encrypted; solo tú y tu contraparte
-              podéis verlas.
+              An additional signature could be needed when you access back to
+              your messages from a new device, or after memory cleans.
+              This is needed to decrypt your messages, as they are
+              secured and wallet2wallet encrypted.
               <a
                 className="block p-3 mt-3 bg-[#0F0D14]"
                 href="https://docs.xmtp.org/intro/intro"

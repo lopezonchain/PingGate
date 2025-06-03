@@ -61,6 +61,15 @@ export default function ConversationScreen({
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
 
+  const { setFrameReady, isFrameReady } = useMiniKit();
+  
+  useEffect(() => {
+      if (!isFrameReady) setFrameReady();
+      (async () => {
+        await sdk.actions.ready({ disableNativeGestures: true });
+      })();
+  }, [isFrameReady, setFrameReady]);
+
   useEffect(() => {
     if (!xmtpClient) return;
 
@@ -74,14 +83,6 @@ export default function ConversationScreen({
       }
     })();
   }, [xmtpClient]);
-
-  const { setFrameReady, isFrameReady } = useMiniKit();
-  useEffect(() => {
-    if (!isFrameReady) setFrameReady();
-    (async () => {
-      await sdk.actions.ready({ disableNativeGestures: true });
-    })();
-  }, [isFrameReady, setFrameReady]);
 
   // =========================
   // Cargar perfil Farcaster/ENS
