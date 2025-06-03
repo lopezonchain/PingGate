@@ -235,7 +235,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           : false;
 
         // "Extender" la instancia `conv` para que cumpla ExtendedConversation
-        const ext = conv as ExtendedConversation;
+        const ext = conv as unknown as ExtendedConversation;
         ext.updatedAt = updatedAt;
         ext.hasUnread = hasUnread;
         ext.peerInboxId = peerInbox;
