@@ -320,7 +320,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             : false;
 
           // Crear un ExtendedConversation basado en newConv
-          const ext = Object.create(newConv) as ExtendedConversation;
+          const ext = newConv as unknown as ExtendedConversation;
           ext.updatedAt = updatedAt;
           ext.hasUnread = hasUnread;
           ext.peerInboxId = peerInbox;
