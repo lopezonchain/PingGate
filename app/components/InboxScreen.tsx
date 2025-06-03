@@ -64,10 +64,10 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const { xmtpClient, error: xmtpError } = useXmtpClient();
   const myAddr = walletClient?.account.address.toLowerCase() || "";
 
-  // 1) Instanciar WarpcastService
+  // Instanciar WarpcastService
   const warpcast = useMemo(() => new WarpcastService(), []);
 
-  // — Resolver mi propio nombre (Farcaster → ENS → fallback)
+  // Resolver mi propio nombre (Farcaster → ENS → fallback)
   const [myName, setMyName] = useState<string>("");
   useEffect(() => {
     if (!myAddr) return;
@@ -104,7 +104,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     };
   }, [myAddr, warpcast]);
 
-  // — Estados principales
+  // Estados principales
   const [conversations, setConversations] = useState<ExtendedConversation[]>([]);
   const [purchasedPeers, setPurchasedPeers] = useState<Set<string>>(new Set());
   const [soldPeers, setSoldPeers] = useState<Set<string>>(new Set());
@@ -129,7 +129,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
 
-  // — Obtener mi inboxId para saber mis mensajes no leídos
+  // Obtener mi inboxId para saber mis mensajes no leídos
   const [myInboxId, setMyInboxId] = useState<string>("");
   useEffect(() => {
     if (!xmtpClient) return;
@@ -270,12 +270,12 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       for await (const maybeConv of streamDms as AsyncStream<Dm>) {
         if (!active) break;
 
-        // 1) Descartar el caso "undefined"
+        // Descartar el caso "undefined"
         if (!maybeConv) continue;
         const newConv = maybeConv; // ahora TS sabe que es Dm
 
         try {
-          // 2) peerInbox
+          // peerInbox
           let peerInbox: string | undefined;
           try {
             peerInbox = await newConv.peerInboxId();
@@ -283,7 +283,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             peerInbox = undefined;
           }
 
-          // 3) peerWallet
+          // peerWallet
           let peerWallet: string | undefined;
           if (peerInbox) {
             try {
@@ -305,7 +305,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             }
           }
 
-          // 4) último mensaje (puede que aún no haya ninguno)
+          // último mensaje (puede que aún no haya ninguno)
           const metas = await newConv.messages({
             limit: BigInt(1),
             direction: SortDirection.Descending,
@@ -319,15 +319,14 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             ? lastMsg.senderInboxId !== myInboxId
             : false;
 
-          // 5) Crear un ExtendedConversation basado en newConv
-          //    ─ en lugar de "as ExtendedConversation" a secas, usamos Object.create
+          // Crear un ExtendedConversation basado en newConv
           const ext = Object.create(newConv) as ExtendedConversation;
           ext.updatedAt = updatedAt;
           ext.hasUnread = hasUnread;
           ext.peerInboxId = peerInbox;
           ext.peerWalletAddress = peerWallet;
 
-          // 6) Añadir al estado, comprobando que no exista ya
+          // Añadir al estado, comprobando que no exista ya
           setConversations((prev) => {
             const exists = prev.find((c) => c.id === ext.id);
             if (exists) return prev;
@@ -349,13 +348,13 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   }, [xmtpClient, myInboxId]);
 
 
-  // — 2️⃣ Obtener compras y ventas: ahora “peerWalletAddress” en lugar de inbox ID
+  // Obtener compras y ventas: ahora “peerWalletAddress” en lugar de inbox ID
   useEffect(() => {
     if (!walletClient) return;
     let active = true;
 
     (async () => {
-      // ── Purchases → Experts ──
+      // Purchases → Experts 
       const spentMap: Record<string, bigint> = {};
       const buyerIds = await fetchPurchasedServiceIds(walletClient.account.address);
       for (const id of buyerIds) {
@@ -369,7 +368,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         setPurchasedPeers(new Set(Object.keys(spentMap)));
       }
 
-      // ── Sales → Clients ──
+      // Sales → Clients
       const earnedMap: Record<string, bigint> = {};
       const sales = await fetchSalesRecords(walletClient.account.address);
       for (const sale of sales) {
@@ -389,7 +388,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     };
   }, [walletClient]);
 
-  // — 3️⃣ Cargar perfiles Farcaster + ENS, esta vez con “peerWalletAddress”
+  // Cargar perfiles Farcaster + ENS, esta vez con “peerWalletAddress”
   useEffect(() => {
     if (conversations.length === 0) return;
     let active = true;
@@ -410,7 +409,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         Web3BioProfile | { displayName: string; avatar: string | null }
       > = {};
 
-      // 3.1) Intentamos Farcaster
+      // Intentamos Farcaster
       try {
         const bioProfiles = await warpcast.getWeb3BioProfiles(ids);
         const aliasMap: Record<string, Web3BioProfile> = {};
@@ -429,7 +428,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         // Ignorar errores
       }
 
-      // 3.2) ENS / fallback
+      // ENS / fallback
       await Promise.all(
         peers.map(async (addr) => {
           if (newProfiles[addr]) return;
@@ -458,7 +457,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     };
   }, [conversations, warpcast]);
 
-  // — 4️⃣ Determinar gatedChats basado en “peerWalletAddress”
+  // Determinar gatedChats basado en “peerWalletAddress”
   useEffect(() => {
     if (!walletClient || conversations.length === 0) return;
     let active = true;
@@ -497,7 +496,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     };
   }, [conversations, walletClient]);
 
-  // — 5️⃣ Stream global de mensajes (solo actualiza updatedAt / hasUnread para conversaciones ya cargadas)
+  // Stream global de mensajes (solo actualiza updatedAt / hasUnread para conversaciones ya cargadas)
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
@@ -510,7 +509,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         // NOTA: no usamos `conversations.find` aquí sino que lo
         // haremos dentro del functional update
         setConversations((prevConvs) => {
-          // 1) Buscamos el índice de la conversación a actualizar
+          // Buscamos el índice de la conversación a actualizar
           const idx = prevConvs.findIndex((c) => c.id === msg?.conversationId);
           if (idx < 0) {
             // Si no existe en el listado actual, devolvemos prevConvs sin cambios
@@ -546,7 +545,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   }, [xmtpClient, myInboxId]);
 
 
-  // — 6️⃣ Cargar mensajes de la conversación “expanded” (igual que antes, usando peerInboxId para crear el DM)
+  // Cargar mensajes de la conversación “expanded” (igual que antes, usando peerInboxId para crear el DM)
   useEffect(() => {
     if (!xmtpClient || !expanded) return;
     let active = true;
