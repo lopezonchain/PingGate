@@ -597,43 +597,47 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       identifier: peer,
       identifierKind: "Ethereum" as IdentifierKind,
     };
-    const convo = await xmtpClient.conversations.newDmWithIdentifier(
-      peerIdentifier
-    );
+    const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
 
+    // Primero enviamos el texto/attachment por XMTP
     if (typeof text === "string") {
       await convo.send(text);
     } else {
       await convo.send(text, ContentTypeAttachment);
     }
 
+    // Luego obtenemos el fid (si existe) para la notificación
     const profile = profilesMap[peer] as Web3BioProfile | null;
     let fid = 0;
-    if ((profile as Web3BioProfile)?.social?.uid) {
-      fid = (profile as Web3BioProfile).social.uid;
+    if (profile?.social?.uid) {
+      fid = profile.social.uid;
     } else {
       try {
         fid = await warpcast.getFidByName(peer);
       } catch {
-        /* ignorar */
+        // Si no hay FID, dejamos fid = 0
       }
     }
 
     const title = `New ping from ${myName}`;
-    const bodyText =
-      typeof text === "string" ? text : (text as XMTPAttachment).filename;
+    const bodyText = typeof text === "string" ? text : (text as XMTPAttachment).filename;
 
-    const res = await fetch("/api/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fid,
-        notification: { title, body: bodyText },
-        targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
-      }),
-    });
-    if (!res.ok) {
-      console.error(`Notify failed: ${res.status} ${res.statusText}`);
+    // Intenta notificar; capturamos cualquier error (404, red, etc.)
+    try {
+      const res = await fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fid,
+          notification: { title, body: bodyText },
+          targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
+        }),
+      });
+      if (!res.ok) {
+        console.error(`Notify failed: ${res.status} ${res.statusText}`);
+      }
+    } catch (e) {
+      console.error("Notify error:", e);
     }
   };
 
@@ -650,43 +654,46 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         identifier: addr,
         identifierKind: "Ethereum" as IdentifierKind,
       };
-      const convo = await xmtpClient.conversations.newDmWithIdentifier(
-        peerIdentifier
-      );
+      const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
       await convo.send(body);
 
       setShowComposer(false);
       setTo("");
       setBody("");
 
+      // Obtenemos nuevamente el fid para la notificación
       const profile = profilesMap[addr] as Web3BioProfile | null;
       let fid = 0;
-      if ((profile as Web3BioProfile)?.social?.uid) {
-        fid = (profile as Web3BioProfile).social.uid;
+      if (profile?.social?.uid) {
+        fid = profile.social.uid;
       } else {
         try {
           fid = await warpcast.getFidByName(addr);
         } catch {
-          /* ignorar */
+          // Si no hay FID, dejamos fid = 0
         }
       }
 
       const title = `New ping from ${myName}`;
       const bodyText = body;
 
-      const res = await fetch("/api/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fid,
-          notification: { title, body: bodyText },
-          targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
-        }),
-      });
-      if (!res.ok) {
-        console.error(`Notify failed: ${res.status} ${res.statusText}`);
+      // Sólo aquí llamamos a /api/notify, con try/catch
+      try {
+        const res = await fetch("/api/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fid,
+            notification: { title, body: bodyText },
+            targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
+          }),
+        });
+        if (!res.ok) {
+          console.error(`Notify failed: ${res.status} ${res.statusText}`);
+        }
+      } catch (e) {
+        console.error("Notify error:", e);
       }
-
     } catch (e: any) {
       setErr(e.message);
     } finally {
