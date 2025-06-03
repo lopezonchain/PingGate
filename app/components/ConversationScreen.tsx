@@ -512,7 +512,7 @@ export default function ConversationScreen({
 
         {/* Área de input */}
         <div className="border-t border-gray-700 p-4">
-          <MessageInput onSend={(t) => handleSend(t)} inConversation={true} />
+          <MessageInput onSend={(t) => handleSend(t)} />
         </div>
       </div>
 

@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
-  FiX,
-  FiSend,
+  FiTrash2,
   FiPlus,
+  FiSend,
   FiImage,
   FiFile,
-  FiTrash2,
   FiSmile,
   FiDollarSign,
 } from "react-icons/fi";
@@ -23,26 +22,19 @@ export type XMTPAttachment = {
 interface MessageInputProps {
   /** Ahora acepta: texto (string) o attachment XMTP */
   onSend: (payload: string | XMTPAttachment) => void;
-  /** Si está en conversación inline o no */
-  inConversation?: boolean;
 }
 
-export default function MessageInput({
-  onSend,
-  inConversation = false,
-}: MessageInputProps) {
+export default function MessageInput({ onSend }: MessageInputProps) {
   const [text, setText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
-  const [modalOpen, setModalOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [menuAnchor, setMenuAnchor] =
     useState<{ x: number; y: number } | null>(null);
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const inlineTextRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Ajusta la altura del textarea inline según el contenido
   const adjustInlineHeight = (el: HTMLTextAreaElement | null) => {
@@ -52,18 +44,8 @@ export default function MessageInput({
   };
 
   useEffect(() => {
-    if (modalOpen) textareaRef.current?.focus();
-  }, [modalOpen]);
-
-  useEffect(() => {
-    if (inConversation) adjustInlineHeight(inlineTextRef.current);
-  }, [text, inConversation]);
-
-  const closeModal = () => {
-    setModalOpen(false);
-    setMenuOpen(false);
-    setShowPicker(false);
-  };
+    adjustInlineHeight(inlineTextRef.current);
+  }, [text]);
 
   const resetAll = () => {
     setText("");
@@ -72,14 +54,15 @@ export default function MessageInput({
       setPreviewUrl("");
       setSelectedFile(null);
     }
-    closeModal();
+    setMenuOpen(false);
+    setShowPicker(false);
   };
 
   const submitText = async () => {
     if (selectedFile) {
       const buffer = await selectedFile.arrayBuffer();
       const data = new Uint8Array(buffer);
-      const attachment = {
+      const attachment: XMTPAttachment = {
         filename: selectedFile.name,
         mimeType: selectedFile.type,
         data,
@@ -130,13 +113,6 @@ export default function MessageInput({
     setMenuOpen((o) => !o);
   };
 
-  const openModal = () => {
-    if (!inConversation) {
-      setModalOpen(true);
-    }
-    setMenuOpen(false);
-  };
-
   const removeAttachment = () => {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
@@ -171,7 +147,7 @@ export default function MessageInput({
                 <FiTrash2 className="text-white" size={12} />
               </button>
             </div>
-          ) : inConversation ? (
+          ) : (
             <textarea
               ref={inlineTextRef}
               className="w-full px-4 bg-[#2a2438] text-white rounded-lg resize-none overflow-hidden
@@ -184,14 +160,6 @@ export default function MessageInput({
               onChange={(e) => setText(e.target.value)}
               onInput={(e) => adjustInlineHeight(e.currentTarget)}
               onKeyDown={handleKeyDown}
-            />
-          ) : (
-            <input
-              className="w-full px-4 py-2 bg-[#2a2438] text-white rounded-lg cursor-text"
-              placeholder="Type a message..."
-              value={text}
-              readOnly
-              onClick={openModal}
             />
           )}
         </div>
@@ -229,7 +197,7 @@ export default function MessageInput({
             className="self-end pt-2 pr-4 hover:bg-[#231c32] rounded text-white"
             aria-label="Cerrar menú"
           >
-            <FiX />
+            <FiTrash2 />
           </button>
 
           <button
@@ -263,68 +231,6 @@ export default function MessageInput({
       {showPicker && (
         <div className="fixed inset-0 flex items-center justify-center z-[55]">
           <Picker onEmojiClick={onEmojiClick} theme={Theme.DARK} />
-        </div>
-      )}
-
-      {/* FULLSCREEN MODAL */}
-      {!inConversation && modalOpen && (
-        <div className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-75">
-          <div className="w-full max-w-md h-full bg-[#0f0d14] rounded-lg overflow-hidden flex flex-col">
-            <div className="flex justify-end p-4">
-              <button onClick={closeModal} className="text-white text-2xl">
-                <FiX />
-              </button>
-            </div>
-            <div className="flex-1 px-4 pb-4">
-              {previewUrl && (
-                <div className="mb-4 relative">
-                  <img
-                    src={previewUrl}
-                    alt="preview"
-                    className="w-full object-contain rounded-lg"
-                  />
-                  <button
-                    onClick={removeAttachment}
-                    className="absolute top-2 right-2 p-2 bg-black bg-opacity-50 rounded-full"
-                  >
-                    <FiTrash2 className="text-white" size={16} />
-                  </button>
-                </div>
-              )}
-              <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onFocus={(e) => {
-                  e.currentTarget.setSelectionRange(
-                    e.currentTarget.value.length,
-                    e.currentTarget.value.length
-                  );
-                }}
-                className="w-full h-full
-                  bg-[#1a1725] text-white p-4 rounded-lg
-                  scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600
-                  focus:outline-none"
-                placeholder="Type your message…"
-              />
-            </div>
-            <div className="p-4 border-t border-gray-700 flex space-x-2">
-              <button
-                onClick={openMenu}
-                className="p-2 bg-[#2a2438] rounded-lg text-white"
-              >
-                <FiPlus />
-              </button>
-              <button
-                onClick={submitText}
-                className="flex-1 flex items-center justify-center space-x-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-bold"
-              >
-                <FiSend />
-                <span>Send</span>
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </>

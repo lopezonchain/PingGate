@@ -919,10 +919,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
                       );
                     })}
 
-                  <MessageInput
-                    onSend={(t) => handleSend(peer, t)}
-                    inConversation={false}
-                  />
+                  <MessageInput onSend={(t) => handleSend(peer, t)}/>
                 </div>
               )}
             </motion.div>
