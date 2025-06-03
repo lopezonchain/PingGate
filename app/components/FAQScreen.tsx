@@ -62,7 +62,12 @@ const faqs: FAQ[] = [
   {
     question: "When someone buys my service, what happens?",
     answer:
-      "When a buyer pays, they unlock a gated chat with your wallet. You’ll see them as a Client and can reply privately in that chat.",
+      "When a buyer pays, they unlock a gated chat with your wallet. You’ll see them as a Client and can reply privately in that chat. Also you will receive 92% of the funds while the platform keeps 8% as fee",
+  },
+  {
+    question: "What are the platform fees?",
+    answer:
+      "There is a fixed fee to create and edit services, and 8% fee of every service buy. This will help the platform keep improving and offering more and more!",
   },
   {
     question: "How do reviews work?",
