@@ -170,7 +170,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   };
 
-  // — 1️⃣ Cargar conversaciones iniciales XMTP y extraer inbox ID → walletAddress
+    // Cargar conversaciones iniciales XMTP y extraer inbox ID → walletAddress
   useEffect(() => {
     if (!xmtpClient) return;
     let active = true;
@@ -178,16 +178,16 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     (async () => {
       setLoadingList(true);
 
-      // 1) Sincronizamos toda la lista (todos los consent states)
+      // Sincronizamos toda la lista (todos los consent states)
       await xmtpClient.conversations.syncAll([ConsentState.Allowed]);
 
-      // 2) Listamos todas las conversaciones (cada item es Dm | Group)
+      // Listamos todas las conversaciones (cada item es Dm | Group)
       const list = await xmtpClient.conversations.list();
 
       const enrichedConvs: ExtendedConversation[] = [];
 
       for (const conv of list) {
-        // 2.1) Si es un DM, pedimos el inbox ID del peer
+        // Si es un DM, pedimos el inbox ID del peer
         let peerInbox: string | undefined;
         if (conv instanceof Dm) {
           try {
@@ -197,8 +197,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           }
         }
 
-        // 2.2) A partir del inboxId (si existe), llamamos a inboxStateFromInboxIds
-        //      para extraer la dirección Ethereum (la “identity” de tipo Ethereum).
+        // A partir del inboxId (si existe), llamamos a inboxStateFromInboxIds para extraer la dirección Ethereum (la “identity” de tipo Ethereum).
         let peerWallet: string | undefined;
         if (peerInbox) {
           try {
@@ -221,7 +220,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           }
         }
 
-        // 2.3) Obtenemos el último mensaje para updatedAt y hasUnread
+        // Obtenemos el último mensaje para updatedAt y hasUnread
         const metas = await conv.messages({
           limit: BigInt(1),
           direction: SortDirection.Descending,
@@ -235,7 +234,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
           ? lastMsg.senderInboxId !== myInboxId
           : false;
 
-        // 2.4) "Extender" la instancia `conv` para que cumpla ExtendedConversation
+        // "Extender" la instancia `conv` para que cumpla ExtendedConversation
         const ext = conv as ExtendedConversation;
         ext.updatedAt = updatedAt;
         ext.hasUnread = hasUnread;
@@ -253,6 +252,91 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       if (active) {
         setConversations(enrichedConvs);
         setLoadingList(false);
+      }
+    })().catch(console.error);
+
+    return () => {
+      active = false;
+    };
+  }, [xmtpClient, myInboxId]);
+
+  // Stream de nuevas conversaciones (DMs) para agregarlas al estado al vuelo
+  useEffect(() => {
+    if (!xmtpClient) return;
+    let active = true;
+
+    (async () => {
+      const streamDms = await xmtpClient.conversations.streamDms();
+      for await (const newConv of streamDms as AsyncStream<Dm>) {
+        if (!active) break;
+
+        // Cada vez que llega un DM nuevo, lo enriquecemos igual que en la carga inicial
+        try {
+          // 1) peerInbox
+          let peerInbox: string | undefined;
+          try {
+            peerInbox = await newConv.peerInboxId();
+          } catch {
+            peerInbox = undefined;
+          }
+
+          // 2) peerWallet
+          let peerWallet: string | undefined;
+          if (peerInbox) {
+            try {
+              const states = await xmtpClient.preferences.inboxStateFromInboxIds(
+                [peerInbox],
+                true
+              );
+              const oneState = states?.[0];
+              if (oneState) {
+                const ethId = oneState.accountIdentifiers.find(
+                  (i) => i.identifierKind === "Ethereum"
+                );
+                if (ethId?.identifier) {
+                  peerWallet = (ethId.identifier as string).toLowerCase();
+                }
+              }
+            } catch {
+              peerWallet = undefined;
+            }
+          }
+
+          // 3) último mensaje (puede que aún no haya ninguno)
+          const metas = await newConv.messages({
+            limit: BigInt(1),
+            direction: SortDirection.Descending,
+          });
+          const lastMsg = metas[0];
+          const updatedAt =
+            lastMsg?.sentAtNs !== undefined
+              ? new Date(Number(lastMsg.sentAtNs / BigInt(1e6)))
+              : new Date();
+          const hasUnread = lastMsg
+            ? lastMsg.senderInboxId !== myInboxId
+            : false;
+
+          // 4) extender la instancia
+          const ext = newConv as ExtendedConversation;
+          ext.updatedAt = updatedAt;
+          ext.hasUnread = hasUnread;
+          ext.peerInboxId = peerInbox;
+          ext.peerWalletAddress = peerWallet;
+
+          // 5) Añadir al estado, comprobando que no exista ya
+          setConversations((prev) => {
+            const exists = prev.find((c) => c.id === ext.id);
+            if (exists) return prev;
+            const newList = [ext, ...prev];
+            newList.sort(
+              (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
+            );
+            return newList;
+          });
+        } catch (e) {
+          // Si algo falla enriqueciendo, lo ignoramos pero no detenemos el stream
+          console.error("Error al procesar nueva conversación", e);
+        }
       }
     })().catch(console.error);
 
