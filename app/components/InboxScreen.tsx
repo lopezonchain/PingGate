@@ -172,88 +172,84 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
   // Cargar conversaciones iniciales XMTP y extraer inbox ID → walletAddress
   useEffect(() => {
-    if (!xmtpClient) return;
+    if (!xmtpClient || !myInboxId) return;
     let active = true;
 
-    (async () => {
+    const loadConversations = async () => {
       setLoadingList(true);
+      try {
+        console.log("→ Syncing all conversations...");
+        await xmtpClient.conversations.syncAll([ConsentState.Allowed]);
 
-      // Sincronizamos toda la lista (todos los consent states)
-      await xmtpClient.conversations.syncAll([ConsentState.Allowed]);
+        console.log("→ Listing conversations...");
+        const list = await xmtpClient.conversations.list();
 
-      // Listamos todas las conversaciones (cada item es Dm | Group)
-      const list = await xmtpClient.conversations.list();
+        const enrichedConvs: ExtendedConversation[] = [];
 
-      const enrichedConvs: ExtendedConversation[] = [];
+        for (const conv of list) {
+          if (!active) break;
 
-      for (const conv of list) {
-        // Si es un DM, pedimos el inbox ID del peer
-        let peerInbox: string | undefined;
-        if (conv instanceof Dm) {
-          try {
-            peerInbox = await conv.peerInboxId();
-          } catch {
-            peerInbox = undefined;
-          }
-        }
-
-        // A partir del inboxId (si existe), llamamos a inboxStateFromInboxIds para extraer la dirección Ethereum (la “identity” de tipo Ethereum).
-        let peerWallet: string | undefined;
-        if (peerInbox) {
-          try {
-            const states = await xmtpClient.preferences.inboxStateFromInboxIds(
-              [peerInbox],
-              true
-            );
-            const oneState = states?.[0];
-            if (oneState) {
-              // Buscamos la identidad ETHEREUM dentro de “accountIdentifiers”
-              const ethId = oneState.accountIdentifiers.find(
-                (i) => i.identifierKind === "Ethereum"
-              );
-              if (ethId?.identifier) {
-                peerWallet = (ethId.identifier as string).toLowerCase();
-              }
+          let peerInbox: string | undefined;
+          if (conv instanceof Dm) {
+            try {
+              peerInbox = await conv.peerInboxId();
+            } catch (err) {
+              console.warn("Failed to get peerInboxId", err);
             }
-          } catch {
-            peerWallet = undefined;
           }
+
+          let peerWallet: string | undefined;
+          if (peerInbox) {
+            try {
+              const [state] = await xmtpClient.preferences.inboxStateFromInboxIds([peerInbox], true);
+              const ethId = state?.accountIdentifiers?.find((i) => i.identifierKind === "Ethereum");
+              peerWallet = ethId?.identifier?.toLowerCase();
+            } catch (err) {
+              console.warn("Failed to resolve wallet from inboxState", err);
+            }
+          }
+
+          let updatedAt: Date | undefined;
+          let hasUnread = false;
+
+          try {
+            const [lastMsg] = await conv.messages({
+              limit: BigInt(1),
+              direction: SortDirection.Descending
+            });
+
+            if (lastMsg) {
+              updatedAt = new Date(Number(lastMsg.sentAtNs / BigInt(1e6)));
+              hasUnread = lastMsg.senderInboxId !== myInboxId;
+            }
+          } catch (err) {
+            console.warn("Failed to fetch messages", err);
+          }
+
+          const ext = conv as unknown as ExtendedConversation;
+          ext.updatedAt = updatedAt;
+          ext.hasUnread = hasUnread;
+          ext.peerInboxId = peerInbox;
+          ext.peerWalletAddress = peerWallet;
+
+          enrichedConvs.push(ext);
         }
 
-        // Obtenemos el último mensaje para updatedAt y hasUnread
-        const metas = await conv.messages({
-          limit: BigInt(1),
-          direction: SortDirection.Descending,
-        });
-        const lastMsg = metas[0];
-        const updatedAt =
-          lastMsg?.sentAtNs !== undefined
-            ? new Date(Number(lastMsg.sentAtNs / BigInt(1e6)))
-            : undefined;
-        const hasUnread = lastMsg
-          ? lastMsg.senderInboxId !== myInboxId
-          : false;
+        enrichedConvs.sort(
+          (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
+        );
 
-        // "Extender" la instancia `conv` para que cumpla ExtendedConversation
-        const ext = conv as unknown as ExtendedConversation;
-        ext.updatedAt = updatedAt;
-        ext.hasUnread = hasUnread;
-        ext.peerInboxId = peerInbox;
-        ext.peerWalletAddress = peerWallet;
-
-        enrichedConvs.push(ext);
+        if (active) {
+          setConversations(enrichedConvs);
+          setLoadingList(false);
+        }
+      } catch (err) {
+        console.error("Unexpected error while loading conversations", err);
+        if (active) setLoadingList(false);
       }
+    };
 
-      // 2.5) Ordenamos por updatedAt descendente
-      enrichedConvs.sort(
-        (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
-      );
-
-      if (active) {
-        setConversations(enrichedConvs);
-        setLoadingList(false);
-      }
-    })().catch(console.error);
+    loadConversations();
 
     return () => {
       active = false;
@@ -497,47 +493,47 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   }, [conversations, walletClient]);
 
   // Stream global de mensajes (solo actualiza updatedAt / hasUnread para conversaciones ya cargadas)
-useEffect(() => {
-  if (!xmtpClient) return;
-  let active = true;
+  useEffect(() => {
+    if (!xmtpClient) return;
+    let active = true;
 
-  (async () => {
-    const streamAll = await xmtpClient.conversations.streamAllMessages();
-    for await (const msg of streamAll as AsyncStream<DecodedMessage>) {
-      if (!active) break;
+    (async () => {
+      const streamAll = await xmtpClient.conversations.streamAllMessages();
+      for await (const msg of streamAll as AsyncStream<DecodedMessage>) {
+        if (!active) break;
 
-      setConversations((prevConvs) => {
-        // 1) Buscamos la conversación a la que llegó el mensaje
-        const idx = prevConvs.findIndex((c) => c.id === msg?.conversationId);
-        if (idx < 0) return prevConvs;
+        setConversations((prevConvs) => {
+          // 1) Buscamos la conversación a la que llegó el mensaje
+          const idx = prevConvs.findIndex((c) => c.id === msg?.conversationId);
+          if (idx < 0) return prevConvs;
 
-        // 2) Calculamos si el mensaje vino de mí o del otro, y la fecha en ms
-        const isMe = msg?.senderInboxId === myInboxId;
-        const sentAtMs =
-          msg?.sentAtNs !== undefined
-            ? Number(msg.sentAtNs / BigInt(1e6))
-            : Date.now();
+          // 2) Calculamos si el mensaje vino de mí o del otro, y la fecha en ms
+          const isMe = msg?.senderInboxId === myInboxId;
+          const sentAtMs =
+            msg?.sentAtNs !== undefined
+              ? Number(msg.sentAtNs / BigInt(1e6))
+              : Date.now();
 
-        // 3) Creamos un nuevo array clonando la lista anterior
-        const newConvs = [...prevConvs];
+          // 3) Creamos un nuevo array clonando la lista anterior
+          const newConvs = [...prevConvs];
 
-        // 4) En la misma instancia (ExtendedConversation) actualizamos los campos
-        const target = newConvs[idx];
-        target.updatedAt = new Date(sentAtMs);
-        target.hasUnread = !isMe;
+          // 4) En la misma instancia (ExtendedConversation) actualizamos los campos
+          const target = newConvs[idx];
+          target.updatedAt = new Date(sentAtMs);
+          target.hasUnread = !isMe;
 
-        // 5) Ordenamos por updatedAt descendente
-        newConvs.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
+          // 5) Ordenamos por updatedAt descendente
+          newConvs.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
 
-        return newConvs;
-      });
-    }
-  })().catch(console.error);
+          return newConvs;
+        });
+      }
+    })().catch(console.error);
 
-  return () => {
-    active = false;
-  };
-}, [xmtpClient, myInboxId]);
+    return () => {
+      active = false;
+    };
+  }, [xmtpClient, myInboxId]);
 
 
   // Cargar mensajes de la conversación “expanded” (igual que antes, usando peerInboxId para crear el DM)
@@ -901,8 +897,8 @@ useEffect(() => {
                           <div
                             key={i}
                             className={`flex flex-col max-w-[80%] break-words py-1 px-3 rounded-lg ${m.senderInboxId === myInboxId
-                                ? "bg-purple-600 ml-auto"
-                                : "bg-[#2a2438]"
+                              ? "bg-purple-600 ml-auto"
+                              : "bg-[#2a2438]"
                               }`}
                           >
                             {isAttachment ? (
