@@ -170,13 +170,13 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
     }
   };
 
-  // Cargar conversaciones iniciales XMTP y extraer inbox ID → walletAddress
   useEffect(() => {
     if (!xmtpClient || !myInboxId) return;
     let active = true;
 
     const loadConversations = async () => {
       setLoadingList(true);
+
       try {
         console.log("→ Syncing all conversations...");
         await xmtpClient.conversations.syncAll([ConsentState.Allowed]);
@@ -189,33 +189,40 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         for (const conv of list) {
           if (!active) break;
 
+          // Verificación defensiva por si viene corrupto
+          if (!conv?.id || typeof conv.id !== "string") {
+            console.warn("Skipping conversation with invalid ID:", conv);
+            continue;
+          }
+
           let peerInbox: string | undefined;
-          if (conv instanceof Dm) {
-            try {
+          try {
+            if (conv instanceof Dm) {
               peerInbox = await conv.peerInboxId();
-            } catch (err) {
-              console.warn("Failed to get peerInboxId", err);
             }
+          } catch (err) {
+            console.warn("Failed to get peerInboxId for conversation:", conv.id, err);
+            continue; // skip corrupt
           }
 
           let peerWallet: string | undefined;
-          if (peerInbox) {
-            try {
+          try {
+            if (peerInbox) {
               const [state] = await xmtpClient.preferences.inboxStateFromInboxIds([peerInbox], true);
-              const ethId = state?.accountIdentifiers?.find((i) => i.identifierKind === "Ethereum");
+              const ethId = state?.accountIdentifiers?.find(i => i.identifierKind === "Ethereum");
               peerWallet = ethId?.identifier?.toLowerCase();
-            } catch (err) {
-              console.warn("Failed to resolve wallet from inboxState", err);
             }
+          } catch (err) {
+            console.warn("Failed to resolve wallet for inboxId", peerInbox, err);
+            // No continue — solo omitimos peerWallet (podría seguir siendo útil)
           }
 
           let updatedAt: Date | undefined;
           let hasUnread = false;
-
           try {
             const [lastMsg] = await conv.messages({
               limit: BigInt(1),
-              direction: SortDirection.Descending
+              direction: SortDirection.Descending,
             });
 
             if (lastMsg) {
@@ -223,7 +230,8 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
               hasUnread = lastMsg.senderInboxId !== myInboxId;
             }
           } catch (err) {
-            console.warn("Failed to fetch messages", err);
+            console.warn("Failed to fetch messages for", conv.id, err);
+            // no continue, permitimos mostrar la conversación aunque vacía
           }
 
           const ext = conv as unknown as ExtendedConversation;
