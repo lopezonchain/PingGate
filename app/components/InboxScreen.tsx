@@ -802,10 +802,10 @@ useEffect(() => {
         ) : filtered.length === 0 && tab !== "all" ? (
           <div className="flex flex-col items-center justify-center text-center mt-8 px-4">
             {tab === "sales" && (
-              <p className="text-gray-400">You still don't have clients! Create your first service in Menu &gt; "My services" and start monetizing your Inbox!</p>
+              <p className="text-gray-400">You still don&apos;t have clients! Create your first service in Menu &gt; `&quot;My services`&quot; and start monetizing your Inbox!</p>
             )}
             {tab === "purchases" && (
-              <p className="text-gray-400">No experts contacted yet, you can find some in the Menu &gt; "Explore" section</p>
+              <p className="text-gray-400">No experts contacted yet, you can find some in Menu &gt; `&quot;Explore`&quot;</p>
             )}
           </div>
         ) : (
