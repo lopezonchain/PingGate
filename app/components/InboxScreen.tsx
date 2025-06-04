@@ -497,52 +497,47 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   }, [conversations, walletClient]);
 
   // Stream global de mensajes (solo actualiza updatedAt / hasUnread para conversaciones ya cargadas)
-  useEffect(() => {
-    if (!xmtpClient) return;
-    let active = true;
+useEffect(() => {
+  if (!xmtpClient) return;
+  let active = true;
 
-    (async () => {
-      const streamAll = await xmtpClient.conversations.streamAllMessages();
-      for await (const msg of streamAll as AsyncStream<DecodedMessage>) {
-        if (!active) break;
+  (async () => {
+    const streamAll = await xmtpClient.conversations.streamAllMessages();
+    for await (const msg of streamAll as AsyncStream<DecodedMessage>) {
+      if (!active) break;
 
-        // NOTA: no usamos `conversations.find` aquí sino que lo
-        // haremos dentro del functional update
-        setConversations((prevConvs) => {
-          // Buscamos el índice de la conversación a actualizar
-          const idx = prevConvs.findIndex((c) => c.id === msg?.conversationId);
-          if (idx < 0) {
-            // Si no existe en el listado actual, devolvemos prevConvs sin cambios
-            return prevConvs;
-          }
+      setConversations((prevConvs) => {
+        // 1) Buscamos la conversación a la que llegó el mensaje
+        const idx = prevConvs.findIndex((c) => c.id === msg?.conversationId);
+        if (idx < 0) return prevConvs;
 
-          // Calculamos si el mensaje vino de mí o del otro
-          const isMe = msg?.senderInboxId === myInboxId;
-          const sentAt = msg?.sentAtNs != undefined ? Number(msg?.sentAtNs / BigInt(1e6)) : 0;
-          const updatedConv = {
-            ...prevConvs[idx],
-            updatedAt: new Date(sentAt),
-            hasUnread: !isMe,
-          } as ExtendedConversation;
+        // 2) Calculamos si el mensaje vino de mí o del otro, y la fecha en ms
+        const isMe = msg?.senderInboxId === myInboxId;
+        const sentAtMs =
+          msg?.sentAtNs !== undefined
+            ? Number(msg.sentAtNs / BigInt(1e6))
+            : Date.now();
 
-          // Creamos un nuevo array con ese elemento modificado
-          const newConvs = [
-            ...prevConvs.slice(0, idx),
-            updatedConv,
-            ...prevConvs.slice(idx + 1),
-          ];
+        // 3) Creamos un nuevo array clonando la lista anterior
+        const newConvs = [...prevConvs];
 
-          // Reordenamos por `updatedAt` descendente
-          newConvs.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
-          return newConvs;
-        });
-      }
-    })().catch(console.error);
+        // 4) En la misma instancia (ExtendedConversation) actualizamos los campos
+        const target = newConvs[idx];
+        target.updatedAt = new Date(sentAtMs);
+        target.hasUnread = !isMe;
 
-    return () => {
-      active = false;
-    };
-  }, [xmtpClient, myInboxId]);
+        // 5) Ordenamos por updatedAt descendente
+        newConvs.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
+
+        return newConvs;
+      });
+    }
+  })().catch(console.error);
+
+  return () => {
+    active = false;
+  };
+}, [xmtpClient, myInboxId]);
 
 
   // Cargar mensajes de la conversación “expanded” (igual que antes, usando peerInboxId para crear el DM)
@@ -787,7 +782,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       {xmtpError && <p className="text-red-500 text-center mb-2">{xmtpError}</p>}
 
       <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
-        {filtered.length === 0 ? (
+        {filtered.length === 0 && tab === "all" ? (
           <div className="flex flex-col items-center justify-center text-center mt-8 space-y-6 px-4">
             <div className="text-gray-400 text-lg font-semibold">
               You don’t have any conversations on this device yet.
@@ -803,6 +798,15 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
             <div className="w-full max-w-2xl mt-6">
               <FaqList />
             </div>
+          </div>
+        ) : filtered.length === 0 && tab !== "all" ? (
+          <div className="flex flex-col items-center justify-center text-center mt-8 px-4">
+            {tab === "sales" && (
+              <p className="text-gray-400">You still don't have clients! Create your first service in Menu &gt; "My services" and start monetizing your Inbox!</p>
+            )}
+            {tab === "purchases" && (
+              <p className="text-gray-400">No experts contacted yet, you can find some in the Menu &gt; "Explore" section</p>
+            )}
           </div>
         ) : (
           filtered.map((conv, idx) => {
