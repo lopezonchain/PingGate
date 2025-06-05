@@ -203,8 +203,8 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
             </button>
 
             <div className="absolute bottom-0 left-2">
-              <span className="text-xs text-gray-500">
-                Random Experts’ service selection. Thanks for using PingGate
+              <span className="text-[0.625rem] text-gray-500">
+                Random Experts’ services selection. Thanks for using PingGate
               </span>
             </div>
           </div>
