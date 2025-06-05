@@ -226,13 +226,13 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
             className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
           >
             {/* Faded background icon */}
-            <FiSearch className="absolute text-indigo-800 text-6xl opacity-20 top-4 right-4" />
+            <FiSearch className="absolute text-indigo-600 text-6xl opacity-20 top-4 right-4" />
             <button
               onClick={() => onAction("explore")}
               className="relative w-full flex items-center justify-center space-x-2 py-1"
             >
-              <FiSearch size={28} className="text-purple-500" />
-              <span className="text-purple-500 font-semibold text-xl">
+              <FiSearch size={28} className="text-purple-400" />
+              <span className="text-purple-400 font-semibold text-xl">
                 Explore Services
               </span>
             </button>
@@ -249,13 +249,13 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
               transition={{ duration: 0.5, delay: 0.4 }}
               className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
             >
-              <FiHelpCircle className="absolute text-indigo-800 text-5xl opacity-20 top-3 right-3" />
+              <FiHelpCircle className="absolute text-indigo-600 text-5xl opacity-20 top-3 right-3" />
               <button
                 onClick={() => onAction("faq")}
                 className="relative w-full flex items-center space-x-2 py-3"
               >
-                <FiHelpCircle size={24} className="text-purple-500" />
-                <span className="text-purple-500 font-medium">FAQ</span>
+                <FiHelpCircle size={24} className="text-purple-400" />
+                <span className="text-purple-400 font-medium">FAQ</span>
               </button>
               <p className="text-xs text-gray-400 mt-1">
                 Get answers to common questions
@@ -269,13 +269,13 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
             >
-              <FiPlusCircle className="absolute text-indigo-800 text-5xl opacity-20 top-3 right-3" />
+              <FiPlusCircle className="absolute text-indigo-600 text-5xl opacity-20 top-3 right-3" />
               <button
                 onClick={() => onAction("myplans")}
                 className="relative w-full flex items-center space-x-2 py-3"
               >
-                <FiPlusCircle size={24} className="text-purple-500" />
-                <span className="text-purple-500 font-medium">
+                <FiPlusCircle size={24} className="text-purple-400" />
+                <span className="text-purple-400 font-medium">
                   My Services
                 </span>
               </button>
@@ -291,13 +291,13 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
             >
-              <FiStar className="absolute text-indigo-800 text-5xl opacity-20 top-3 right-3" />
+              <FiStar className="absolute text-indigo-600 text-5xl opacity-20 top-3 right-3" />
               <button
                 onClick={() => onAction("reviews")}
                 className="relative w-full flex items-center space-x-2 py-3"
               >
-                <FiStar size={24} className="text-purple-500" />
-                <span className="text-purple-500 font-medium">
+                <FiStar size={24} className="text-purple-400" />
+                <span className="text-purple-400 font-medium">
                   Reviews
                 </span>
               </button>
@@ -313,13 +313,13 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
             >
-              <FiMessageSquare className="absolute text-indigo-800 text-5xl opacity-20 top-3 right-3" />
+              <FiMessageSquare className="absolute text-indigo-600 text-5xl opacity-20 top-3 right-3" />
               <button
                 onClick={() => onAction("inbox")}
                 className="relative w-full flex items-center space-x-2 py-3"
               >
-                <FiMessageSquare size={24} className="text-purple-500" />
-                <span className="text-purple-500 font-medium">
+                <FiMessageSquare size={24} className="text-purple-400" />
+                <span className="text-purple-400 font-medium">
                   Pings
                 </span>
               </button>

@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Reset global de márgenes y paddings */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  overflow-x: hidden;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #111111;
