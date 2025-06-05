@@ -600,9 +600,9 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
     // Primero enviamos el texto/attachment por XMTP
     if (typeof text === "string") {
-      await convo.send(text);
+      await convo.sendOptimistic(text);
     } else {
-      await convo.send(text, ContentTypeAttachment);
+      await convo.sendOptimistic(text, ContentTypeAttachment);
     }
 
     // Luego obtenemos el fid (si existe) para la notificación
@@ -614,30 +614,33 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       try {
         fid = await warpcast.getFidByName(peer);
       } catch {
-        // Si no hay FID, dejamos fid = 0
+        //ignore
       }
     }
 
-    const title = `New ping from ${myName}`;
-    const bodyText = typeof text === "string" ? text : (text as XMTPAttachment).filename;
+    if(fid !== 0) {
+      const title = `New ping from ${myName}`;
+      const bodyText = typeof text === "string" ? text : (text as XMTPAttachment).filename;
 
-    // Intenta notificar; capturamos cualquier error (404, red, etc.)
-    try {
-      const res = await fetch("/api/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fid,
-          notification: { title, body: bodyText },
-          targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
-        }),
-      });
-      if (!res.ok) {
-        console.error(`Notify failed: ${res.status} ${res.statusText}`);
+      // Intenta notificar; capturamos cualquier error (404, red, etc.)
+      try {
+        const res = await fetch("/api/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fid,
+            notification: { title, body: bodyText },
+            targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
+          }),
+        });
+        if (!res.ok) {
+          console.error(`Notify failed: ${res.status} ${res.statusText}`);
+        }
+      } catch (e) {
+        console.error("Notify error:", e);
       }
-    } catch (e) {
-      console.error("Notify error:", e);
     }
+    
   };
 
   // ✉️ Nuevo hilo (“composer”)
@@ -654,7 +657,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         identifierKind: "Ethereum" as IdentifierKind,
       };
       const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
-      await convo.send(body);
+      await convo.sendOptimistic(body);
 
       setShowComposer(false);
       setTo("");

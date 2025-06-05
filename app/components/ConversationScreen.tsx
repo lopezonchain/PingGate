@@ -313,9 +313,9 @@ export default function ConversationScreen({
     const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
 
     if (typeof text === "string") {
-      await convo.send(text);
+      await convo.sendOptimistic(text);
     } else {
-      await convo.send(text, ContentTypeAttachment);
+      await convo.sendOptimistic(text, ContentTypeAttachment);
     }
 
     // Opcional: enviar notificación
