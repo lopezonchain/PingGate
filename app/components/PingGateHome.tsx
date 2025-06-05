@@ -1,175 +1,347 @@
 // src/components/PingGateHome.tsx
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import Link from "next/link";
 import {
-  FiInbox,
+  FiMessageSquare,
   FiSearch,
   FiPlusCircle,
-  FiInfo,
   FiStar,
-  FiAirplay,
-  FiHelpCircle
+  FiHelpCircle,
+  FiChevronLeft,
+  FiChevronRight,
 } from "react-icons/fi";
 import { WarpView } from "../page-client";
-import { motion } from 'framer-motion';
+import BottomMenu from "./BottomMenu";
+import { getActiveServices, Service } from "../services/contractService";
+import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 
 interface PingGateHomeProps {
   onAction: (view: WarpView) => void;
 }
 
 const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
-  const [openDesc, setOpenDesc] = useState<string | null>(null);
+  const [services, setServices] = useState<Service[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, Web3BioProfile>>({});
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [autoPlay, setAutoPlay] = useState(true);
 
-  const actions: {
-    icon: JSX.Element;
-    label: string;
-    desc: string;
-    action: WarpView;
-    enabled: boolean;
-  }[] = [
-    {
-      icon: <FiInbox />,
-      label: "Pings Inbox",
-      desc: "View and reply to your Pings (messages). Start new conversations with farcaster names, Basename/ENS or wallets.",
-      action: "inbox",
-      enabled: true
-    },
-    {
-      icon: <FiSearch />,
-      label: "Explore",
-      desc: "Browse services. Find Experts. Select your preferred option and directly get 1 to 1 chat access!",
-      action: "explore",
-      enabled: true
-    },
-    {
-      icon: <FiPlusCircle />,
-      label: "My Services",
-      desc: "Monetize your Inbox. Create and manage your own Services.",
-      action: "myplans",
-      enabled: true
-    },
-    {
-      icon: <FiStar />,
-      label: "Reviews",
-      desc: "Leave reviews of services you bought, check or edit previous ones.",
-      action: "reviews",
-      enabled: true
-    },
-    {
-      icon: <FiHelpCircle />,
-      label: "FAQ",
-      desc: "Frequently Asked Questions",
-      action: "faq",
-      enabled: true
-    },
-  ];
-
-  const handleShare = useCallback(() => {
-    const text = `Try PingGate 💬 Chat privately with wallet to wallet encryption. Monetize your inbox or message experts onchain! Powered by @xmtp @base & @farcaster and created by @lopezonchain.eth ✨ https://pinggate.lopezonchain.xyz`;
-    const url = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(text)}`;
-    window.open(url, "_blank");
+  // Fetch active services on mount
+  useEffect(() => {
+    let mounted = true;
+    async function fetchServices() {
+      try {
+        const data = await getActiveServices();
+        if (mounted) {
+          setServices(data);
+        }
+      } catch (err) {
+        console.error("Error fetching services:", err);
+      }
+    }
+    fetchServices();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
+  // Fetch Web3.bio profiles for all unique sellers
+  useEffect(() => {
+    if (services.length === 0) return;
+    const uniqueSellers = Array.from(
+      new Set(services.map((s) => s.seller.toLowerCase()))
+    );
+    const ids = uniqueSellers.map((addr) => `farcaster,${addr}`);
+
+    const warp = new WarpcastService();
+    async function fetchProfiles() {
+      try {
+        const bioProfiles: Web3BioProfile[] = await warp.getWeb3BioProfiles(ids);
+        const lookup: Record<string, Web3BioProfile> = {};
+        bioProfiles.forEach((p) => {
+          p.aliases?.forEach((alias) => {
+            const [platform, addr] = alias.split(",");
+            if (platform === "farcaster") {
+              lookup[addr.toLowerCase()] = p;
+            }
+          });
+        });
+        setProfiles(lookup);
+      } catch (err) {
+        console.error("Error fetching Web3.bio profiles:", err);
+      }
+    }
+    fetchProfiles();
+  }, [services]);
+
+  // Shuffle once when services load
+  const shuffledServices = useMemo(() => {
+    const arr = [...services];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [services]);
+
+  // Auto-advance the slider every 5 seconds
+  useEffect(() => {
+    if (!autoPlay || shuffledServices.length === 0) return;
+    const interval = setInterval(() => {
+      setCurrentIdx((prev) => (prev + 1) % shuffledServices.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [autoPlay, shuffledServices]);
+
+  const handlePrev = () => {
+    setAutoPlay(false);
+    setCurrentIdx((prev) =>
+      prev === 0 ? shuffledServices.length - 1 : prev - 1
+    );
+  };
+
+  const handleNext = () => {
+    setAutoPlay(false);
+    setCurrentIdx((prev) => (prev + 1) % shuffledServices.length);
+  };
+
   return (
-    <div className="bg-[#0f0d14] text-white px-4 py-3 flex flex-col items-center w-full">
-      {/* Header */}
-      <div className="flex items-end mb-4 items-center">
-        <h1 className="text-4xl font-bold">PingGate</h1>
-        <img
-          src="/PingGateLogo.png"
-          alt="PingGate Logo"
-          className="w-12 h-12 ml-4 rounded-full animate-pulse"/>
-      </div>
-      <p className="text-sm text-gray-400 mb-6 text-center leading-snug">
-        Monetize your inbox, connect with experts<br/>or just chat
-      </p>
+    <div className="bg-[#0f0d14] text-white flex flex-col h-screen pb-16">
+      {/* Header with Logo & Title */}
+      <header className="flex flex-col items-center pb-4 px-4">
+        <div className="flex items-center space-x-3">
+          <img
+            src="/PingGateLogo.png"
+            alt="PingGate Logo"
+            className="w-12 h-12 rounded-full animate-pulse"
+          />
+          <h1 className="text-3xl font-bold">PingGate</h1>
+        </div>
+        <p className="text-gray-400 text-center mt-2 leading-snug">
+          Monetize your inbox, connect with experts,
+          <br />
+          or just chat in private.
+        </p>
+      </header>
 
-      {/* Actions list */}
-      <div className="flex flex-col space-y-4 w-full max-w-md">
-        {actions.map(({ icon, label, desc, action, enabled }, idx) => {
-          const isOpen = openDesc === action;
-
-          return (
-            <motion.div
-              key={action}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1, duration: 0.5 }}
+      {/* Slider: Random Services with background avatar */}
+      <section className="relative w-full overflow-hidden">
+        {shuffledServices.length > 0 ? (
+          <div className="relative h-40 sm:h-48 md:h-56 lg:h-64">
+            <Link
+              href={`/user/${shuffledServices[currentIdx].seller}`}
+              passHref
             >
-              <div className="relative">
-                <motion.button
-                  onClick={() => enabled && onAction(action)}
-                  disabled={!enabled}
-                  whileHover={enabled ? { scale: 1.02 } : {}}
-                  whileTap={enabled ? { scale: 0.98 } : {}}
-                  className={`
-                    relative w-full rounded-2xl px-5 py-4 pr-16 flex items-center
-                    ${enabled
-                      ? 'bg-[#1a1725] hover:shadow-lg'
-                      : 'bg-[#1a1725] opacity-50 cursor-not-allowed'}
-                    transition-shadow duration-200
-                  `}
-                >
-                  {/* Icon + label */}
-                  <div className="flex justify-center items-center w-full space-x-2">
-                    <span className="text-lg">{icon}</span>
-                    <span className="font-semibold text-xl">
-                      {label}
-                    </span>
-                  </div>
+              <motion.a
+                key={shuffledServices[currentIdx].id.toString()}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+                className="absolute inset-0 mx-4 rounded-2xl shadow-xl overflow-hidden hover:cursor-pointer"
+                style={{
+                  backgroundImage: profiles[
+                    shuffledServices[currentIdx].seller.toLowerCase()
+                  ]?.avatar
+                    ? `url("${profiles[
+                      shuffledServices[currentIdx].seller.toLowerCase()
+                    ].avatar}")`
+                    : undefined,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundColor: profiles[
+                    shuffledServices[currentIdx].seller.toLowerCase()
+                  ]?.avatar
+                    ? undefined
+                    : "#1b1826",
+                }}
+              >
+                {/* Overlay de degradado */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#1b1826]/80 to-[#2f2c42]/80" />
 
-                  {/* Info toggle */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenDesc(isOpen ? null : action);
-                    }}
-                    className="absolute inset-y-0 right-0 w-12 flex items-center justify-center"
-                    aria-label="Show description"
-                  >
-                    <div className="p-3 bg-gray-700 rounded-full hover:bg-gray-600 transition-colors">
-                      <FiInfo className="text-2xl" />
-                    </div>
-                  </button>
-                </motion.button>
+                {/* Titulo */}
+                <h2 className="absolute top-0 left-0 w-full bg-black/50 backdrop-blur-sm text-sm sm:text-base md:text-lg lg:text-xl font-semibold text-center py-2">
+                  {shuffledServices[currentIdx].title}
+                </h2>
 
-                {/* Description */}
-                <div
-                  className={`
-                    overflow-hidden transition-[max-height] duration-300
-                    ${isOpen ? 'max-h-40 mt-2' : 'max-h-0'}
-                  `}
-                >
-                  <p className="text-s text-gray-400 px-6 pb-2">{desc}</p>
+                <div className="relative z-10 flex flex-col items-center justify-center h-full p-4 pt-12 pb-4">
+                  {/* Display Name o Wallet */}
+                  <span className="text-indigo-300 text-sm mb-1">
+                    {profiles[
+                      shuffledServices[currentIdx].seller.toLowerCase()
+                    ]?.displayName ||
+                      shuffledServices[currentIdx].seller}
+                  </span>
+
+                  {/* Descripción */}
+                  <p className="text-gray-300 text-xs sm:text-sm text-center mx-4">
+                    {profiles[
+                      shuffledServices[currentIdx].seller.toLowerCase()
+                    ]?.description ||
+                      shuffledServices[currentIdx].description}
+                  </p>
                 </div>
-              </div>
+              </motion.a>
+            </Link>
+
+            {/* Botones Prev/Next (más grandes, rectangulares, encima del slider) */}
+            <button
+              onClick={handlePrev}
+              className="absolute left-0 top-1/2 transform -translate-y-1/2 h-10 w-8 bg-[#2b283c] rounded-r-md hover:bg-[#3c394f] transition-colors z-20"
+              aria-label="Previous"
+            >
+              <FiChevronLeft size={20} className="text-gray-400" />
+            </button>
+            <button
+              onClick={handleNext}
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 h-10 w-8 bg-[#2b283c] rounded-l-md hover:bg-[#3c394f] transition-colors z-20"
+              aria-label="Next"
+            >
+              <FiChevronRight size={20} className="text-gray-400" />
+            </button>
+
+            <div className="absolute bottom-0 left-2">
+              <span className="text-xs text-gray-500">
+                Random Experts’ service selection. Thanks for using PingGate
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="h-40 sm:h-48 md:h-56 lg:h-64 flex justify-center items-center text-gray-500">
+            Loading services...
+          </div>
+        )}
+      </section>
+
+      {/* Scrollable area under slider */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500 px-4 mt-4">
+        {/* Prominent Explore Section */}
+        <section className="mb-4">
+          <h2 className="text-center text-lg text-gray-300 mb-4">
+            Explore all the services published here
+          </h2>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
+          >
+            {/* Faded background icon */}
+            <FiSearch className="absolute text-indigo-800 text-6xl opacity-20 top-4 right-4" />
+            <button
+              onClick={() => onAction("explore")}
+              className="relative w-full flex items-center justify-center space-x-2 py-1"
+            >
+              <FiSearch size={28} className="text-indigo-400" />
+              <span className="text-indigo-400 font-semibold text-xl">
+                Explore Services
+              </span>
+            </button>
+          </motion.div>
+        </section>
+
+        {/* Other Options Grid */}
+        <section className="mb-4">
+          <div className="grid grid-cols-2 gap-4">
+            {/* FAQ */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
+            >
+              <FiHelpCircle className="absolute text-indigo-800 text-5xl opacity-20 top-3 right-3" />
+              <button
+                onClick={() => onAction("faq")}
+                className="relative w-full flex items-center space-x-2 py-3"
+              >
+                <FiHelpCircle size={24} className="text-indigo-400" />
+                <span className="text-indigo-400 font-medium">FAQ</span>
+              </button>
+              <p className="text-xs text-gray-400 mt-1">
+                Get answers to common questions
+              </p>
             </motion.div>
-          );
-        })}
+
+            {/* My Services */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
+            >
+              <FiPlusCircle className="absolute text-indigo-800 text-5xl opacity-20 top-3 right-3" />
+              <button
+                onClick={() => onAction("myplans")}
+                className="relative w-full flex items-center space-x-2 py-3"
+              >
+                <FiPlusCircle size={24} className="text-indigo-400" />
+                <span className="text-indigo-400 font-medium">
+                  My Services
+                </span>
+              </button>
+              <p className="text-xs text-gray-400 mt-1">
+                Create & manage your offerings
+              </p>
+            </motion.div>
+
+            {/* Reviews */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
+            >
+              <FiStar className="absolute text-indigo-800 text-5xl opacity-20 top-3 right-3" />
+              <button
+                onClick={() => onAction("reviews")}
+                className="relative w-full flex items-center space-x-2 py-3"
+              >
+                <FiStar size={24} className="text-indigo-400" />
+                <span className="text-indigo-400 font-medium">
+                  Reviews
+                </span>
+              </button>
+              <p className="text-xs text-gray-400 mt-1">
+                Reviews of services you bought
+              </p>
+            </motion.div>
+
+            {/* Pings Inbox */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
+            >
+              <FiMessageSquare className="absolute text-indigo-800 text-5xl opacity-20 top-3 right-3" />
+              <button
+                onClick={() => onAction("inbox")}
+                className="relative w-full flex items-center space-x-2 py-3"
+              >
+                <FiMessageSquare size={24} className="text-indigo-400" />
+                <span className="text-indigo-400 font-medium">
+                  Pings
+                </span>
+              </button>
+              <p className="text-xs text-gray-400 mt-1">
+                Check messages & start conversations
+              </p>
+            </motion.div>
+          </div>
+        </section>
       </div>
 
-      {/* Share + Support */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: actions.length * 0.1, duration: 0.5 }}
-        className="flex flex-col mt-6 w-full max-w-sm space-y-2"
-      >
-        <motion.button
-          onClick={handleShare}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="flex justify-center items-center py-3 rounded-2xl bg-purple-600
-            hover:bg-purple-700 transition-colors duration-200 shadow-lg">
-          <FiAirplay className="mr-2" /> Share <FiAirplay className="ml-2" />
-        </motion.button>
-      </motion.div>
-
-      {/* Footer */}
-      <footer className="mt-4 text-xs text-gray-500 text-center">
-        ✦ Powered by XMTP, Base & Farcaster ✦
+      {/* Footer Branding */}
+      <footer className="flex justify-between text-gray-500 text-xs px-4 pb-4 pt-1 mb-16">
+        <span>✦ Powered by XMTP</span>
+        <span> & Base & Farcaster ✦</span>
       </footer>
+
+      {/* Bottom Navigation Menu */}
+      <BottomMenu onAction={onAction} />
     </div>
   );
 };
