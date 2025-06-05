@@ -219,9 +219,6 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500 px-4 mt-4">
         {/* Prominent Explore Section */}
         <section className="mb-4">
-          <h2 className="text-center text-lg text-gray-300 mb-4">
-            Explore all the services published here
-          </h2>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
