@@ -37,3 +37,26 @@ body {
   font-style: normal;
   font-size: 100%;
 }
+
+/* ==============================
+   Animación “pulso” para el texto
+   ============================== */
+@keyframes modern-pulse {
+  0%, 100% {
+    transform: scale(1);
+    text-shadow:
+      0 0 4px rgba(119, 26, 180, 0.6),
+      0 0 8px rgba(119, 26, 180, 0.4);
+  }
+  50% {
+    transform: scale(1.03);
+    text-shadow:
+      0 0 12px rgba(119, 26, 180, 1),
+      0 0 24px rgba(119, 26, 180, 0.8);
+  }
+}
+
+.glow-modern {
+  animation: modern-pulse 3s ease-in-out infinite;
+  will-change: transform, text-shadow;
+}

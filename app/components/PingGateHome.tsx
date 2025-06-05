@@ -162,8 +162,8 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
                 <div className="absolute inset-0 bg-gradient-to-br from-[#1b1826]/80 to-[#2f2c42]/80" />
 
                 {/* Titulo */}
-                <h2 className="absolute top-0 left-0 w-full bg-black/50 backdrop-blur-sm text-sm sm:text-base md:text-lg lg:text-xl font-semibold text-center py-2">
-                  {shuffledServices[currentIdx].title}
+                <h2 className="absolute top-0 left-0 w-full bg-black/50 backdrop-blur-sm text-white border-10 text-sm sm:text-base md:text-lg lg:text-xl font-semibold text-center py-2">
+                  <p className="glow-modern">{shuffledServices[currentIdx].title}</p>
                 </h2>
 
                 <div className="relative z-10 flex flex-col items-center justify-center h-full p-4 pt-12 pb-4">
