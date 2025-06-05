@@ -203,7 +203,7 @@ export default function Page(): JSX.Element {
   const { setFrameReady, isFrameReady, context } = useMiniKit();
   const addFrame = useAddFrame();
 
-  const [warpView, setWarpView] = useState<WarpView>("inbox");
+  const [warpView, setWarpView] = useState<WarpView>("home");
   const [frameAdded, setFrameAdded] = useState(false);
   const [selectedChain, setSelectedChain] = useState<any>(base);
   const triedAutoConnect = useRef(false);
@@ -261,28 +261,6 @@ export default function Page(): JSX.Element {
     }
     return null;
   }, [context, frameAdded, handleAddFrame]);
-
-  const handleChainChange = async (id: number) => {
-    const found = chainOptions.find((o) => o.chain.id === id);
-    if (found && walletClient) {
-      try {
-        await walletClient.switchChain({ id });
-        setSelectedChain(found.chain);
-      } catch (error: any) {
-        if (error.code === 4902) {
-          try {
-            await walletClient.addChain({ chain: found.chain });
-            await walletClient.switchChain({ id });
-            setSelectedChain(found.chain);
-          } catch (addError) {
-            console.error("Error adding chain:", addError);
-          }
-        } else {
-          console.error("Error switching chain:", error);
-        }
-      }
-    }
-  };
 
   const handleBack = () => setWarpView("home");
 
