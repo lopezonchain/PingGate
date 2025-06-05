@@ -231,8 +231,8 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
               onClick={() => onAction("explore")}
               className="relative w-full flex items-center justify-center space-x-2 py-1"
             >
-              <FiSearch size={28} className="text-indigo-400" />
-              <span className="text-indigo-400 font-semibold text-xl">
+              <FiSearch size={28} className="text-purple-500" />
+              <span className="text-purple-500 font-semibold text-xl">
                 Explore Services
               </span>
             </button>
@@ -254,8 +254,8 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
                 onClick={() => onAction("faq")}
                 className="relative w-full flex items-center space-x-2 py-3"
               >
-                <FiHelpCircle size={24} className="text-indigo-400" />
-                <span className="text-indigo-400 font-medium">FAQ</span>
+                <FiHelpCircle size={24} className="text-purple-500" />
+                <span className="text-purple-500 font-medium">FAQ</span>
               </button>
               <p className="text-xs text-gray-400 mt-1">
                 Get answers to common questions
@@ -274,8 +274,8 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
                 onClick={() => onAction("myplans")}
                 className="relative w-full flex items-center space-x-2 py-3"
               >
-                <FiPlusCircle size={24} className="text-indigo-400" />
-                <span className="text-indigo-400 font-medium">
+                <FiPlusCircle size={24} className="text-purple-500" />
+                <span className="text-purple-500 font-medium">
                   My Services
                 </span>
               </button>
@@ -296,8 +296,8 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
                 onClick={() => onAction("reviews")}
                 className="relative w-full flex items-center space-x-2 py-3"
               >
-                <FiStar size={24} className="text-indigo-400" />
-                <span className="text-indigo-400 font-medium">
+                <FiStar size={24} className="text-purple-500" />
+                <span className="text-purple-500 font-medium">
                   Reviews
                 </span>
               </button>
@@ -318,8 +318,8 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
                 onClick={() => onAction("inbox")}
                 className="relative w-full flex items-center space-x-2 py-3"
               >
-                <FiMessageSquare size={24} className="text-indigo-400" />
-                <span className="text-indigo-400 font-medium">
+                <FiMessageSquare size={24} className="text-purple-500" />
+                <span className="text-purple-500 font-medium">
                   Pings
                 </span>
               </button>
