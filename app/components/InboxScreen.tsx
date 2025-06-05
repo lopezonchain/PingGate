@@ -600,9 +600,9 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
 
     // Primero enviamos el texto/attachment por XMTP
     if (typeof text === "string") {
-      await convo.sendOptimistic(text);
+      await convo.send(text);
     } else {
-      await convo.sendOptimistic(text, ContentTypeAttachment);
+      await convo.send(text, ContentTypeAttachment);
     }
 
     // Luego obtenemos el fid (si existe) para la notificación
@@ -657,7 +657,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         identifierKind: "Ethereum" as IdentifierKind,
       };
       const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
-      await convo.sendOptimistic(body);
+      await convo.send(body);
 
       setShowComposer(false);
       setTo("");
