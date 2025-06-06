@@ -138,7 +138,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
   const formatPrice = (priceWei: bigint): string => {
     const WEI_IN_ETH = BigInt("1000000000000000000");
     const integerPart = priceWei / WEI_IN_ETH;
-    let fractionalPart = priceWei % WEI_IN_ETH;
+    const fractionalPart = priceWei % WEI_IN_ETH;
     if (fractionalPart === BigInt(0)) {
       return integerPart.toString();
     }
