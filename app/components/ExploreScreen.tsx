@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useWalletClient } from "wagmi";
+import Link from "next/link";
 import {
   FiShoppingCart,
   FiArrowLeft,
@@ -18,6 +19,7 @@ import {
   purchaseService,
   getAverageRating,
   getReview,
+  getSalesBy,
   publicClient,
 } from "../services/contractService";
 import { resolveEnsName } from "../services/nameResolver";
@@ -63,7 +65,7 @@ export default function ExploreScreen({ onBack }: ExploreScreenProps) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [successPeer, setSuccessPeer] = useState<string>("");
 
-  // Load services, seller profiles, and ratings
+  // Load services, seller profiles, ratings and reviews
   useEffect(() => {
     const warp = new WarpcastService();
     (async () => {
@@ -121,6 +123,36 @@ export default function ExploreScreen({ onBack }: ExploreScreenProps) {
           })
         );
         setRatings(Object.fromEntries(ratingEntries));
+
+        // Fetch reviews for all services:
+        // 1) getSalesBy(seller) → PurchaseRecord[]
+        // 2) filter records where record.serviceId === svc.id
+        // 3) for each buyer, call getReview(serviceId, buyer)
+        const reviewEntries = await Promise.all(
+          list.map(async (svc) => {
+            const sales = await getSalesBy(svc.seller);
+            const buyersForSvc = sales
+              .filter((rec) => rec.serviceId === svc.id)
+              .map((rec) => rec.buyer);
+            const revs = await Promise.all(
+              buyersForSvc.map(async (buyer) => {
+                const r = await getReview(svc.id, buyer);
+                return {
+                  buyer,
+                  quality: r.quality,
+                  communication: r.communication,
+                  timeliness: r.timeliness,
+                  comment: r.comment,
+                };
+              })
+            );
+            return [svc.id.toString(), revs] as [
+              string,
+              { buyer: string; quality: number; communication: number; timeliness: number; comment: string }[]
+            ];
+          })
+        );
+        setReviews(Object.fromEntries(reviewEntries));
       } catch (e: any) {
         console.error(e);
         toast.error("Error loading services");
@@ -131,21 +163,11 @@ export default function ExploreScreen({ onBack }: ExploreScreenProps) {
   }, []);
 
   // Toggle review details for a service
-  const toggleReviews = async (svcId: bigint) => {
+  const toggleReviews = (svcId: bigint) => {
     const key = svcId.toString();
     if (expandedReviewsService === key) {
       setExpandedReviewsService(null);
       return;
-    }
-    // If reviews not yet fetched, fetch them
-    if (!reviews[key]) {
-      try {
-        // In this example, reviews are not actually fetched from on-chain unless you track buyers.
-        // So we simply set an empty array or placeholder.
-        setReviews((prev) => ({ ...prev, [key]: [] }));
-      } catch (e) {
-        console.error(e);
-      }
     }
     setExpandedReviewsService(key);
   };
@@ -248,6 +270,14 @@ export default function ExploreScreen({ onBack }: ExploreScreenProps) {
               name: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
             };
             const avg = ratings[key] ?? 0;
+            const svcReviews = reviews[key] || [];
+            // Filtramos solo las reviews con comentario NO vacío y al menos una puntuación > 0
+            const meaningfulReviews = svcReviews.filter(
+            (r) =>
+                r.comment.trim() !== "" &&
+                (r.quality > 0 || r.communication > 0 || r.timeliness > 0)
+            );
+            const count = meaningfulReviews.length;
             const isExpanded = expandedReviewsService === key;
 
             return (
@@ -257,46 +287,55 @@ export default function ExploreScreen({ onBack }: ExploreScreenProps) {
               >
                 <div className="flex items-center mb-4 space-x-4">
                   {prof.avatarUrl ? (
-                    <img
-                      src={prof.avatarUrl}
-                      alt={prof.name}
-                      className="w-12 h-12 rounded-full object-cover border-2 border-purple-500 hover:scale-105 transition"
-                    />
+                    <Link href={`/user/${addr}`}>
+                      <img
+                        src={prof.avatarUrl}
+                        alt={prof.name}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-purple-500 hover:scale-105 transition cursor-pointer"
+                      />
+                    </Link>
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center border-2 border-purple-500">
-                      <FiUser className="w-6 h-6 text-gray-400" />
-                    </div>
+                    <Link href={`/user/${addr}`}>
+                      <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center border-2 border-purple-500 cursor-pointer">
+                        <FiUser className="w-6 h-6 text-gray-400" />
+                      </div>
+                    </Link>
                   )}
-                  <p className="text-lg font-medium">{prof.name}</p>
+                  <Link href={`/user/${addr}`}>
+                    <p className="text-lg font-medium cursor-pointer">{prof.name}</p>
+                  </Link>
                 </div>
                 <h3 className="font-semibold text-xl mb-2">{svc.title}</h3>
-                <p className="text-sm text-gray-400 line-clamp-3 mb-2">
+                <p className="text-sm text-gray-400 mb-2 break-words whitespace-pre-wrap">
                   {svc.description}
                 </p>
-                <p className="text-sm text-yellow-400 mb-2">
-                  ⭐ {avg.toFixed(1)} / 5
-                  <button
-                    onClick={() => toggleReviews(svc.id)}
-                    className="ml-2 text-xs text-gray-300"
-                  >
-                    {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
-                  </button>
-                </p>
-                {isExpanded && (
-                  <div className="bg-[#2a2438] p-4 rounded mb-4">
-                    {reviews[key] && reviews[key].length > 0 ? (
-                      reviews[key].map((r, idx) => (
-                        <div key={idx} className="mb-3">
-                          <p className="text-sm">
-                            ⭐ Quality: {r.quality} · Communication: {r.communication} · Timeliness: {r.timeliness}
-                          </p>
-                          <p className="text-xs text-gray-300 mt-1">{r.comment}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-500 text-sm">No reviews yet</p>
-                    )}
-                  </div>
+                {count > 0 ? (
+                  <p className="text-sm text-yellow-400 mb-2">
+                    ⭐ {avg.toFixed(1)} / 5.0 ({count}{" "}
+                    {count === 1 ? "review" : "reviews"})
+                    <button
+                      onClick={() => toggleReviews(svc.id)}
+                      className="ml-2 text-xs text-gray-300"
+                    >
+                      {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
+                    </button>
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-400 mb-2">
+                    Be the first buying this service!
+                  </p>
+                )}
+                {isExpanded && count > 0 && (
+                <div className="bg-[#2a2438] p-4 rounded mb-4">
+                    {meaningfulReviews.map((r, idx) => (
+                    <div key={idx} className="mb-3">
+                        <p className="text-sm">
+                        ⭐ Quality: {r.quality} · Communication: {r.communication} · Timeliness: {r.timeliness}
+                        </p>
+                        <p className="text-xs text-gray-300 mt-1">{r.comment}</p>
+                    </div>
+                    ))}
+                </div>
                 )}
                 <div className="mt-auto flex items-center justify-between">
                   <span className="text-xl font-bold">
@@ -307,9 +346,7 @@ export default function ExploreScreen({ onBack }: ExploreScreenProps) {
                     className="inline-flex items-center px-5 py-2 bg-purple-600 hover:bg-purple-700 rounded-full transition disabled:opacity-50"
                     disabled={!walletClient || processingId === svc.id}
                   >
-                    {processingId !== svc.id && (
-                      <FiShoppingCart className="mr-2" />
-                    )}
+                    {processingId !== svc.id && <FiShoppingCart className="mr-2" />}
                     {processingId === svc.id && (
                       <FiShoppingCart className="mr-2 animate-spin" />
                     )}
@@ -325,10 +362,7 @@ export default function ExploreScreen({ onBack }: ExploreScreenProps) {
       {processingId && <LoadingOverlay />}
 
       {showSuccess && (
-        <SuccessModal
-          peerAddress={successPeer}
-          onClose={() => setShowSuccess(false)}
-        />
+        <SuccessModal peerAddress={successPeer} onClose={() => setShowSuccess(false)} />
       )}
     </div>
   );

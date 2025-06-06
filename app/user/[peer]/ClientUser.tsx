@@ -204,7 +204,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
         className="mb-4 flex items-center justify-center text-purple-400 text-lg px-4 py-2 bg-[#1a1725] rounded-lg max-w-[200px]"
       >
         <FiArrowLeft className="w-5 h-5 mr-2" />
-        Pings Inbox
+        Back
       </button>
 
       <div className="flex items-center space-x-4 mb-6">

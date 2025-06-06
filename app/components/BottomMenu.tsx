@@ -17,7 +17,7 @@ interface BottomMenuProps {
 
 const BottomMenu: React.FC<BottomMenuProps> = ({ onAction }) => {
   return (
-    <nav className="fixed bottom-0 left-0 w-full bg-[#1a1725] border-t border-[#2a2735]">
+    <nav className="fixed bottom-0 left-0 w-full bg-[#1a1725] border-t border-[#2a2735] z-50">
       <ul className="flex items-center px-4 py-2">
         {/* FAQ */}
         <li className="flex-1 flex flex-col items-center">

@@ -28,6 +28,31 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [autoPlay, setAutoPlay] = useState(true);
 
+  // Nuevo estado: dirección del avance (-1 = izquierda, +1 = derecha)
+  const [direction, setDirection] = useState<number>(0);
+
+  // Variants que usan “custom” = dirección:
+  //   enter: viene desde derecha (if dir>0) o desde izquierda (if dir<0)
+  //   center: posición normal
+  //   exit: sale hacia la izquierda (if dir>0) o hacia la derecha (if dir<0)
+  const slideVariants = {
+    enter: (dir: number) => ({
+      x: dir > 0 ? 200 : -200,
+      scale: 0.95,
+      opacity: 1,
+    }),
+    center: {
+      x: 0,
+      scale: 1,
+      opacity: 1,
+    },
+    exit: (dir: number) => ({
+      x: dir > 0 ? -200 : 200,
+      scale: 0.95,
+      opacity: 1,
+    }),
+  };
+
   // Fetch active services on mount
   useEffect(() => {
     let mounted = true;
@@ -97,6 +122,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
 
   const handlePrev = () => {
     setAutoPlay(false);
+    setDirection(-1);
     setCurrentIdx((prev) =>
       prev === 0 ? shuffledServices.length - 1 : prev - 1
     );
@@ -104,13 +130,30 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
 
   const handleNext = () => {
     setAutoPlay(false);
+    setDirection(1);
     setCurrentIdx((prev) => (prev + 1) % shuffledServices.length);
   };
 
+  // Formatear priceWei (bigint) → ETH, eliminando ceros inútiles a la derecha
+  const formatPrice = (priceWei: bigint): string => {
+    const WEI_IN_ETH = BigInt("1000000000000000000");
+    const integerPart = priceWei / WEI_IN_ETH;
+    let fractionalPart = priceWei % WEI_IN_ETH;
+    if (fractionalPart === BigInt(0)) {
+      return integerPart.toString();
+    }
+    let fracStr = fractionalPart.toString().padStart(18, "0");
+    fracStr = fracStr.replace(/0+$/, "");
+
+    return `${integerPart.toString()}.${fracStr}`;
+  };
+
   return (
-    <div className="bg-[#0f0d14] text-white flex flex-col h-screen pb-16">
-      {/* Header with Logo & Title */}
-      <header className="flex flex-col items-center pb-4 px-4">
+    <div className="bg-[#0f0d14] text-white flex flex-col h-screen">
+      {/* ======================
+          1) HEADER FIJO (PingGate)
+          ====================== */}
+      <header className="flex flex-col items-center pb-1 px-4 flex-shrink-0">
         <div className="flex items-center space-x-3">
           <img
             src="/PingGateLogo.png"
@@ -119,111 +162,111 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
           />
           <h1 className="text-3xl font-bold">PingGate</h1>
         </div>
-        <p className="text-gray-400 text-center mt-2 leading-snug">
+        <p className="text-gray-400 text-sm text-center leading-snug">
           Monetize your inbox, connect with experts,
           <br />
-          or just chat in private.
+          or just chat!!
         </p>
       </header>
-
-      {/* Slider: Random Services with background avatar */}
-      <section className="relative w-full overflow-hidden">
-        {shuffledServices.length > 0 ? (
-          <div className="relative h-40 sm:h-48 md:h-56 lg:h-64">
-            <Link
-              href={`/user/${shuffledServices[currentIdx].seller}`}
-              passHref
-            >
-              <motion.a
-                key={shuffledServices[currentIdx].id.toString()}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.4 }}
-                className="absolute inset-0 mx-4 rounded-2xl shadow-xl overflow-hidden hover:cursor-pointer"
-                style={{
-                  backgroundImage: profiles[
-                    shuffledServices[currentIdx].seller.toLowerCase()
-                  ]?.avatar
-                    ? `url("${profiles[
+      <div className="mb-20 flex-grow overflow-y-auto scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+        <section className="relative w-full overflow-hidden flex-shrink-0">
+          {shuffledServices.length > 0 ? (
+            <div className="relative w-full h-56 sm:h-64 md:h-72 lg:h-80 overflow-hidden">
+              <Link href={`/user/${shuffledServices[currentIdx].seller}`} passHref>
+                <motion.a
+                  key={shuffledServices[currentIdx].id.toString()}
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ type: "spring", stiffness: 80, damping: 12 }}
+                  className="absolute inset-0 block overflow-hidden"
+                  style={{
+                    backgroundImage: profiles[
                       shuffledServices[currentIdx].seller.toLowerCase()
-                    ].avatar}")`
-                    : undefined,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  backgroundColor: profiles[
-                    shuffledServices[currentIdx].seller.toLowerCase()
-                  ]?.avatar
-                    ? undefined
-                    : "#1b1826",
-                }}
+                    ]?.avatar
+                      ? `url("${profiles[
+                          shuffledServices[currentIdx].seller.toLowerCase()
+                        ].avatar}")`
+                      : undefined,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    backgroundColor: profiles[
+                      shuffledServices[currentIdx].seller.toLowerCase()
+                    ]?.avatar
+                      ? undefined
+                      : "#1b1826",
+                  }}
+                >
+                  {/* Overlay de degradado para contraste */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-black/60 to-gray-800/40" />
+
+                  {/* Contenido centrado */}
+                  <div className="relative z-10 flex flex-col items-center justify-center h-full px-6">
+                    {/* Nombre del experto (por encima del título) */}
+                    <span className="text-indigo-300 text-base sm:text-lg md:text-xl font-medium mb-2">
+                      {profiles[
+                        shuffledServices[currentIdx].seller.toLowerCase()
+                      ]?.displayName ||
+                        shuffledServices[currentIdx].seller}
+                    </span>
+
+                    {/* Título principal en el centro */}
+                    <h2 className="text-white text-xl font-extrabold text-center leading-tight">
+                      {shuffledServices[currentIdx].title}
+                    </h2>
+
+                    {/* Precio justo debajo del título */}
+                    <span className="mt-3 text-gray-200 text-lg sm:text-xl md:text-2xl font-semibold">
+                      {formatPrice(shuffledServices[currentIdx].price)} ETH
+                    </span>
+                  </div>
+                </motion.a>
+              </Link>
+
+              {/* Flecha Anterior */}
+              <button
+                onClick={handlePrev}
+                className="absolute left-1 top-3/4 transform -translate-y-1/2 p-4 bg-white bg-opacity-20 backdrop-blur-sm rounded-full hover:bg-opacity-30 transition z-30"
+                aria-label="Previous"
               >
-                {/* Overlay de degradado */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[#1b1826]/80 to-[#2f2c42]/80" />
+                <FiChevronLeft size={28} className="text-white" />
+              </button>
 
-                {/* Titulo */}
-                <h2 className="absolute top-0 left-0 w-full bg-black/50 backdrop-blur-sm text-white border-10 text-sm sm:text-base md:text-lg lg:text-xl font-semibold text-center py-2">
-                  <p className="glow-modern">{shuffledServices[currentIdx].title}</p>
-                </h2>
+              {/* Flecha Siguiente */}
+              <button
+                onClick={handleNext}
+                className="absolute right-1 top-3/4 transform -translate-y-1/2 p-4 bg-white bg-opacity-20 backdrop-blur-sm rounded-full hover:bg-opacity-30 transition z-30"
+                aria-label="Next"
+              >
+                <FiChevronRight size={28} className="text-white" />
+              </button>
 
-                <div className="relative z-10 flex flex-col items-center justify-center h-full p-4 pt-12 pb-4">
-                  {/* Display Name o Wallet */}
-                  <span className="text-indigo-300 text-sm mb-1">
-                    {profiles[
-                      shuffledServices[currentIdx].seller.toLowerCase()
-                    ]?.displayName ||
-                      shuffledServices[currentIdx].seller}
-                  </span>
-
-                  {/* Descripción */}
-                  <p className="text-gray-300 text-xs sm:text-sm text-center mx-4">
-                    {profiles[
-                      shuffledServices[currentIdx].seller.toLowerCase()
-                    ]?.description ||
-                      shuffledServices[currentIdx].description}
-                  </p>
-                </div>
-              </motion.a>
-            </Link>
-
-            {/* Botones Prev/Next (más grandes, rectangulares, encima del slider) */}
-            <button
-              onClick={handlePrev}
-              className="absolute left-0 top-1/2 transform -translate-y-1/2 h-10 w-8 bg-[#2b283c] rounded-r-md hover:bg-[#3c394f] transition-colors z-20"
-              aria-label="Previous"
-            >
-              <FiChevronLeft size={20} className="text-gray-400" />
-            </button>
-            <button
-              onClick={handleNext}
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 h-10 w-8 bg-[#2b283c] rounded-l-md hover:bg-[#3c394f] transition-colors z-20"
-              aria-label="Next"
-            >
-              <FiChevronRight size={20} className="text-gray-400" />
-            </button>
-
-            <div className="absolute bottom-0 left-2">
-              <span className="text-[0.625rem] text-gray-500">
-                Random Experts’ services selection. Thanks for using PingGate
-              </span>
+              {/* Mensaje inferior */}
+              <div className="absolute bottom-0 left-6">
+                <span className="text-[0.625rem] text-gray-400">
+                  Random Experts’ services selection. Thanks for using PingGate
+                </span>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="h-40 sm:h-48 md:h-56 lg:h-64 flex justify-center items-center text-gray-500">
-            Loading services...
-          </div>
-        )}
-      </section>
+          ) : (
+            <div className="w-full h-56 sm:h-64 md:h-72 lg:h-80 flex justify-center items-center text-gray-500">
+              Loading services...
+            </div>
+          )}
+        </section>
 
-      {/* Scrollable area under slider */}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500 px-4 mt-4">
+        {/* Espacio superior opcional para separar del slider */}
+        <div className="mt-1" />
+
         {/* Prominent Explore Section */}
-        <section className="mb-4">
+        <section>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
+            className="relative bg-[#1a1725] overflow-hidden p-4"
           >
             {/* Faded background icon */}
             <FiSearch className="absolute text-indigo-600 text-6xl opacity-20 top-4 right-4" />
@@ -240,24 +283,24 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
         </section>
 
         {/* Other Options Grid */}
-        <section className="mb-4">
-          <div className="grid grid-cols-2 gap-4">
+        <section className="mt-1 mb-1">
+          <div className="grid grid-cols-2 gap-1">
             {/* FAQ */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
-              className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
+              className="relative bg-[#1a1725] overflow-hidden p-4"
             >
               <FiHelpCircle className="absolute text-indigo-600 text-5xl opacity-20 top-3 right-3" />
               <button
                 onClick={() => onAction("faq")}
-                className="relative w-full flex items-center space-x-2 py-3"
+                className="relative w-full flex items-center space-x-1 py-2"
               >
                 <FiHelpCircle size={24} className="text-purple-400" />
                 <span className="text-purple-400 font-medium">FAQ</span>
               </button>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-400">
                 Get answers to common questions
               </p>
             </motion.div>
@@ -267,77 +310,32 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
+              className="relative bg-[#1a1725] overflow-hidden p-4"
             >
               <FiPlusCircle className="absolute text-indigo-600 text-5xl opacity-20 top-3 right-3" />
               <button
                 onClick={() => onAction("myplans")}
-                className="relative w-full flex items-center space-x-2 py-3"
+                className="relative w-full flex items-center space-x-1 py-2"
               >
                 <FiPlusCircle size={24} className="text-purple-400" />
                 <span className="text-purple-400 font-medium">
                   My Services
                 </span>
               </button>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-400">
                 Create & manage your offerings
               </p>
             </motion.div>
-
-            {/* Reviews */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
-            >
-              <FiStar className="absolute text-indigo-600 text-5xl opacity-20 top-3 right-3" />
-              <button
-                onClick={() => onAction("reviews")}
-                className="relative w-full flex items-center space-x-2 py-3"
-              >
-                <FiStar size={24} className="text-purple-400" />
-                <span className="text-purple-400 font-medium">
-                  Reviews
-                </span>
-              </button>
-              <p className="text-xs text-gray-400 mt-1">
-                Reviews of services you bought
-              </p>
-            </motion.div>
-
-            {/* Pings Inbox */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="relative bg-[#1a1725] rounded-2xl overflow-hidden p-4"
-            >
-              <FiMessageSquare className="absolute text-indigo-600 text-5xl opacity-20 top-3 right-3" />
-              <button
-                onClick={() => onAction("inbox")}
-                className="relative w-full flex items-center space-x-2 py-3"
-              >
-                <FiMessageSquare size={24} className="text-purple-400" />
-                <span className="text-purple-400 font-medium">
-                  Pings
-                </span>
-              </button>
-              <p className="text-xs text-gray-400 mt-1">
-                Check messages & start conversations
-              </p>
-            </motion.div>
           </div>
+          {/* Si necesitas más secciones debajo del grid, agrégalas aquí */}
         </section>
+
+        <footer className="flex justify-between text-gray-500 text-xs px-4 pt-1 pb-2 mb-14 flex-shrink-0">
+          <span>✦ Powered by XMTP</span>
+          <span> & Base & Farcaster ✦</span>
+        </footer>
       </div>
 
-      {/* Footer Branding */}
-      <footer className="flex justify-between text-gray-500 text-xs px-4 pb-4 pt-1 mb-16">
-        <span>✦ Powered by XMTP</span>
-        <span> & Base & Farcaster ✦</span>
-      </footer>
-
-      {/* Bottom Navigation Menu */}
       <BottomMenu onAction={onAction} />
     </div>
   );
