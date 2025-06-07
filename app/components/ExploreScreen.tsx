@@ -2,18 +2,16 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useWalletClient } from "wagmi";
-import {
-    FiRefreshCw,
-} from "react-icons/fi";
+import { useWalletClient, useAccount } from "wagmi";
+import { FiRefreshCw } from "react-icons/fi";
 import toast from "react-hot-toast";
 import {
-    getActiveServices,
-    purchaseService,
-    getAverageRating,
-    getReview,
-    getSalesBy,
-    publicClient,
+  getActiveServices,
+  purchaseService,
+  getAverageRating,
+  getReview,
+  getSalesBy,
+  publicClient,
 } from "../services/contractService";
 import { resolveEnsName } from "../services/nameResolver";
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
@@ -22,276 +20,244 @@ import SuccessModal from "../components/SuccessModal";
 import { WarpView } from "../page-client";
 import BottomMenu from "./BottomMenu";
 import ServiceCard from "./ServiceCard";
+import { base } from "viem/chains";
 
 interface ServiceDetails {
-    id: bigint;
-    seller: `0x${string}`;
-    title: string;
-    description: string;
-    price: bigint;
-    duration: bigint;
-    active: boolean;
+  id: bigint;
+  seller: `0x${string}`;
+  title: string;
+  description: string;
+  price: bigint;
+  duration: bigint;
+  active: boolean;
 }
 
 interface SellerProfile {
-    name: string;
-    avatarUrl?: string;
+  name: string;
+  avatarUrl?: string;
 }
 
 interface ExploreScreenProps {
-    onAction: (view: WarpView) => void;
+  onAction: (view: WarpView) => void;
 }
 
 export default function ExploreScreen({ onAction }: ExploreScreenProps) {
-    const { data: walletClient } = useWalletClient();
-    const [services, setServices] = useState<ServiceDetails[]>([]);
-    const [displayed, setDisplayed] = useState<ServiceDetails[]>([]);
-    const [profiles, setProfiles] = useState<Record<string, SellerProfile>>({});
-    const [ratings, setRatings] = useState<Record<string, number>>({});
-    const [reviews, setReviews] = useState<
-        Record<
-            string,
-            { buyer: string; quality: number; communication: number; timeliness: number; comment: string }[]
-        >
-    >({});
-    const [expandedReviewsService, setExpandedReviewsService] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [processingId, setProcessingId] = useState<bigint | null>(null);
-    const [showSuccess, setShowSuccess] = useState(false);
-    const [successPeer, setSuccessPeer] = useState<string>("");
+  const { address } = useAccount();
+  const { data: walletClient } = useWalletClient();
+  const [services, setServices] = useState<ServiceDetails[]>([]);
+  const [displayed, setDisplayed] = useState<ServiceDetails[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, SellerProfile>>({});
+  const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [reviews, setReviews] = useState<
+    Record<string, { buyer: string; quality: number; communication: number; timeliness: number; comment: string }[]>
+  >({});
+  const [expandedService, setExpandedService] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [processingId, setProcessingId] = useState<bigint | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successPeer, setSuccessPeer] = useState<string>("");
 
-    // Load services, seller profiles, ratings and reviews
-    useEffect(() => {
-        const warp = new WarpcastService();
-        (async () => {
-            try {
-                const list = await getActiveServices();
-                setServices(list);
-                setDisplayed(list);
+  // Load services, profiles, ratings, and reviews
+  useEffect(() => {
+    const warp = new WarpcastService();
+    (async () => {
+      try {
+        const list = await getActiveServices();
+        setServices(list);
+        setDisplayed(list);
 
-                const sellers = Array.from(new Set(list.map((s) => s.seller.toLowerCase())));
-                const ids = sellers.map((addr) => `farcaster,${addr}`);
-
-                let bioProfiles: Web3BioProfile[] = [];
-                try {
-                    bioProfiles = await warp.getWeb3BioProfiles(ids);
-                } catch {
-                    bioProfiles = [];
-                }
-
-                const bioMap: Record<string, Web3BioProfile> = {};
-                bioProfiles.forEach((p) => {
-                    p.aliases?.forEach((alias) => {
-                        const [platform, addr] = alias.split(",");
-                        if (platform === "farcaster") bioMap[addr.toLowerCase()] = p;
-                    });
-                });
-
-                const entries = await Promise.all(
-                    sellers.map(async (addr) => {
-                        const p = bioMap[addr];
-                        let name: string | undefined;
-                        let avatarUrl: string | undefined;
-                        if (p?.displayName) {
-                            name = p.displayName;
-                            avatarUrl = p.avatar;
-                        }
-                        if (!name) {
-                            try {
-                                const ens = await resolveEnsName(addr);
-                                if (ens) name = ens;
-                            } catch {
-                                // ignore ENS failure
-                            }
-                        }
-                        if (!name) name = `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-                        return [addr, { name, avatarUrl }];
-                    })
-                );
-                setProfiles(Object.fromEntries(entries));
-
-                // Fetch average ratings for all services
-                const ratingEntries = await Promise.all(
-                    list.map(async (svc) => {
-                        const avg = await getAverageRating(svc.id);
-                        return [svc.id.toString(), avg] as [string, number];
-                    })
-                );
-                setRatings(Object.fromEntries(ratingEntries));
-
-                // Fetch reviews for all services:
-                // 1) getSalesBy(seller) → PurchaseRecord[]
-                // 2) filter records where record.serviceId === svc.id
-                // 3) for each buyer, call getReview(serviceId, buyer)
-                const reviewEntries = await Promise.all(
-                    list.map(async (svc) => {
-                        const sales = await getSalesBy(svc.seller);
-                        const buyersForSvc = sales
-                            .filter((rec) => rec.serviceId === svc.id)
-                            .map((rec) => rec.buyer);
-                        const revs = await Promise.all(
-                            buyersForSvc.map(async (buyer) => {
-                                const r = await getReview(svc.id, buyer);
-                                return {
-                                    buyer,
-                                    quality: r.quality,
-                                    communication: r.communication,
-                                    timeliness: r.timeliness,
-                                    comment: r.comment,
-                                };
-                            })
-                        );
-                        return [svc.id.toString(), revs] as [
-                            string,
-                            { buyer: string; quality: number; communication: number; timeliness: number; comment: string }[]
-                        ];
-                    })
-                );
-                setReviews(Object.fromEntries(reviewEntries));
-            } catch (e: any) {
-                console.error(e);
-                toast.error("Error loading services");
-            } finally {
-                setLoading(false);
-            }
-        })();
-    }, []);
-
-    // Toggle review details for a service
-    const toggleReviews = (svcId: bigint) => {
-        const key = svcId.toString();
-        if (expandedReviewsService === key) {
-            setExpandedReviewsService(null);
-            return;
-        }
-        setExpandedReviewsService(key);
-    };
-
-    // Handle search filtering
-    const handleSearch = (term: string) => {
-        setSearchTerm(term);
-        const lower = term.toLowerCase();
-        setDisplayed(
-            services.filter((svc) => {
-                const sellerName = profiles[svc.seller.toLowerCase()]?.name.toLowerCase() || "";
-                return svc.title.toLowerCase().includes(lower) || sellerName.includes(lower);
-            })
-        );
-    };
-
-    // Randomize displayed services
-    const handleRandomize = () => {
-        const shuffled = [...displayed];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-        }
-        setDisplayed(shuffled);
-    };
-
-    // Ensure Base network before purchase
-    const ensureBase = async () => {
-        if (!walletClient) throw new Error("Wallet not connected");
-        if (walletClient.chain?.id !== 8453) {
-            await walletClient.switchChain({ id: 8453 });
-        }
-    };
-
-    // Handle purchase with transaction confirmation
-    const onBuy = async (id: bigint, price: bigint, seller: string) => {
-        if (!walletClient) {
-            toast.error("Connect your wallet first");
-            return;
-        }
-        setProcessingId(id);
+        // Load seller profiles
+        const sellers = Array.from(new Set(list.map((s) => s.seller.toLowerCase())));
+        const ids = sellers.map((addr) => `farcaster,${addr}`);
+        let bioProfiles: Web3BioProfile[] = [];
         try {
-            await ensureBase();
-            const hash = await purchaseService(walletClient, id, price);
-            await publicClient.waitForTransactionReceipt({ hash });
-            setSuccessPeer(seller);
-            setShowSuccess(true);
-        } catch (e: any) {
-            console.error(e);
-            toast.error(e.message || "Purchase failed");
-        } finally {
-            setProcessingId(null);
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="h-full p-4 bg-[#0f0d14] text-white flex items-center justify-center">
-                <span className="text-gray-400">Loading services…</span>
-            </div>
+          bioProfiles = await warp.getWeb3BioProfiles(ids);
+        } catch {}
+        const bioMap: Record<string, Web3BioProfile> = {};
+        bioProfiles.forEach((p) =>
+          p.aliases?.forEach((alias) => {
+            const [platform, addr] = alias.split(",");
+            if (platform === "farcaster") bioMap[addr.toLowerCase()] = p;
+          })
         );
-    }
+        const profileEntries = await Promise.all(
+          sellers.map(async (addr) => {
+            const p = bioMap[addr];
+            let name: string | undefined = p?.displayName;
+            let avatarUrl: string | undefined = p?.avatar;
+            if (!name) {
+              try {
+                const ens = await resolveEnsName(addr);
+                name = ens;
+              } catch {}
+            }
+            if (!name) name = `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+            return [addr, { name, avatarUrl }];
+          })
+        );
+        setProfiles(Object.fromEntries(profileEntries));
 
-    return (
-        <div className="h-[100%] flex flex-col bg-[#0f0d14] text-white py-2">
-            <div className="flex-1 flex flex-col min-h-0 bg-[#0f0d14] text-white pb-14">
+        // Load average ratings
+        const ratingEntries = await Promise.all(
+          list.map(async (svc) => [svc.id.toString(), await getAverageRating(svc.id)] as [string, number])
+        );
+        setRatings(Object.fromEntries(ratingEntries));
 
-                <h2 className="text-3xl font-bold mb-4 text-center">Explore Services</h2>
+        // Load reviews
+        const reviewEntries = await Promise.all(
+          list.map(async (svc) => {
+            const sales = await getSalesBy(svc.seller);
+            const buyers = sales.filter((r) => r.serviceId === svc.id).map((r) => r.buyer);
+            const revs = await Promise.all(
+              buyers.map(async (buyer) => {
+                const r = await getReview(svc.id, buyer);
+                return {
+                  buyer,
+                  quality: r.quality,
+                  communication: r.communication,
+                  timeliness: r.timeliness,
+                  comment: r.comment,
+                };
+              })
+            );
+            return [svc.id.toString(), revs] as [string, typeof revs];
+          })
+        );
+        setReviews(Object.fromEntries(reviewEntries));
+      } catch (e) {
+        console.error(e);
+        toast.error("Error loading services");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-                <div className="flex items-center gap-2 mb-4">
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        placeholder="Search by title or seller"
-                        className="flex-1 p-2 rounded-lg bg-[#1a1725] text-white placeholder-gray-500"
-                    />
-                    <button
-                        onClick={handleRandomize}
-                        className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg"
-                    >
-                        <FiRefreshCw className="w-6 h-6 text-white" />
-                    </button>
-                </div>
+  const toggleReviews = (svcId: bigint) => {
+    const key = svcId.toString();
+    setExpandedService((prev) => (prev === key ? null : key));
+  };
 
-                <div className="flex-1 flex flex-col gap-4 overflow-y-auto scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
-                    {displayed.length === 0 ? (
-                        <p className="text-gray-400 text-center">No services available</p>
-                    ) : (
-                        displayed.map((svc) => {
-                            const key = svc.id.toString();
-                            const addr = svc.seller.toLowerCase();
-                            const prof: SellerProfile = profiles[addr] || {
-                                name: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
-                            };
-                            const avg = ratings[key] ?? 0;
-                            const svcReviews = reviews[key] || [];
-                            const isExpanded = expandedReviewsService === key;
-
-                            return (
-                                <ServiceCard
-                                    key={key}
-                                    svc={svc}
-                                    prof={prof}
-                                    avgRating={avg}
-                                    reviews={svcReviews}
-                                    isExpanded={isExpanded}
-                                    onToggleReviews={toggleReviews}
-                                    onBuy={onBuy}
-                                    processingId={processingId}
-                                    walletConnected={!!walletClient}
-                                />
-                            );
-                        })
-                    )}
-                </div>
-
-                <div>
-                    <BottomMenu onAction={onAction} />
-                </div>
-
-            </div>
-
-            {processingId && <LoadingOverlay />}
-
-            {showSuccess && (
-                <SuccessModal peerAddress={successPeer} onClose={() => setShowSuccess(false)} />
-            )}
-        </div>
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    const lower = term.toLowerCase();
+    setDisplayed(
+      services.filter((svc) => {
+        const sellerName = profiles[svc.seller.toLowerCase()]?.name.toLowerCase() || "";
+        return svc.title.toLowerCase().includes(lower) || sellerName.includes(lower);
+      })
     );
+  };
+
+  const handleRandomize = () => {
+    const arr = [...displayed];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    setDisplayed(arr);
+  };
+
+  // Ensure user is on Base network before any contract call
+  const ensureBase = async () => {
+    if (!walletClient) throw new Error("Wallet not connected");
+    if (walletClient.chain?.id !== base.id) {
+      try {
+        await walletClient.switchChain({ id: base.id });
+      } catch {
+        toast.error("Please switch your wallet to the Base network");
+        throw new Error("Wrong network");
+      }
+    }
+  };
+
+  // Handle purchase action
+  const onBuy = async (id: bigint, price: bigint, seller: string) => {
+    if (!walletClient) {
+      toast.error("Connect your wallet first");
+      return;
+    }
+    setProcessingId(id);
+    try {
+      await ensureBase();
+      const hash = await purchaseService(walletClient, id, price);
+      await publicClient.waitForTransactionReceipt({ hash });
+      setSuccessPeer(seller);
+      setShowSuccess(true);
+    } catch (e: any) {
+      if (e.message !== "Wrong network") {
+        toast.error(e.message || "Purchase failed");
+      }
+      console.error(e);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-full p-4 bg-[#0f0d14] text-white flex items-center justify-center">
+        <span className="text-gray-400">Loading services…</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col bg-[#0f0d14] text-white py-2">
+      <div className="flex-1 flex flex-col min-h-0 bg-[#0f0d14] pb-14">
+        <h2 className="text-3xl font-bold mb-4 text-center">Explore Services</h2>
+
+        <div className="flex items-center gap-2 mb-4 px-4">
+          <input
+            className="flex-1 p-2 rounded-lg bg-[#1a1725] text-white placeholder-gray-500"
+            placeholder="Search by title or seller"
+            value={searchTerm}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+          <button
+            onClick={handleRandomize}
+            className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg"
+          >
+            <FiRefreshCw className="w-6 h-6 text-white" />
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col gap-4 overflow-y-auto px-4 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+          {displayed.length === 0 ? (
+            <p className="text-gray-400 text-center">No services available</p>
+          ) : (
+            displayed.map((svc) => {
+              const key = svc.id.toString();
+              const addr = svc.seller.toLowerCase();
+              const prof = profiles[addr] || {
+                name: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
+              };
+              return (
+                <ServiceCard
+                  key={key}
+                  svc={svc}
+                  prof={prof}
+                  avgRating={ratings[key] ?? 0}
+                  reviews={reviews[key] || []}
+                  isExpanded={expandedService === key}
+                  onToggleReviews={() => toggleReviews(svc.id)}
+                  onBuy={(id, price) => onBuy(id, price, prof.name)}
+                  processingId={processingId}
+                  walletConnected={!!walletClient}
+                />
+              );
+            })
+          )}
+        </div>
+
+        <BottomMenu onAction={onAction} />
+      </div>
+
+      {processingId && <LoadingOverlay />}
+      {showSuccess && (
+        <SuccessModal peerAddress={successPeer} onClose={() => setShowSuccess(false)} />
+      )}
+    </div>
+  );
 }
