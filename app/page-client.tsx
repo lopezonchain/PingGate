@@ -35,6 +35,7 @@ import ReviewsScreen from "./components/ReviewsScreen";
 import ExploreScreen from "./components/ExploreScreen";
 import MyServicesScreen from "./components/MyServicesScreen";
 import FAQScreen from "./components/FAQScreen";
+import toast from "react-hot-toast";
 
 export type WarpView =
   | "home"
@@ -219,6 +220,40 @@ export default function Page(): JSX.Element {
   const addFrame = useAddFrame();
   const [frameAdded, setFrameAdded] = useState(false);
   const triedAutoConnect = useRef(false);
+
+   useEffect(() => {
+    // if the walletClient is ready, call switchChain once on load
+    if (walletClient && walletClient.chain?.id !== base.id) {
+      walletClient
+        .switchChain({ id: base.id })
+        .catch(() => {
+          // user may reject—but we'll also listen to chainChanged below
+        });
+    }
+
+    // now listen to any manual chain changes in the wallet UI
+    const ethereum = (window as any).ethereum;
+    if (ethereum && ethereum.on) {
+      const handleChainChanged = (chainIdHex: string) => {
+        const chainId = parseInt(chainIdHex, 16);
+        if (chainId !== base.id) {
+          ethereum
+            .request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: `0x${base.id.toString(16)}` }],
+            })
+            .catch(() => {
+              toast.error("Please switch back to the Base network");
+            });
+        }
+      };
+      ethereum.on("chainChanged", handleChainChanged);
+
+      return () => {
+        ethereum.removeListener("chainChanged", handleChainChanged);
+      };
+    }
+  }, [walletClient]);
 
   // sincronizar warpView cada vez que cambie la query param
   useEffect(() => {

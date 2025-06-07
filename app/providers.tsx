@@ -51,24 +51,17 @@ function MiniKitWrapper({ children }: { children: ReactNode }) {
   const { data: walletClient } = useWalletClient();
   const [selectedChain, setSelectedChain] = useState<ChainType>(base);
 
-  const chainOptions: { label: string; chain: ChainType }[] = [
-    { label: "Base", chain: base },
-    { label: "Base Sepolia", chain: baseSepolia }
-  ];
 
   useEffect(() => {
     if (walletClient) {
-      const found = chainOptions.find((o) => o.chain.id === walletClient.chain.id);
-      if (found) {
-        setSelectedChain(found.chain);
-      }
+      setSelectedChain(base);
     }
   }, [walletClient]);
 
   return (
     <MiniKitProvider
       apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-      chain={selectedChain}
+      chain={base}
       config={{
         appearance: {
           mode: "auto",
@@ -78,9 +71,7 @@ function MiniKitWrapper({ children }: { children: ReactNode }) {
         },
       }}
     >
-      <Suspense fallback={<div className="h-screen p-4 bg-[#0f0d14] text-white flex items-center justify-center">
-                <span className="text-gray-400">Loading…</span>
-            </div>}>{children}</Suspense>
+      <Suspense fallback={<div className="bg-[#0F1E14]">Loading...</div>}>{children}</Suspense>
     </MiniKitProvider>
   );
 }

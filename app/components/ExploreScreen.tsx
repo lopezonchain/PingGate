@@ -17,9 +17,9 @@ import { resolveEnsName } from "../services/nameResolver";
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import LoadingOverlay from "../components/LoadingOverlay";
 import SuccessModal from "../components/SuccessModal";
-import { WarpView } from "../page-client";
-import BottomMenu from "./BottomMenu";
 import ServiceCard from "./ServiceCard";
+import BottomMenu from "./BottomMenu";
+import { WarpView } from "../page-client";
 import { base } from "viem/chains";
 
 interface ServiceDetails {
@@ -44,6 +44,7 @@ interface ExploreScreenProps {
 export default function ExploreScreen({ onAction }: ExploreScreenProps) {
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
+
   const [services, setServices] = useState<ServiceDetails[]>([]);
   const [displayed, setDisplayed] = useState<ServiceDetails[]>([]);
   const [profiles, setProfiles] = useState<Record<string, SellerProfile>>({});
@@ -58,7 +59,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [successPeer, setSuccessPeer] = useState<string>("");
 
-  // Load services, profiles, ratings, and reviews
+  // 1) Load all data on mount
   useEffect(() => {
     const warp = new WarpcastService();
     (async () => {
@@ -67,53 +68,52 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
         setServices(list);
         setDisplayed(list);
 
-        // Load seller profiles
+        // load profiles
         const sellers = Array.from(new Set(list.map((s) => s.seller.toLowerCase())));
-        const ids = sellers.map((addr) => `farcaster,${addr}`);
-        let bioProfiles: Web3BioProfile[] = [];
+        const ids = sellers.map((a) => `farcaster,${a}`);
+        let bios: Web3BioProfile[] = [];
         try {
-          bioProfiles = await warp.getWeb3BioProfiles(ids);
+          bios = await warp.getWeb3BioProfiles(ids);
         } catch {}
         const bioMap: Record<string, Web3BioProfile> = {};
-        bioProfiles.forEach((p) =>
+        bios.forEach((p) =>
           p.aliases?.forEach((alias) => {
-            const [platform, addr] = alias.split(",");
-            if (platform === "farcaster") bioMap[addr.toLowerCase()] = p;
+            const [ref, addr] = alias.split(",");
+            if (ref === "farcaster") bioMap[addr.toLowerCase()] = p;
           })
         );
-        const profileEntries = await Promise.all(
+        const profEntries = await Promise.all(
           sellers.map(async (addr) => {
             const p = bioMap[addr];
-            let name: string | undefined = p?.displayName;
-            const avatarUrl: string | undefined = p?.avatar;
+            let name = p?.displayName;
+            let avatarUrl = p?.avatar;
             if (!name) {
               try {
-                const ens = await resolveEnsName(addr);
-                name = ens;
+                name = await resolveEnsName(addr);
               } catch {}
             }
             if (!name) name = `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-            return [addr, { name, avatarUrl }];
+            return [addr, { name, avatarUrl }] as const;
           })
         );
-        setProfiles(Object.fromEntries(profileEntries));
+        setProfiles(Object.fromEntries(profEntries));
 
-        // Load average ratings
+        // load ratings
         const ratingEntries = await Promise.all(
           list.map(async (svc) => [svc.id.toString(), await getAverageRating(svc.id)] as [string, number])
         );
         setRatings(Object.fromEntries(ratingEntries));
 
-        // Load reviews
+        // load reviews
         const reviewEntries = await Promise.all(
           list.map(async (svc) => {
             const sales = await getSalesBy(svc.seller);
             const buyers = sales.filter((r) => r.serviceId === svc.id).map((r) => r.buyer);
             const revs = await Promise.all(
-              buyers.map(async (buyer) => {
-                const r = await getReview(svc.id, buyer);
+              buyers.map(async (b) => {
+                const r = await getReview(svc.id, b);
                 return {
-                  buyer,
+                  buyer: b,
                   quality: r.quality,
                   communication: r.communication,
                   timeliness: r.timeliness,
@@ -134,18 +134,20 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
     })();
   }, []);
 
-  const toggleReviews = (svcId: bigint) => {
-    const key = svcId.toString();
+  // toggle expand
+  const toggleReviews = (id: bigint) => {
+    const key = id.toString();
     setExpandedService((prev) => (prev === key ? null : key));
   };
 
+  // search/filter
   const handleSearch = (term: string) => {
     setSearchTerm(term);
-    const lower = term.toLowerCase();
+    const low = term.toLowerCase();
     setDisplayed(
       services.filter((svc) => {
         const sellerName = profiles[svc.seller.toLowerCase()]?.name.toLowerCase() || "";
-        return svc.title.toLowerCase().includes(lower) || sellerName.includes(lower);
+        return svc.title.toLowerCase().includes(low) || sellerName.includes(low);
       })
     );
   };
@@ -159,37 +161,42 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
     setDisplayed(arr);
   };
 
-  // Ensure user is on Base network before any contract call
-  const ensureBase = async () => {
-    if (!walletClient) throw new Error("Wallet not connected");
+  // 2) Ensure the user is on Base network before a tx
+  async function ensureBaseNetwork(): Promise<boolean> {
+    if (!walletClient) {
+      toast.error("Connect your wallet first");
+      return false;
+    }
     if (walletClient.chain?.id !== base.id) {
       try {
         await walletClient.switchChain({ id: base.id });
+        // wallet prompt appears; user must approve
+        toast.success("Switched to Base network");
+        return false; // transaction must be retried
       } catch {
         toast.error("Please switch your wallet to the Base network");
-        throw new Error("Wrong network");
+        return false;
       }
     }
-  };
+    return true;
+  }
 
-  // Handle purchase action
-  const onBuy = async (id: bigint, price: bigint, seller: string) => {
-    if (!walletClient) {
-      toast.error("Connect your wallet first");
-      return;
-    }
+  // 3) Buy flow
+  const onBuy = async (id: bigint, price: bigint, sellerName: string) => {
     setProcessingId(id);
     try {
-      await ensureBase();
-      const hash = await purchaseService(walletClient, id, price);
+      const ok = await ensureBaseNetwork();
+      if (!ok) {
+        setProcessingId(null);
+        return;
+      }
+      const hash = await purchaseService(walletClient!, id, price);
       await publicClient.waitForTransactionReceipt({ hash });
-      setSuccessPeer(seller);
+      setSuccessPeer(sellerName);
       setShowSuccess(true);
     } catch (e: any) {
-      if (e.message !== "Wrong network") {
-        toast.error(e.message || "Purchase failed");
-      }
       console.error(e);
+      toast.error(e.message || "Purchase failed");
     } finally {
       setProcessingId(null);
     }
@@ -197,7 +204,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
 
   if (loading) {
     return (
-      <div className="h-full p-4 bg-[#0f0d14] text-white flex items-center justify-center">
+      <div className="h-full bg-[#0f0d14] text-white flex items-center justify-center">
         <span className="text-gray-400">Loading services…</span>
       </div>
     );
@@ -205,20 +212,17 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
 
   return (
     <div className="h-full flex flex-col bg-[#0f0d14] text-white py-2">
-      <div className="flex-1 flex flex-col min-h-0 bg-[#0f0d14] pb-14">
+      <div className="flex-1 flex flex-col min-h-0 pb-14">
         <h2 className="text-3xl font-bold mb-4 text-center">Explore Services</h2>
 
         <div className="flex items-center gap-2 mb-4 px-4">
           <input
-            className="flex-1 p-2 rounded-lg bg-[#1a1725] text-white placeholder-gray-500"
+            className="flex-1 p-2 rounded-lg bg-[#1a1725] text-white"
             placeholder="Search by title or seller"
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value)}
           />
-          <button
-            onClick={handleRandomize}
-            className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg"
-          >
+          <button onClick={handleRandomize} className="p-2 bg-purple-600 rounded-lg">
             <FiRefreshCw className="w-6 h-6 text-white" />
           </button>
         </div>
@@ -230,9 +234,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
             displayed.map((svc) => {
               const key = svc.id.toString();
               const addr = svc.seller.toLowerCase();
-              const prof = profiles[addr] || {
-                name: `${addr.slice(0, 6)}…${addr.slice(-4)}`,
-              };
+              const prof = profiles[addr] || { name: `${addr.slice(0, 6)}…${addr.slice(-4)}` };
               return (
                 <ServiceCard
                   key={key}
@@ -255,9 +257,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
       </div>
 
       {processingId && <LoadingOverlay />}
-      {showSuccess && (
-        <SuccessModal peerAddress={successPeer} onClose={() => setShowSuccess(false)} />
-      )}
+      {showSuccess && <SuccessModal peerAddress={successPeer} onClose={() => setShowSuccess(false)} />}
     </div>
   );
 }

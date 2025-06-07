@@ -38,18 +38,18 @@ export async function generateMetadata({
     avatarUrl || "https://pinggate.lopezonchain.xyz/PingGateLogo.png";
 
   return {
-    title: `User Profile • ${peerLabel}`,
-    description: `View services offered by ${peerLabel}`,
+    title: `PingGate services offered by ${peerLabel}`,
+    description: `PingGate services offered by ${peerLabel}`,
     other: {
       "fc:frame": JSON.stringify({
         version: "next",
         imageUrl,
         button: {
-          title: `Check my PingGate Services!!`,
+          title: `Check my PingGate services!!`,
           action: {
             type: "launch_frame",
             url,
-            name: `Check my PingGate Services!!`,
+            name: `Check my PingGate services!!`,
             splashImageUrl: imageUrl,
             splashBackgroundColor: "#17101f",
           },
