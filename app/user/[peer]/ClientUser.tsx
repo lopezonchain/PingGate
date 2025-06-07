@@ -1,273 +1,325 @@
 // app/users/[peer]/ClientUser.tsx
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWalletClient } from "wagmi";
-import { FiArrowLeft, FiShoppingCart, FiUser } from "react-icons/fi";
+import { FiArrowLeft, FiUser } from "react-icons/fi";
 import toast from "react-hot-toast";
 import { ethers } from "ethers";
 import {
-  getServicesBy,
-  getService,
-  purchaseService,
-  publicClient,
+    getServicesBy,
+    getService,
+    purchaseService,
+    getAverageRating,
+    getReview,
+    getSalesBy,
+    publicClient,
 } from "../../services/contractService";
 import { resolveEnsName } from "../../services/nameResolver";
 import { WarpcastService, Web3BioProfile } from "../../services/warpcastService";
-import { sdk } from "@farcaster/frame-sdk";
-import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import SuccessModal from "../../components/SuccessModal";
-
-interface ServiceDetails {
-  id: bigint;
-  seller: `0x${string}`;
-  title: string;
-  description: string;
-  price: bigint;
-  duration: bigint;
-  active: boolean;
-}
+import ServiceCard, { ServiceDetails } from "../../components/ServiceCard";
 
 interface UserProfile {
-  displayName: string;
-  avatarUrl?: string;
-  addressAbbrev: string;
+    displayName: string;
+    avatarUrl?: string;
+    addressAbbrev: string;
+    description?: string;
+    links?: {
+        farcaster?: { link: string; handle: string };
+        twitter?: { link: string; handle: string };
+    };
 }
 
 interface ClientUserProps {
-  peerAddress: string;
+    peerAddress: string;
 }
 
 export default function ClientUser({ peerAddress }: ClientUserProps) {
-  const router = useRouter();
-  const { data: walletClient } = useWalletClient();
-  const normalizedPeer = peerAddress.toLowerCase();
+    const router = useRouter();
+    const { data: walletClient } = useWalletClient();
+    const peer = peerAddress.toLowerCase();
 
-  const [profile, setProfile] = useState<UserProfile>({
-    displayName: normalizedPeer,
-    addressAbbrev: `${normalizedPeer.slice(0, 6)}…${normalizedPeer.slice(-4)}`,
-  });
-  const [services, setServices] = useState<ServiceDetails[]>([]);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [loadingServices, setLoadingServices] = useState(true);
-  const [processingId, setProcessingId] = useState<bigint | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
+    // Perfil
+    const [profile, setProfile] = useState<UserProfile>({
+        displayName: peer,
+        addressAbbrev: `${peer.slice(0, 6)}…${peer.slice(-4)}`,
+    });
+    const [loadingProfile, setLoadingProfile] = useState(true);
 
-  const { setFrameReady, isFrameReady } = useMiniKit();
+    // Servicios
+    const [services, setServices] = useState<ServiceDetails[]>([]);
+    const [ratings, setRatings] = useState<Record<string, number>>({});
+    const [reviews, setReviews] = useState<Record<string, any[]>>({});
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [loadingServices, setLoadingServices] = useState(true);
 
-  useEffect(() => {
-    if (!isFrameReady) setFrameReady();
-    (async () => {
-      await sdk.actions.ready({ disableNativeGestures: true });
-    })();
-  }, [isFrameReady, setFrameReady]);
+    // Compra
+    const [processingId, setProcessingId] = useState<bigint | null>(null);
+    const [showSuccess, setShowSuccess] = useState(false);
 
-  // Load Farcaster/ENS profile
-  useEffect(() => {
-    if (!normalizedPeer) return;
-    let active = true;
-    (async () => {
-      try {
-        const warp = new WarpcastService();
-        const ids = [`farcaster,${normalizedPeer}`];
-        let bioProfiles: Web3BioProfile[] = [];
-        try {
-          bioProfiles = await warp.getWeb3BioProfiles(ids);
-        } catch {
-          bioProfiles = [];
+    // Cargar perfil (Farcaster + ENS)
+    useEffect(() => {
+        if (!peer) return;
+        let active = true;
+        (async () => {
+            try {
+                const warp = new WarpcastService();
+                const bios = await warp.getWeb3BioProfiles([`farcaster,${peer}`]).catch(() => []);
+                const map: Record<string, Web3BioProfile> = {};
+                bios.forEach((p) =>
+                    p.aliases?.forEach((a) => {
+                        const [, addr] = a.split(",");
+                        map[addr.toLowerCase()] = p;
+                    })
+                );
+                const bp = map[peer];
+                if (bp && active) {
+                    setProfile({
+                        displayName: bp.displayName || peer,
+                        avatarUrl: bp.avatar,
+                        addressAbbrev: `${peer.slice(0, 6)}…${peer.slice(-4)}`,
+                        description: bp.description,
+                        links: {
+                            farcaster:
+                                bp.links?.farcaster && {
+                                    link: bp.links.farcaster.link,
+                                    handle: bp.links.farcaster.handle,
+                                },
+                            twitter:
+                                bp.links?.twitter && {
+                                    link: bp.links.twitter.link,
+                                    handle: bp.links.twitter.handle,
+                                },
+                        },
+                    });
+                } else {
+                    const ens = await resolveEnsName(peer).catch(() => null);
+                    if (ens && active) {
+                        setProfile((prev) => ({ ...prev, displayName: ens }));
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                active && setLoadingProfile(false);
+            }
+        })();
+        return () => {
+            active = false;
+        };
+    }, [peer]);
+
+    // Cargar servicios + ratings + reviews
+    useEffect(() => {
+        if (!peer) return;
+        let active = true;
+        (async () => {
+            try {
+                const ids = await getServicesBy(peer as `0x${string}`);
+                const svcs: ServiceDetails[] = [];
+                for (const id of ids) {
+                    const svc = await getService(id);
+                    if (svc.active && svc.seller.toLowerCase() === peer) {
+                        svcs.push(svc);
+                    }
+                }
+                if (!active) return;
+                setServices(svcs);
+
+                const ratingEntries = await Promise.all(
+                    svcs.map((svc) =>
+                        getAverageRating(svc.id).then((avg) => [svc.id.toString(), avg] as [string, number])
+                    )
+                );
+                active && setRatings(Object.fromEntries(ratingEntries));
+
+                const reviewEntries = await Promise.all(
+                    svcs.map(async (svc) => {
+                        const sales = await getSalesBy(svc.seller);
+                        const buyers = sales.filter((r) => r.serviceId === svc.id).map((r) => r.buyer);
+                        const revs = await Promise.all(
+                            buyers.map((b) =>
+                                getReview(svc.id, b).then((r) => ({
+                                    buyer: b,
+                                    quality: r.quality,
+                                    communication: r.communication,
+                                    timeliness: r.timeliness,
+                                    comment: r.comment,
+                                }))
+                            )
+                        );
+                        return [svc.id.toString(), revs] as [string, any[]];
+                    })
+                );
+                active && setReviews(Object.fromEntries(reviewEntries));
+            } catch (e) {
+                console.error(e);
+                toast.error("Error loading services");
+            } finally {
+                active && setLoadingServices(false);
+            }
+        })();
+        return () => {
+            active = false;
+        };
+    }, [peer]);
+
+    // Compra
+    const ensureBase = async () => {
+        if (!walletClient) throw new Error("Wallet not connected");
+        if (walletClient.chain?.id !== 8453) {
+            await walletClient.switchChain({ id: 8453 });
         }
-        const aliasMap: Record<string, Web3BioProfile> = {};
-        bioProfiles.forEach((p) =>
-          p.aliases?.forEach((alias) => {
-            const [, addr] = alias.split(",");
-            aliasMap[addr.toLowerCase()] = p;
-          })
-        );
-        const bp = aliasMap[normalizedPeer];
-        if (bp?.displayName && active) {
-          setProfile({
-            displayName: bp.displayName,
-            avatarUrl: bp.avatar || undefined,
-            addressAbbrev: `${normalizedPeer.slice(0, 6)}…${normalizedPeer.slice(-4)}`,
-          });
-          return;
-        }
-        // If no Farcaster name, try ENS
-        try {
-          const ens = await resolveEnsName(normalizedPeer);
-          if (ens && active) {
-            setProfile({
-              displayName: ens,
-              avatarUrl: undefined,
-              addressAbbrev: `${normalizedPeer.slice(0, 6)}…${normalizedPeer.slice(-4)}`,
-            });
+    };
+    const handleBuy = async (id: bigint, price: bigint) => {
+        if (!walletClient) {
+            toast.error("Connect your wallet first");
             return;
-          }
-        } catch {
-          // ignore ENS failure
         }
-      } catch {
-        // ignore errors
-      } finally {
-        if (active) setLoadingProfile(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [normalizedPeer]);
-
-  // Load services offered by peer
-  useEffect(() => {
-    if (!normalizedPeer) return;
-    let active = true;
-    (async () => {
-      try {
-        const ids: bigint[] = await getServicesBy(normalizedPeer as `0x${string}`);
-        const loaded: ServiceDetails[] = [];
-        for (const id of ids) {
-          const svc = await getService(id);
-          if (svc.active && svc.seller.toLowerCase() === normalizedPeer) {
-            loaded.push(svc);
-          }
+        setProcessingId(id);
+        try {
+            await ensureBase();
+            const hash = await purchaseService(walletClient, id, price);
+            await publicClient.waitForTransactionReceipt({ hash });
+            setShowSuccess(true);
+        } catch (e: any) {
+            console.error(e);
+            toast.error(e.message || "Purchase failed");
+        } finally {
+            setProcessingId(null);
         }
-        if (active) setServices(loaded);
-      } catch (e: any) {
-        console.error(e);
-        if (active) setError("Failed to load services");
-      } finally {
-        if (active) setLoadingServices(false);
-      }
-    })();
-    return () => {
-      active = false;
     };
-  }, [normalizedPeer]);
+    const closeSuccess = () => {
+        setShowSuccess(false);
+        router.push(`/?view=home`);
+    };
 
-  // Ensure network is Base before writing
-  const ensureBase = async () => {
-    if (!walletClient) throw new Error("Wallet not connected");
-    if (walletClient.chain?.id !== 8453) {
-      await walletClient.switchChain({ id: 8453 });
+    // Loading
+    if (loadingProfile || loadingServices) {
+        return (
+            <div className="h-full flex items-center justify-center bg-[#0f0d14] text-white">
+                <p className="text-gray-400">Loading…</p>
+            </div>
+        );
     }
-  };
 
-  // Handle service purchase with publicClient.waitForTransactionReceipt
-  const handlePurchase = async (svc: ServiceDetails) => {
-    if (!walletClient) {
-      toast.error("Connect your wallet first");
-      return;
-    }
-    setError(null);
-    setProcessingId(svc.id);
-    try {
-      await ensureBase();
-      const hash = await purchaseService(walletClient, svc.id, svc.price);
-      await publicClient.waitForTransactionReceipt({ hash });
-      setShowSuccess(true);
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e.message || "Purchase failed");
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleCloseSuccess = () => {
-    setShowSuccess(false);
-    router.push(`/conversation/${normalizedPeer}`);
-  };
-
-  if (!normalizedPeer) {
     return (
-      <div className="h-full flex items-center justify-center bg-[#0f0d14] text-white">
-        <p className="text-gray-400">Invalid address</p>
-      </div>
-    );
-  }
-
-  if (loadingProfile) {
-    return (
-      <div className="h-full flex items-center justify-center bg-[#0f0d14] text-white">
-        <p className="text-gray-400">Loading profile…</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-[#0f0d14] text-white p-4 max-w-lg mx-auto flex-1 flex flex-col min-h-0 max-h-screen">
-      <button
-        onClick={() => router.push("/")}
-        className="mb-4 flex items-center justify-center text-purple-400 text-lg px-4 py-2 bg-[#1a1725] rounded-lg max-w-[200px]"
-      >
-        <FiArrowLeft className="w-5 h-5 mr-2" />
-        Back
-      </button>
-
-      <div className="flex items-center space-x-4 mb-6">
-        {profile.avatarUrl ? (
-          <img
-            src={profile.avatarUrl}
-            alt={profile.displayName}
-            className="w-12 h-12 rounded-full object-cover border-2 border-purple-500"
-          />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center border-2 border-purple-500">
-            <FiUser className="w-6 h-6 text-gray-400" />
-          </div>
-        )}
-        <div>
-          <h1 className="text-2xl font-semibold">{profile.displayName}</h1>
-          <p className="text-sm text-gray-400">{profile.addressAbbrev}</p>
-        </div>
-      </div>
-
-      {loadingServices ? (
-        <p className="text-gray-400">Loading services…</p>
-      ) : error ? (
-        <p className="mb-4 text-red-500">{error}</p>
-      ) : services.length === 0 ? (
-        <p className="text-gray-400">No active services found</p>
-      ) : (
-        <ul className="space-y-6 flex-1 overflow-y-auto px-2 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
-          {services.map((svc) => (
-            <li
-              key={svc.id.toString()}
-              className="bg-[#1a1725] p-6 rounded-2xl shadow hover:shadow-2xl transition flex flex-col"
-            >
-              <h2 className="text-xl font-semibold mb-2">{svc.title}</h2>
-              <p className="text-gray-300 mb-4 line-clamp-3">{svc.description}</p>
-              <div className="mt-auto flex items-center justify-between">
-                <span className="text-xl font-bold">
-                  {ethers.formatEther(svc.price)} ETH
-                </span>
+        <div className="bg-[#0f0d14] text-white flex flex-col h-screen">
+            <header className="p-4">
                 <button
-                  onClick={() => handlePurchase(svc)}
-                  disabled={processingId === svc.id}
-                  className="inline-flex items-center px-5 py-2 bg-purple-600 hover:bg-purple-700 rounded-full transition disabled:opacity-50"
+                    onClick={() => router.push(`/?view=home`)}
+                    className="flex items-center text-purple-400"
                 >
-                  {processingId === svc.id && (
-                    <FiShoppingCart className="mr-2 animate-spin" />
-                  )}
-                  {processingId === svc.id ? "Processing…" : "Buy"}
+                    <FiArrowLeft className="mr-2" />
+                    Back to home
                 </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+            </header>
 
-      {processingId && <LoadingOverlay />}
+            <main className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+                {/* Perfil */}
+                <section className="text-center space-y-2">
+                    <div className="flex">
+                        {profile.avatarUrl ? (
+                            <img
+                                src={profile.avatarUrl}
+                                alt={profile.displayName}
+                                className="mx-auto w-16 h-14 rounded-full border-2 border-purple-500"
+                            />
+                        ) : (
+                            <div className="mx-auto w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center border-2 border-purple-500">
+                                <FiUser className="w-6 h-6 text-gray-400" />
+                            </div>
+                        )}
+                        <div className="flex-1 justify-start items-start">
+                            <h1 className="text-2xl font-semibold">{profile.displayName}</h1>
+                            <a href={`https://basescan.org/address/${peer}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block text-sm text-gray-400 hover:underline">
+                                {profile.addressAbbrev}
+                            </a></div>
+                    </div>
 
-      {showSuccess && (
-        <SuccessModal
-          peerAddress={normalizedPeer}
-          onClose={handleCloseSuccess}
-        />
-      )}
-    </div>
-  );
+                    {profile.description && (
+                        <p className="text-sm text-gray-400">
+                            {profile.description}
+                        </p>
+                    )}
+                    <div className="flex justify-center space-x-6">
+                        {profile.links?.farcaster && (
+                            <a
+                                href={profile.links.farcaster.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center space-x-1 transition-opacity hover:opacity-80"
+                            >
+                                <img
+                                    src="/logos/farcaster-2025.png"
+                                    width={26}
+                                    height={26}
+                                    alt="Farcaster"
+                                />
+                                <span className="text-xs text-indigo-300">
+                                    {profile.links.farcaster.handle}
+                                </span>
+                            </a>
+                        )}
+                        {profile.links?.twitter && (
+                            <a
+                                href={profile.links.twitter.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center space-x-1 transition-opacity hover:opacity-80"
+                            >
+                                <img
+                                    src="/logos/x-2025.png"
+                                    width={26}
+                                    height={26}
+                                    alt="X"
+                                />
+                                <span className="text-xs text-blue-300">
+                                    @{profile.links.twitter.handle}
+                                </span>
+                            </a>
+                        )}
+                    </div>
+                </section>
+
+                {/* Servicios */}
+                <section className="space-y-4">
+                    {services.length === 0 ? (
+                        <p className="text-gray-400 text-center">No services found</p>
+                    ) : (
+                        services.map((svc) => (
+                            <ServiceCard
+                                key={svc.id.toString()}
+                                svc={svc}
+                                prof={{
+                                    name: profile.displayName,
+                                    avatarUrl: profile.avatarUrl,
+                                }}
+                                avgRating={ratings[svc.id.toString()] ?? 0}
+                                reviews={reviews[svc.id.toString()] || []}
+                                isExpanded={expandedId === svc.id.toString()}
+                                onToggleReviews={(id) =>
+                                    setExpandedId((prev) =>
+                                        prev === id.toString() ? null : id.toString()
+                                    )
+                                }
+                                onBuy={handleBuy}
+                                processingId={processingId}
+                                walletConnected={!!walletClient}
+                            />
+                        ))
+                    )}
+                </section>
+            </main>
+
+            {processingId && <LoadingOverlay />}
+            {showSuccess && <SuccessModal peerAddress={peer} onClose={closeSuccess} />}
+        </div>
+    );
 }

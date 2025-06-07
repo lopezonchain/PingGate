@@ -306,7 +306,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-400">
+      <div className="flex items-center justify-center h-screen text-gray-400">
         Loading…
       </div>
     );

@@ -1,4 +1,4 @@
-// src/app/page.tsx
+// src/app/page-client.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, ReactNode, useRef } from "react";
@@ -266,9 +266,9 @@ export default function Page(): JSX.Element {
 
   return (
     <div className="flex flex-col bg-[#0f0d14] font-sans text-[var(--app-foreground)] mini-app-theme">
-      <div className="w-full max-w-md mx-auto px-1 py-3 h-screen flex flex-col">
+      <div className="w-full max-w-md mx-auto px-1 h-screen flex flex-col">
         <header className="flex justify-between items-center mb-3 h-11">
-          <div className="flex justify-end space-x-2 w-full z-50">
+          <div className="flex justify-end space-x-2 w-full z-50 pt-2">
 
             <Wallet>
               <ConnectWallet>
