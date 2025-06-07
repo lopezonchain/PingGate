@@ -11,6 +11,7 @@ import {
   IdentifierKind,
   SortDirection,
   Dm,
+  SafeInboxState,
 } from "@xmtp/browser-sdk";
 import { useWalletClient } from "wagmi";
 import {
@@ -49,6 +50,7 @@ interface ExtendedConversation extends Conversation {
   hasUnread?: boolean;
   peerInboxId?: string;       // El inbox ID del peer (string)
   peerWalletAddress?: string; // La(s) dirección(es) ETH asociada(s), selec. la principal
+  peerKey: string;
 }
 
 type Tab = "sales" | "purchases" | "all";
@@ -172,99 +174,88 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
     }
   };
 
-  useEffect(() => {
-    if (!xmtpClient || !myInboxId) return;
-    let active = true;
+  // Fuera de cualquier useEffect, dentro de InboxScreen:
+const loadConversations = async () => {
+   if (!xmtpClient) return 
+  setLoadingList(true)
+  // 1) sincroniza
+  await xmtpClient?.conversations.syncAll([ConsentState.Allowed])
+  // 2) lista
+  const list = await xmtpClient!.conversations.list()
 
-    const loadConversations = async () => {
-      setLoadingList(true);
+  const enriched: ExtendedConversation[] = []
+  for (const conv of list) {
+    if (!(conv.id && typeof conv.id === "string")) continue
 
+    // — obtener peerInboxId
+    let peerInbox: string | undefined
+    if (conv instanceof Dm) {
       try {
-        console.log("→ Syncing all conversations...");
-        await xmtpClient.conversations.syncAll([ConsentState.Allowed]);
-
-        console.log("→ Listing conversations...");
-        const list = await xmtpClient.conversations.list();
-
-        const enrichedConvs: ExtendedConversation[] = [];
-
-        for (const conv of list) {
-          if (!active) break;
-
-          // Verificación defensiva por si viene corrupto
-          if (!conv?.id || typeof conv.id !== "string") {
-            console.warn("Skipping conversation with invalid ID:", conv);
-            continue;
-          }
-
-          let peerInbox: string | undefined;
-          try {
-            if (conv instanceof Dm) {
-              peerInbox = await conv.peerInboxId();
-            }
-          } catch (err) {
-            console.warn("Failed to get peerInboxId for conversation:", conv.id, err);
-            continue; // skip corrupt
-          }
-
-          let peerWallet: string | undefined;
-          try {
-            if (peerInbox) {
-              const [state] = await xmtpClient.preferences.inboxStateFromInboxIds([peerInbox], true);
-              const ethId = state?.accountIdentifiers?.find(i => i.identifierKind === "Ethereum");
-              peerWallet = ethId?.identifier?.toLowerCase();
-            }
-          } catch (err) {
-            console.warn("Failed to resolve wallet for inboxId", peerInbox, err);
-            // No continue — solo omitimos peerWallet (podría seguir siendo útil)
-          }
-
-          let updatedAt: Date | undefined;
-          let hasUnread = false;
-          try {
-            const [lastMsg] = await conv.messages({
-              limit: BigInt(1),
-              direction: SortDirection.Descending,
-            });
-
-            if (lastMsg) {
-              updatedAt = new Date(Number(lastMsg.sentAtNs / BigInt(1e6)));
-              hasUnread = lastMsg.senderInboxId !== myInboxId;
-            }
-          } catch (err) {
-            console.warn("Failed to fetch messages for", conv.id, err);
-            // no continue, permitimos mostrar la conversación aunque vacía
-          }
-
-          const ext = conv as unknown as ExtendedConversation;
-          ext.updatedAt = updatedAt;
-          ext.hasUnread = hasUnread;
-          ext.peerInboxId = peerInbox;
-          ext.peerWalletAddress = peerWallet;
-
-          enrichedConvs.push(ext);
-        }
-
-        enrichedConvs.sort(
-          (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
-        );
-
-        if (active) {
-          setConversations(enrichedConvs);
-          setLoadingList(false);
-        }
-      } catch (err) {
-        console.error("Unexpected error while loading conversations", err);
-        if (active) setLoadingList(false);
+        peerInbox = await conv.peerInboxId()
+      } catch (e) {
+        console.warn("No pude obtener peerInboxId", e)
       }
-    };
+    }
 
-    loadConversations();
+    // — resolver peerWalletAddress a partir de peerInboxId
+    let peerWallet: string | undefined
+    if (peerInbox) {
+      try {
+        const [state] = await xmtpClient.preferences.inboxStateFromInboxIds(
+          [peerInbox],
+          true
+        )
+        const ethId = state?.accountIdentifiers?.find(
+          (i) => i.identifierKind === "Ethereum"
+        )
+        peerWallet = ethId?.identifier.toLowerCase()
+      } catch (e) {
+        console.warn("Error resolviendo peerWalletAddress", e)
+      }
+    }
 
-    return () => {
-      active = false;
-    };
-  }, [xmtpClient, myInboxId]);
+    // — última fecha y unread
+    let updatedAt: Date | undefined
+    let hasUnread = false
+    try {
+      const [last] = await conv.messages({
+        limit: BigInt(1),
+        direction: SortDirection.Descending,
+      })
+      if (last) {
+        updatedAt = new Date(Number(last.sentAtNs / BigInt(1e6)))
+        hasUnread = last.senderInboxId !== myInboxId
+      }
+    } catch {
+      /* swallow */
+    }
+
+    // — arma el objeto extendido
+    const ext = conv as unknown as ExtendedConversation
+    ext.peerInboxId = peerInbox
+    ext.peerWalletAddress = peerWallet
+    ext.updatedAt = updatedAt
+    ext.hasUnread = hasUnread
+    // — peerKey usa preferentemente wallet
+    ext.peerKey = peerWallet || peerInbox!
+
+    enriched.push(ext)
+  }
+
+  // ordena por updatedAt desc
+  enriched.sort(
+    (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
+  )
+  setConversations(enriched)
+  setLoadingList(false)
+}
+
+useEffect(() => {
+  if (!xmtpClient || !myInboxId) return
+  let active = true
+  loadConversations().catch(console.error)
+  return () => { active = false }
+}, [xmtpClient, myInboxId])
 
   // Stream de nuevas conversaciones (DMs) para agregarlas al estado al vuelo
   useEffect(() => {
@@ -278,14 +269,23 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
 
       // → Construir el stub como antes
       let peerInbox: string | undefined;
-      let peerWallet: string | undefined;
-      try {
-        peerInbox = await newConv.peerInboxId();
-        const [state] = await xmtpClient.preferences.inboxStateFromInboxIds([peerInbox!], true);
-        const ethId = state?.accountIdentifiers?.find(i => i.identifierKind === "Ethereum");
-        peerWallet = ethId?.identifier?.toLowerCase();
-      } catch {
-        /* omitido */
+      let peerWallet: string | undefined
+      if (peerInbox) {
+        // 1) Llamada **sin** optional chaining
+        const states: SafeInboxState[] = await xmtpClient.preferences.inboxStateFromInboxIds(
+          [peerInbox],
+          true
+        )
+        // 2) Comprueba que vino algo
+        if (states.length > 0) {
+          const state = states[0]
+          // 3) Anota el tipo de 'i' para que TS sepa qué lleva dentro
+          const ethId = state.accountIdentifiers?.find(
+            (i: { identifierKind: IdentifierKind; identifier: string }) =>
+              i.identifierKind == "Ethereum"
+          )
+          peerWallet = ethId?.identifier.toLowerCase()
+        }
       }
 
       const metas = await newConv.messages({
@@ -638,24 +638,27 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
 
   // ✉️ Nuevo hilo (“composer”)
   const handleCreate = async () => {
-    setSending(true);
-    setErr(null);
+    setSending(true)
+    setErr(null)
     try {
-      if (!xmtpClient) throw new Error("XMTP not ready");
-      if (!to || !body) throw new Error("Fill all fields");
+      if (!xmtpClient) throw new Error("XMTP not ready")
+      if (!to || !body) throw new Error("Fill all fields")
 
-      const addr = await resolveRecipient(to);
+      const addr = await resolveRecipient(to)
       const peerIdentifier = {
         identifier: addr,
         identifierKind: "Ethereum" as IdentifierKind,
-      };
-      const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
-      await convo.send(body);
+      }
+      const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier)
+      await convo.send(body)
 
-      setShowComposer(false);
-      setTo("");
-      setBody("");
+      // ←—— Aquí refrescas el listado
+      await loadConversations()
 
+      setShowComposer(false)
+      setTo("")
+      setBody("")
+    
       // Obtenemos nuevamente el fid para la notificación
       const profile = profilesMap[addr] as Web3BioProfile | null;
       let fid = 0;
@@ -690,23 +693,20 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         console.error("Notify error:", e);
       }
     } catch (e: any) {
-      setErr(e.message);
-    } finally {
-      setSending(false);
-    }
+    setErr(e.message)
+  } finally {
+    setSending(false)
+  }
   };
 
   // — Filtrar conversaciones según pestaña (“sales”/“purchases”/“all”), pero ahora usando peerWalletAddress
   const filtered = conversations.filter((c) => {
-    const peerWA = c.peerWalletAddress;
-    if (!peerWA) {
-      // Si no hay dirección (por ejemplo, es un grupo sin ETH asociado), no lo mostramos
-      return false;
-    }
-    const peer = peerWA.toLowerCase();
-    if (tab === "sales") return soldPeers.has(peer);
-    if (tab === "purchases") return purchasedPeers.has(peer);
-    return true;
+    const key = c.peerKey;
+    if (!key) return false;
+
+    if (tab === "sales")   return soldPeers.has(key);
+    if (tab === "purchases") return purchasedPeers.has(key);
+    return true; // “all” muestra todo, incluso sin wallet
   });
 
   if (loadingList) {
@@ -799,7 +799,12 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
             </div>
           ) : (
             filtered.map((conv, idx) => {
-              const peer = conv.peerWalletAddress!.toLowerCase();
+              const peerRaw = conv.peerWalletAddress ?? conv.peerInboxId;
+              if (!peerRaw) {
+                console.warn(`Conversation ${conv.id} with no peer`);
+                return null;
+              }
+              const peer = peerRaw.toLowerCase();
               const profile = profilesMap[peer];
               const label = profile
                 ? abbreviateAddress((profile as any).displayName)
@@ -820,7 +825,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
                     className="p-4 hover:bg-[#231c32] cursor-pointer"
                     onClick={() => {
                       if (isGated) return;
-                      setExpanded(isOpen ? null : peer);
+                      setExpanded(isOpen ? null : conv.peerKey);
                     }}
                   >
                     <div className="flex items-center space-x-2 mb-2">
