@@ -62,7 +62,7 @@ export async function generateMetadata({
 // Fallback mientras carga React
 function LoadingUser() {
   return (
-    <div className="h-full flex items-center justify-center bg-[#0f0d14] text-white">
+    <div className="h-screen flex items-center justify-center bg-[#0f0d14] text-white">
       <p className="text-gray-400">Loading profile…</p>
     </div>
   );

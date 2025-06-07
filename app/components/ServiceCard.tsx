@@ -103,7 +103,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
         </p>
       ) : (
         <p className="text-sm text-gray-400 mb-2">
-          Be the first buying this service!
+          ⭐ 0 reviews
         </p>
       )}
 
@@ -122,8 +122,8 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
       )}
 
       {/* Footer: precio y botón de compra */}
-      <div className="mt-auto flex items-center justify-between">
-        <span className="text-xl font-bold">
+      <div className="mt-auto flex items-center justify-end">
+        <span className="text-xl font-bold mr-4">
           {ethers.formatEther(svc.price)} ETH
         </span>
         <button

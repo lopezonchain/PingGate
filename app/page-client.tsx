@@ -1,13 +1,17 @@
 // src/app/page-client.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, ReactNode, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  ReactNode,
+  useRef,
+} from "react";
 import { useAccount, useWalletClient, useConnect } from "wagmi";
-import { useSearchParams } from "next/navigation";
-import {
-  useMiniKit,
-  useAddFrame,
-} from "@coinbase/onchainkit/minikit";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMiniKit, useAddFrame } from "@coinbase/onchainkit/minikit";
 import {
   Name,
   Identity,
@@ -22,24 +26,28 @@ import {
   WalletDropdownDisconnect,
   WalletModal,
 } from "@coinbase/onchainkit/wallet";
-import { sdk } from '@farcaster/frame-sdk';
+import { sdk } from "@farcaster/frame-sdk";
 
-import { base,baseSepolia} from "wagmi/chains";
+import { base, baseSepolia } from "wagmi/chains";
 import PingGateHome from "./components/PingGateHome";
 import InboxScreen from "./components/InboxScreen";
-import MyPlansScreen from "./components/MyServicesScreen";
 import ReviewsScreen from "./components/ReviewsScreen";
 import ExploreScreen from "./components/ExploreScreen";
 import MyServicesScreen from "./components/MyServicesScreen";
 import FAQScreen from "./components/FAQScreen";
 
-export type WarpView = "home" | "inbox" | "myplans" | "explore" | "reviews" | "faq" ;
+export type WarpView =
+  | "home"
+  | "inbox"
+  | "myservices"
+  | "explore"
+  | "reviews"
+  | "faq";
 
 const chainOptions = [
   { label: "Sepolia", chain: baseSepolia },
   { label: "Base", chain: base },
 ] as const;
-
 
 type ButtonProps = {
   children: ReactNode;
@@ -50,7 +58,7 @@ type ButtonProps = {
   disabled?: boolean;
   type?: "button" | "submit" | "reset";
   icon?: ReactNode;
-}
+};
 
 export function Button({
   children,
@@ -85,7 +93,9 @@ export function Button({
   return (
     <button
       type={type}
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      className={`${baseClasses} ${variantClasses[variant]} ${
+        sizeClasses[size]
+      } ${className}`}
       onClick={onClick}
       disabled={disabled}
     >
@@ -99,7 +109,7 @@ type IconProps = {
   name: "heart" | "star" | "check" | "plus" | "arrow-right";
   size?: "sm" | "md" | "lg";
   className?: string;
-}
+};
 
 export function Icon({ name, size = "md", className = "" }: IconProps) {
   const sizeClasses = {
@@ -194,49 +204,59 @@ export function Icon({ name, size = "md", className = "" }: IconProps) {
     </span>
   );
 }
-
 export default function Page(): JSX.Element {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { address } = useAccount();
   const { connectAsync, connectors } = useConnect();
   const { data: walletClient } = useWalletClient();
-  const searchParams = useSearchParams();
+
+  // inicializar warpView desde la query o "home"
+  const initialView = (searchParams.get("view") ?? "home") as WarpView;
+  const [warpView, setWarpView] = useState<WarpView>(initialView);
+
   const { setFrameReady, isFrameReady, context } = useMiniKit();
   const addFrame = useAddFrame();
-
-  const [warpView, setWarpView] = useState<WarpView>("home");
   const [frameAdded, setFrameAdded] = useState(false);
-  const [selectedChain, setSelectedChain] = useState<any>(base);
   const triedAutoConnect = useRef(false);
 
+  // sincronizar warpView cada vez que cambie la query param
+  useEffect(() => {
+    const v = (searchParams.get("view") ?? "home") as WarpView;
+    setWarpView(v);
+  }, [searchParams]);
+
+  // Preparar OnChainKit frame
   useEffect(() => {
     if (!isFrameReady) setFrameReady();
-    (async () => {
-      await sdk.actions.ready({ disableNativeGestures: true });
-    })();
+    sdk.actions.ready({ disableNativeGestures: true });
   }, [isFrameReady, setFrameReady]);
 
+  // Auto-conectar wallet inyectada
   useEffect(() => {
     if (!triedAutoConnect.current && !address && connectors.length) {
       triedAutoConnect.current = true;
-      const injected = connectors.find((c) => c.id === "injected") ?? connectors[0];
+      const injected =
+        connectors.find((c) => c.id === "injected") ?? connectors[0];
       connectAsync({ connector: injected });
     }
   }, [address, connectors, connectAsync]);
 
+  // Forzar Base si cambia de chain
   useEffect(() => {
-    if (walletClient) {
-      const found = chainOptions.find((o) => o.chain.id === walletClient.chain.id);
-      if (found && selectedChain.id !== found.chain.id) {
-        setSelectedChain(found.chain);
-      }
+    if (walletClient && walletClient.chain?.id !== base.id) {
+      walletClient.switchChain({ id: base.id }).catch(() => {});
     }
-  }, [walletClient, selectedChain.id]);
+  }, [walletClient]);
 
-  useEffect(() => {
-    const w = searchParams.get("wallet");
-    const a = searchParams.get("amount");
-    // TODO if (w && a) setWarpView("send");
-  }, [searchParams]);
+  // onAction que hace push shallow y actualiza warpView
+  const onAction = useCallback(
+    (view: WarpView) => {
+      router.push(`?view=${view}`);
+      // setWarpView(view); // no es necesario, el efecto lo sincroniza
+    },
+    [router]
+  );
 
   const handleAddFrame = useCallback(async () => {
     const added = await addFrame();
@@ -246,7 +266,13 @@ export default function Page(): JSX.Element {
   const saveFrameButton = useMemo(() => {
     if (context && !context.client.added) {
       return (
-        <Button variant="ghost" size="md" onClick={handleAddFrame} className="p-1" icon={<Icon name="star" size="sm" />}>
+        <Button
+          variant="ghost"
+          size="md"
+          onClick={handleAddFrame}
+          className="p-1"
+          icon={<Icon name="star" size="sm" />}
+        >
           Enable Notifications
         </Button>
       );
@@ -262,14 +288,11 @@ export default function Page(): JSX.Element {
     return null;
   }, [context, frameAdded, handleAddFrame]);
 
-  const handleBack = () => setWarpView("home");
-
   return (
     <div className="flex flex-col bg-[#0f0d14] font-sans text-[var(--app-foreground)] mini-app-theme">
       <div className="w-full max-w-md mx-auto px-1 h-screen flex flex-col">
         <header className="flex justify-between items-center mb-3 h-11">
           <div className="flex justify-end space-x-2 w-full z-50 pt-2">
-
             <Wallet>
               <ConnectWallet>
                 <Avatar className="h-6 w-6" />
@@ -285,24 +308,28 @@ export default function Page(): JSX.Element {
                 <WalletDropdownDisconnect />
               </WalletDropdown>
             </Wallet>
-
             <div className="ml-4">{saveFrameButton}</div>
           </div>
-          
         </header>
 
         <main className="flex-1 overflow-hidden">
-          {warpView === "home" && <PingGateHome onAction={(view) => setWarpView(view)} />}
-          {warpView === "inbox" && (<InboxScreen onAction={(view) => setWarpView(view)} />)}
-          {warpView === "myplans" && (<MyServicesScreen onAction={(view) => setWarpView(view)} />)}
-          {warpView === "explore" && (<ExploreScreen onAction={(view) => setWarpView(view)} />)}
-          {warpView === "reviews" && (<ReviewsScreen onAction={(view) => setWarpView(view)} />)}
-          {warpView === "faq" && (<FAQScreen onAction={(view) => setWarpView(view)} />)}
+          {warpView === "home" && <PingGateHome onAction={onAction} />}
+          {warpView === "inbox" && <InboxScreen onAction={onAction} />}
+          {warpView === "myservices" && (
+            <MyServicesScreen onAction={onAction} />
+          )}
+          {warpView === "explore" && <ExploreScreen onAction={onAction} />}
+          {warpView === "reviews" && <ReviewsScreen onAction={onAction} />}
+          {warpView === "faq" && <FAQScreen onAction={onAction} />}
         </main>
       </div>
-       <WalletModal isOpen={false} onClose={function (): void {
-        throw new Error("Function not implemented.");
-      } } />
+
+      <WalletModal
+        isOpen={false}
+        onClose={() => {
+          /* implementar si es necesario */
+        }}
+      />
     </div>
   );
 }

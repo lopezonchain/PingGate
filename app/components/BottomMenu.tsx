@@ -24,7 +24,7 @@ const BottomMenu: React.FC<BottomMenuProps> = ({ onAction }) => {
           { key: "reviews", icon: FiStar, label: "Reviews", view: "reviews" as const },
           // Central “Pings”
           { key: "inbox", icon: FiMessageSquare, label: "Pings", view: "inbox" as const, highlighted: true },
-          { key: "myplans", icon: FiBriefcase, label: "MyServices", view: "myplans" as const },
+          { key: "myservices", icon: FiBriefcase, label: "MyServices", view: "myservices" as const },
           { key: "explore", icon: FiSearch, label: "Explore", view: "explore" as const },
         ].map(({ key, icon: Icon, label, view, highlighted }) => (
           <li key={key} className="flex-1">

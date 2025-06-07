@@ -248,7 +248,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
             { a: "faq", Icon: FiHelpCircle, label: "FAQ", desc: "Frequently asked questions, answered" },
             { a: "inbox", Icon: FiMessageSquare, label: "Pings", desc: "Check your messages, start new conversations" },
             { a: "reviews", Icon: FiStar, label: "Reviews", desc: "Create and manage services you bought" },
-            { a: "myplans", Icon: FiBriefcase, label: "My Services", desc: "Create and manage your offerings" },
+            { a: "myservices", Icon: FiBriefcase, label: "My Services", desc: "Create and manage your offerings" },
           ].map(({ a, Icon, label, desc }) => (
             <div
               key={a}
@@ -262,7 +262,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
                 <Icon size={24} className="text-purple-400" />
                 <span className="text-purple-400 font-medium">{label}</span>
               </div>
-              <p className="text-xs text-gray-400 mt-1">{desc}</p>
+              <p className="text-xs text-gray-400 mt-1 max-width-[50%]">{desc}</p>
             </div>
           ))}
         </div>
