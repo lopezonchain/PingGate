@@ -130,7 +130,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
     const whole = w / WEI;
     const frac = w % WEI;
     if (frac === BigInt(0)) return whole.toString();
-    let s = frac.toString().padStart(18, "0").replace(/0+$/, "");
+    const s = frac.toString().padStart(18, "0").replace(/0+$/, "");
     return `${whole.toString()}.${s}`;
   };
 
