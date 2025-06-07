@@ -127,7 +127,7 @@ export default function MessageInput({ onSend }: MessageInputProps) {
       <div className="mt-3 flex items-end space-x-2">
         <button
           onClick={openMenu}
-          className="p-2 mb-2 bg-[#2a2438] text-white rounded-lg"
+          className="p-4 mb-2 bg-[#2a2438] text-white rounded-lg"
         >
           <FiPlus />
         </button>
@@ -183,7 +183,7 @@ export default function MessageInput({ onSend }: MessageInputProps) {
       {menuOpen && menuAnchor && (
         <div
           className={`
-            fixed z-[60] bg-[#0f0d14] rounded-lg shadow-lg p-2 flex flex-col space-y-1
+            fixed z-[60] bg-[#0f0d14] rounded-lg shadow-lg p-4 flex flex-col space-y-1
             w-56 sm:w-40 min-w-[250px] max-w-[300px] max-h-[50vh] overflow-auto
           `}
           style={{

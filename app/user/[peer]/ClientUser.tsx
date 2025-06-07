@@ -1,4 +1,3 @@
-// app/users/[peer]/ClientUser.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -25,6 +24,7 @@ import SuccessModal from "../../components/SuccessModal";
 import ServiceCard, { ServiceDetails } from "../../components/ServiceCard";
 import BottomMenu from "@/app/components/BottomMenu";
 import { WarpView } from "@/app/page-client";
+import { base } from "viem/chains";
 
 interface UserProfile {
   displayName: string;
@@ -68,6 +68,22 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
   const onAction = (view: WarpView) => {
     router.push(`/?view=${view}`);
   };
+
+  // Efecto para forzar Base al cargar la página
+  useEffect(() => {
+    if (!walletClient) return;
+    const ensureBase = async () => {
+      if (walletClient.chain?.id !== base.id) {
+        try {
+          await walletClient.switchChain({ id: base.id });
+          toast.loading("Switching to Base network...");
+        } catch {
+          toast.error("Please switch your wallet to the Base network");
+        }
+      }
+    };
+    ensureBase();
+  }, [walletClient]);
 
   // Cargar perfil (Farcaster + ENS)
   useEffect(() => {
@@ -183,12 +199,6 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
   }, [peer]);
 
   // Compra
-  const ensureBase = async () => {
-    if (!walletClient) throw new Error("Wallet not connected");
-    if (walletClient.chain?.id !== 8453) {
-      await walletClient.switchChain({ id: 8453 });
-    }
-  };
   const handleBuy = async (id: bigint, price: bigint) => {
     if (!walletClient) {
       toast.error("Connect your wallet first");
@@ -196,7 +206,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
     }
     setProcessingId(id);
     try {
-      await ensureBase();
+      // ya forzamos Base en el efecto de carga
       const hash = await purchaseService(walletClient, id, price);
       await publicClient.waitForTransactionReceipt({ hash });
       setShowSuccess(true);
@@ -207,6 +217,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
       setProcessingId(null);
     }
   };
+
   const closeSuccess = () => {
     setShowSuccess(false);
     router.push(`/?view=home`);
@@ -270,8 +281,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
                 href={profile.links.farcaster.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center space-x-1 transition-  
-opacity hover:opacity-80"
+                className="flex items-center space-x-1 transition-opacity hover:opacity-80"
               >
                 <img
                   src="/logos/farcaster-2025.png"
@@ -280,7 +290,7 @@ opacity hover:opacity-80"
                   alt="Farcaster"
                 />
                 <span className="text-xs text-indigo-300">
-                  {profile.links.farcaster.handle}
+                  @{profile.links.farcaster.handle}
                 </span>
               </a>
             )}
@@ -328,12 +338,13 @@ opacity hover:opacity-80"
             ))
           )}
         </section>
-          {/* Menú inferior */}
-      <BottomMenu onAction={onAction} />
+
+        {/* Menú inferior */}
+        <BottomMenu onAction={onAction} />
       </main>
 
       {processingId && <LoadingOverlay />}
-      {showSuccess && <SuccessModal peerAddress={peer} onClose={closeSuccess} />}
+      {showSuccess && <SuccessModal peerAddress={peer} onClose={closeSuccess} />}    
     </div>
   );
 }

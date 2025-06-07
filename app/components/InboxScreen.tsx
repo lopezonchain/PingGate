@@ -268,90 +268,81 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
 
   // Stream de nuevas conversaciones (DMs) para agregarlas al estado al vuelo
   useEffect(() => {
-    if (!xmtpClient) return;
-    let active = true;
+  if (!xmtpClient) return;
+  let active = true;
 
-    (async () => {
-      const streamDms = await xmtpClient.conversations.streamDms();
-      for await (const maybeConv of streamDms as AsyncStream<Dm>) {
-        if (!active) break;
+  (async () => {
+    const streamDms = await xmtpClient.conversations.streamDms();
+    for await (const newConv of streamDms as AsyncStream<Dm>) {
+      if (!active || !newConv) break;
 
-        // Descartar el caso "undefined"
-        if (!maybeConv) continue;
-        const newConv = maybeConv; // ahora TS sabe que es Dm
-
-        try {
-          // peerInbox
-          let peerInbox: string | undefined;
-          try {
-            peerInbox = await newConv.peerInboxId();
-          } catch {
-            peerInbox = undefined;
-          }
-
-          // peerWallet
-          let peerWallet: string | undefined;
-          if (peerInbox) {
-            try {
-              const states = await xmtpClient.preferences.inboxStateFromInboxIds(
-                [peerInbox],
-                true
-              );
-              const oneState = states?.[0];
-              if (oneState) {
-                const ethId = oneState.accountIdentifiers.find(
-                  (i) => i.identifierKind === "Ethereum"
-                );
-                if (ethId?.identifier) {
-                  peerWallet = (ethId.identifier as string).toLowerCase();
-                }
-              }
-            } catch {
-              peerWallet = undefined;
-            }
-          }
-
-          // último mensaje (puede que aún no haya ninguno)
-          const metas = await newConv.messages({
-            limit: BigInt(1),
-            direction: SortDirection.Descending,
-          });
-          const lastMsg = metas[0];
-          const updatedAt =
-            lastMsg?.sentAtNs !== undefined
-              ? new Date(Number(lastMsg.sentAtNs / BigInt(1e6)))
-              : new Date();
-          const hasUnread = lastMsg
-            ? lastMsg.senderInboxId !== myInboxId
-            : false;
-
-          // Crear un ExtendedConversation basado en newConv
-          const ext = newConv as unknown as ExtendedConversation;
-          ext.updatedAt = updatedAt;
-          ext.hasUnread = hasUnread;
-          ext.peerInboxId = peerInbox;
-          ext.peerWalletAddress = peerWallet;
-
-          // Añadir al estado, comprobando que no exista ya
-          setConversations((prev) => {
-            const exists = prev.find((c) => c.id === ext.id);
-            if (exists) return prev;
-            const newList = [ext, ...prev];
-            newList.sort(
-              (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
-            );
-            return newList;
-          });
-        } catch (e) {
-          console.error("Error al procesar nueva conversación", e);
-        }
+      // → Construir el stub como antes
+      let peerInbox: string | undefined;
+      let peerWallet: string | undefined;
+      try {
+        peerInbox = await newConv.peerInboxId();
+        const [state] = await xmtpClient.preferences.inboxStateFromInboxIds([peerInbox!], true);
+        const ethId = state?.accountIdentifiers?.find(i => i.identifierKind === "Ethereum");
+        peerWallet = ethId?.identifier?.toLowerCase();
+      } catch {
+        /* omitido */
       }
-    })().catch(console.error);
 
-    return () => {
-      active = false;
-    };
-  }, [xmtpClient, myInboxId]);
+      const metas = await newConv.messages({
+        limit: BigInt(1),
+        direction: SortDirection.Descending,
+      });
+      const lastMsg = metas[0];
+      const updatedAt = lastMsg
+        ? new Date(Number(lastMsg.sentAtNs / BigInt(1e6)))
+        : new Date();
+      const hasUnread = lastMsg ? lastMsg.senderInboxId !== myInboxId : true;
+
+      const ext = newConv as unknown as ExtendedConversation;
+      ext.peerInboxId = peerInbox;
+      ext.peerWalletAddress = peerWallet;
+      ext.updatedAt = updatedAt;
+      ext.hasUnread = hasUnread;
+
+      // 1) Añadir a la lista
+      setConversations(prev => {
+        if (prev.find(c => c.id === ext.id)) return prev;
+        const next = [ext, ...prev];
+        next.sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()));
+        return next;
+      });
+
+      // 2) ¡Refetch inmediato para pillar el contenido YA indexado!
+      try {
+        await xmtpClient.conversations.syncAll([ConsentState.Allowed]);
+        const rawList = await xmtpClient.conversations.list();
+        const enriched: ExtendedConversation[] = [];
+        for (const conv of rawList) {
+          const [msg] = await conv.messages({ limit: BigInt(1), direction: SortDirection.Descending });
+          const date = msg
+            ? new Date(Number(msg.sentAtNs / BigInt(1e6)))
+            : new Date();
+          const unread = msg ? msg.senderInboxId !== myInboxId : false;
+          const ec = conv as unknown as ExtendedConversation;
+          ec.updatedAt = date;
+          ec.hasUnread = unread;
+          try {
+            if (conv instanceof Dm) {
+              ec.peerInboxId = await conv.peerInboxId();
+            }
+          } catch { }
+          enriched.push(ec);
+        }
+        enriched.sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()));
+        if (active) setConversations(enriched);
+      } catch {
+        /* ignora errores de refetch */
+      }
+    }
+  })().catch(console.error);
+
+  return () => { active = false; };
+}, [xmtpClient, myInboxId]);
 
 
   // Obtener compras y ventas: ahora “peerWalletAddress” en lugar de inbox ID
