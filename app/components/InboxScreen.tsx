@@ -794,7 +794,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
                 <p className="text-gray-400">You still don&apos;t have clients! Create your first service in &quot;My services&quot; (in the bottom menu) and start monetizing your Inbox!</p>
               )}
               {tab === "purchases" && (
-                <p className="text-gray-400">No experts contacted yet, you can find some in &gt; &quot;Explore&quot; (in the bottom menu)</p>
+                <p className="text-gray-400">No experts contacted yet, you can find some in &quot;Explore&quot; (in the bottom menu)</p>
               )}
             </div>
           ) : (
