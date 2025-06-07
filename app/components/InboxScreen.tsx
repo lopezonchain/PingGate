@@ -733,18 +733,13 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
               </h2>
             </div>
             <p>
-              Welcome to PingGate!! This is a chat-based marketplace where you can just chat or monetize your Inbox by offering services.
-              <br />
-              <br />
-              We use a very nice protocol for messaging called XMTP. XMTP requires a
-              signature the first time you join it so you can start using it,
+              The chat protocol requires a
+              signature the first time you join it so you can have your inbox,
               but don&apos;t worry, this is completely free!
               <br />
               <br />
               An additional signature could be needed when you access back to
               your inbox from a new device, or after memory cleans.
-              This is needed to decrypt your messages, as they are
-              secured and wallet2wallet encrypted.
               <a
                 className="block p-3 mt-3 bg-[#0F0D14]"
                 href="https://docs.xmtp.org/intro/intro"
@@ -805,10 +800,10 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
           ) : filtered.length === 0 && tab !== "all" ? (
             <div className="flex flex-col items-center justify-center text-center mt-8 px-4">
               {tab === "sales" && (
-                <p className="text-gray-400">You still don&apos;t have clients! Create your first service in Menu &gt; `&quot;My services`&quot; and start monetizing your Inbox!</p>
+                <p className="text-gray-400">You still don&apos;t have clients! Create your first service in `&quot;My services`&quot; (in the bottom menu) and start monetizing your Inbox!</p>
               )}
               {tab === "purchases" && (
-                <p className="text-gray-400">No experts contacted yet, you can find some in Menu &gt; `&quot;Explore`&quot;</p>
+                <p className="text-gray-400">No experts contacted yet, you can find some in &gt; `&quot;Explore`&quot; (in the bottom menu)</p>
               )}
             </div>
           ) : (
