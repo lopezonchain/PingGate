@@ -85,7 +85,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
           sellers.map(async (addr) => {
             const p = bioMap[addr];
             let name: string | undefined = p?.displayName;
-            let avatarUrl: string | undefined = p?.avatar;
+            const avatarUrl: string | undefined = p?.avatar;
             if (!name) {
               try {
                 const ens = await resolveEnsName(addr);
