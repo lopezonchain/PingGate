@@ -245,10 +245,10 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
         {/* GRID */}
         <div className="mt-1 grid grid-cols-2 gap-1 flex-shrink-0">
           {[
-            { a: "faq", Icon: FiHelpCircle, label: "FAQ", desc: "Get common questions" },
-            { a: "inbox", Icon: FiMessageSquare, label: "Pings", desc: "Check messages" },
-            { a: "reviews", Icon: FiStar, label: "Reviews", desc: "Your reviews" },
-            { a: "myplans", Icon: FiBriefcase, label: "My Services", desc: "Manage offerings" },
+            { a: "faq", Icon: FiHelpCircle, label: "FAQ", desc: "Frequently asked questions, answered" },
+            { a: "inbox", Icon: FiMessageSquare, label: "Pings", desc: "Check your messages, start new conversations" },
+            { a: "reviews", Icon: FiStar, label: "Reviews", desc: "Create and manage services you bought" },
+            { a: "myplans", Icon: FiBriefcase, label: "My Services", desc: "Create and manage your offerings" },
           ].map(({ a, Icon, label, desc }) => (
             <div
               key={a}
