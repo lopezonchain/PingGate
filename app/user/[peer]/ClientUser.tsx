@@ -1,4 +1,3 @@
-// app/users/[peer]/ClientUser.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -6,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useWalletClient } from "wagmi";
 import { FiArrowLeft, FiUser } from "react-icons/fi";
 import toast from "react-hot-toast";
+import { ethers } from "ethers";
 import {
     getServicesBy,
     getService,
@@ -317,6 +317,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
                 </section>
             </main>
 
+            {/* Moved inside returned JSX */}
             {processingId && <LoadingOverlay />}
             {showSuccess && <SuccessModal peerAddress={peer} onClose={closeSuccess} />}
         </div>
