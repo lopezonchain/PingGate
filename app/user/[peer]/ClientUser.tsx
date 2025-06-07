@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useWalletClient } from "wagmi";
 import { FiArrowLeft, FiUser } from "react-icons/fi";
 import toast from "react-hot-toast";
-import { ethers } from "ethers";
 import {
     getServicesBy,
     getService,
