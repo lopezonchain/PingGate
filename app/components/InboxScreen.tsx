@@ -314,7 +314,7 @@ useEffect(() => {
 
       // 2) ¡Refetch inmediato para pillar el contenido YA indexado!
       try {
-        await xmtpClient.conversations.syncAll([ConsentState.Allowed]);
+        await xmtpClient.conversations.syncAll();
         const rawList = await xmtpClient.conversations.list();
         const enriched: ExtendedConversation[] = [];
         for (const conv of rawList) {
@@ -539,45 +539,42 @@ useEffect(() => {
 
   // Cargar mensajes de la conversación “expanded” (igual que antes, usando peerInboxId para crear el DM)
   useEffect(() => {
-    if (!xmtpClient || !expanded) return;
-    let active = true;
+  if (!xmtpClient || !expanded) return;
+  let active = true;
 
-    (async () => {
-      const peerIdentifier = {
-        identifier: expanded,               // aquí “expanded” era la dirección ETH
-        identifierKind: "Ethereum" as IdentifierKind,
-      };
-      const convo = await xmtpClient.conversations.newDmWithIdentifier(
-        peerIdentifier
-      );
+  (async () => {
+    // 1) En lugar de newDmWithIdentifier, traes la misma instancia que ya está en el store
+    const convo = await xmtpClient.conversations.getConversationById(expanded);
+    // 2) Sincronizas con la red los mensajes históricos
+    await convo?.sync();
+    // 3) Lees los últimos 5 mensajes
+    const initial = await convo?.messages({
+      limit: BigInt(5),
+      direction: SortDirection.Descending,
+    });
+    if (!active) return;
 
-      // Cargar últimos 5 mensajes
-      const initial = await convo.messages({
-        limit: BigInt(5),
-        direction: SortDirection.Descending,
-      });
-      if (!active) return;
+    setMessages((prev) => ({
+      ...prev,
+      [expanded]: initial !== undefined ? initial.slice().reverse() : [],
+    }));
 
+    // Stream para nuevos mensajes
+    const streamSingle = await convo?.stream();
+    for await (const msg of streamSingle as AsyncStream<DecodedMessage>) {
+      if (!active) break;
       setMessages((prev) => ({
         ...prev,
-        [expanded]: initial.slice().reverse(),
+        [expanded]: ([...(prev[expanded] || []), msg] as DecodedMessage[]),
       }));
+    }
+  })().catch(console.error);
 
-      // Stream para nuevos mensajes
-      const streamSingle = await convo.stream();
-      for await (const msg of streamSingle as AsyncStream<DecodedMessage>) {
-        if (!active) break;
-        setMessages((prev) => ({
-          ...prev,
-          [expanded]: ([...(prev[expanded] || []), msg] as DecodedMessage[]),
-        }));
-      }
-    })().catch(console.error);
+  return () => {
+    active = false;
+  };
+}, [xmtpClient, expanded]);
 
-    return () => {
-      active = false;
-    };
-  }, [xmtpClient, expanded]);
 
   // 📤 Envío de mensaje + notificación (ya estabas usando la dirección ETH en “peer”)
   const handleSend = async (
@@ -590,6 +587,7 @@ useEffect(() => {
       identifierKind: "Ethereum" as IdentifierKind,
     };
     const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
+    const initial = await convo.messages({ limit: BigInt(5), direction: SortDirection.Descending })
 
     // Primero enviamos el texto/attachment por XMTP
     if (typeof text === "string") {
@@ -810,7 +808,7 @@ useEffect(() => {
                 ? abbreviateAddress((profile as any).displayName)
                 : abbreviateAddress(peer);
               const avatarUrl = (profile as any)?.avatar || null;
-              const isOpen = expanded === peer;
+              const isOpen = expanded === conv.id;
               const isGated = gatedPeers.has(peer) && !purchasedPeers.has(peer);
 
               return (
@@ -825,7 +823,7 @@ useEffect(() => {
                     className="p-4 hover:bg-[#231c32] cursor-pointer"
                     onClick={() => {
                       if (isGated) return;
-                      setExpanded(isOpen ? null : conv.peerKey);
+                      setExpanded(isOpen ? null : conv.id)
                     }}
                   >
                     <div className="flex items-center space-x-2 mb-2">
@@ -883,10 +881,8 @@ useEffect(() => {
                         Open FULL conversation
                       </div>
 
-                      {(messages[peer] || [])
-                        .slice(-5)
-                        .map((m, i) => {
-                          const contenido = m.content;
+                      {(messages[conv.id] || []).slice(-5).map((m, i) => {
+                           const contenido = m.content;
                           const isString = typeof contenido === "string";
                           const isAttachment =
                             !isString && (contenido as any).data !== undefined;
