@@ -266,7 +266,7 @@ export default function Page(): JSX.Element {
 
   return (
     <div className="flex flex-col bg-[#0f0d14] font-sans text-[var(--app-foreground)] mini-app-theme">
-      <div className="w-full max-w-md mx-auto px-4 py-3 h-screen flex flex-col">
+      <div className="w-full max-w-md mx-auto px-1 py-3 h-screen flex flex-col">
         <header className="flex justify-between items-center mb-3 h-11">
           <div className="flex justify-end space-x-2 w-full z-50">
 
@@ -293,11 +293,11 @@ export default function Page(): JSX.Element {
 
         <main className="flex-1 overflow-hidden">
           {warpView === "home" && <PingGateHome onAction={(view) => setWarpView(view)} />}
-          {warpView === "inbox" && (<InboxScreen onBack={() => setWarpView("home")} />)}
-          {warpView === "myplans" && (<MyServicesScreen onBack={() => setWarpView("home")} />)}
-          {warpView === "explore" && (<ExploreScreen onBack={() => setWarpView("home")} />)}
-          {warpView === "reviews" && (<ReviewsScreen onBack={() => setWarpView("home")} />)}
-          {warpView === "faq" && (<FAQScreen onBack={() => setWarpView("home")} />)}
+          {warpView === "inbox" && (<InboxScreen onAction={(view) => setWarpView(view)} />)}
+          {warpView === "myplans" && (<MyServicesScreen onAction={(view) => setWarpView(view)} />)}
+          {warpView === "explore" && (<ExploreScreen onAction={(view) => setWarpView(view)} />)}
+          {warpView === "reviews" && (<ReviewsScreen onAction={(view) => setWarpView(view)} />)}
+          {warpView === "faq" && (<FAQScreen onAction={(view) => setWarpView(view)} />)}
         </main>
       </div>
        <WalletModal isOpen={false} onClose={function (): void {

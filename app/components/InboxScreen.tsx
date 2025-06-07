@@ -37,9 +37,11 @@ import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
 import { formatEther } from "ethers";
 import FaqList from "./FAQList";
+import BottomMenu from "./BottomMenu";
+import { WarpView } from "../page-client";
 
 interface InboxScreenProps {
-  onBack: () => void;
+  onAction: (view: WarpView) => void;
 }
 
 interface ExtendedConversation extends Conversation {
@@ -57,7 +59,7 @@ function abbreviateAddress(addr: string) {
   return addr.slice(0, 7) + "…" + addr.slice(-5);
 }
 
-export default function InboxScreen({ onBack }: InboxScreenProps) {
+export default function InboxScreen({ onAction }: InboxScreenProps) {
   const router = useRouter();
   const { context } = useMiniKit();
   const { data: walletClient } = useWalletClient();
@@ -618,7 +620,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
       }
     }
 
-    if(fid !== 0) {
+    if (fid !== 0) {
       const title = `New ping from ${myName}`;
       const bodyText = typeof text === "string" ? text : (text as XMTPAttachment).filename;
 
@@ -640,7 +642,7 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
         console.error("Notify error:", e);
       }
     }
-    
+
   };
 
   // ✉️ Nuevo hilo (“composer”)
@@ -759,264 +761,261 @@ export default function InboxScreen({ onBack }: InboxScreenProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 max-h-[99%] bg-[#0f0d14] text-white relative">
-      <button
-        onClick={onBack}
-        className="mb-4 flex items-center justify-center text-purple-400 px-4 py-2 bg-[#1a1725] rounded-lg max-w-[200px]"
-      >
-        <FiMenu className="w-5 h-5 mr-2" /> Menu
-      </button>
-
-      <div className="flex justify-center mb-4 divide-x divide-purple-600">
-        {(["all", "purchases", "sales"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`
+    <div className="flex-1 flex flex-col min-h-0 h-[99%] bg-[#0f0d14] text-white">
+      <div className="flex-1 flex flex-col min-h-0 bg-[#0f0d14] text-white pb-14">
+        <div className="flex justify-center mb-2 divide-x divide-purple-600">
+          {(["all", "purchases", "sales"] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`
               px-6 py-3
               first:rounded-l-lg last:rounded-r-lg
               ${tab === t
-                ? "bg-purple-600 text-white"
-                : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
-              }
+                  ? "bg-purple-600 text-white"
+                  : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
+                }
             `}
-          >
-            {t === "sales" ? "Clients" : t === "purchases" ? "Experts" : "All"}
-          </button>
-        ))}
-      </div>
-
-      {xmtpError && <p className="text-red-500 text-center mb-2">{xmtpError}</p>}
-
-      <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
-        {filtered.length === 0 && tab === "all" ? (
-          <div className="flex flex-col items-center justify-center text-center mt-8 space-y-6 px-4">
-            <div className="text-gray-400 text-lg font-semibold">
-              You don’t have any conversations on this device yet.
-            </div>
-
-            <button
-              onClick={() => setShowComposer(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg text-lg font-medium"
             >
-              Create Ping
+              {t === "sales" ? "Clients" : t === "purchases" ? "Experts" : "All"}
             </button>
+          ))}
+        </div>
 
-            <div className="w-full max-w-2xl mt-6">
-              <FaqList />
-            </div>
-          </div>
-        ) : filtered.length === 0 && tab !== "all" ? (
-          <div className="flex flex-col items-center justify-center text-center mt-8 px-4">
-            {tab === "sales" && (
-              <p className="text-gray-400">You still don&apos;t have clients! Create your first service in Menu &gt; `&quot;My services`&quot; and start monetizing your Inbox!</p>
-            )}
-            {tab === "purchases" && (
-              <p className="text-gray-400">No experts contacted yet, you can find some in Menu &gt; `&quot;Explore`&quot;</p>
-            )}
-          </div>
-        ) : (
-          filtered.map((conv, idx) => {
-            const peer = conv.peerWalletAddress!.toLowerCase();
-            const profile = profilesMap[peer];
-            const label = profile
-              ? abbreviateAddress((profile as any).displayName)
-              : abbreviateAddress(peer);
-            const avatarUrl = (profile as any)?.avatar || null;
-            const isOpen = expanded === peer;
-            const isGated = gatedPeers.has(peer) && !purchasedPeers.has(peer);
+        {xmtpError && <p className="text-red-500 text-center mb-2">{xmtpError}</p>}
 
-            return (
-              <motion.div
-                key={peer}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="bg-[#1a1725] rounded-xl overflow-hidden"
+        <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+          {filtered.length === 0 && tab === "all" ? (
+            <div className="flex flex-col items-center justify-center text-center mt-8 space-y-6 px-4">
+              <div className="text-gray-400 text-lg font-semibold">
+                You don’t have any conversations on this device yet.
+              </div>
+
+              <button
+                onClick={() => setShowComposer(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg text-lg font-medium"
               >
-                <div
-                  className="p-4 hover:bg-[#231c32] cursor-pointer"
-                  onClick={() => {
-                    if (isGated) return;
-                    setExpanded(isOpen ? null : peer);
-                  }}
+                Create Ping
+              </button>
+
+              <div className="w-full max-w-2xl mt-6">
+                <FaqList />
+              </div>
+            </div>
+          ) : filtered.length === 0 && tab !== "all" ? (
+            <div className="flex flex-col items-center justify-center text-center mt-8 px-4">
+              {tab === "sales" && (
+                <p className="text-gray-400">You still don&apos;t have clients! Create your first service in Menu &gt; `&quot;My services`&quot; and start monetizing your Inbox!</p>
+              )}
+              {tab === "purchases" && (
+                <p className="text-gray-400">No experts contacted yet, you can find some in Menu &gt; `&quot;Explore`&quot;</p>
+              )}
+            </div>
+          ) : (
+            filtered.map((conv, idx) => {
+              const peer = conv.peerWalletAddress!.toLowerCase();
+              const profile = profilesMap[peer];
+              const label = profile
+                ? abbreviateAddress((profile as any).displayName)
+                : abbreviateAddress(peer);
+              const avatarUrl = (profile as any)?.avatar || null;
+              const isOpen = expanded === peer;
+              const isGated = gatedPeers.has(peer) && !purchasedPeers.has(peer);
+
+              return (
+                <motion.div
+                  key={peer}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="bg-[#1a1725] rounded-xl overflow-hidden"
                 >
-                  <div className="flex items-center space-x-2 mb-2">
-                    {avatarUrl && (
-                      <img
-                        src={avatarUrl}
-                        alt=""
-                        className="w-5 h-5 rounded-full object-cover"
-                      />
+                  <div
+                    className="p-4 hover:bg-[#231c32] cursor-pointer"
+                    onClick={() => {
+                      if (isGated) return;
+                      setExpanded(isOpen ? null : peer);
+                    }}
+                  >
+                    <div className="flex items-center space-x-2 mb-2">
+                      {avatarUrl && (
+                        <img
+                          src={avatarUrl}
+                          alt=""
+                          className="w-5 h-5 rounded-full object-cover"
+                        />
+                      )}
+                      <span className="font-semibold">{label}</span>
+                    </div>
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-xs text-gray-400">
+                        {conv.updatedAt?.toLocaleString() || "No messages"}
+                      </p>
+                      <FiMessageCircle className="text-lg text-gray-300" />
+                    </div>
+
+                    {isGated && (
+                      <div className="mb-2 flex items-center space-x-2">
+                        <span className="text-xs text-yellow-400">
+                          Expert (Gated Chat)
+                        </span>
+                        <button
+                          onClick={() => router.push(`/user/${peer}`)}
+                          className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded"
+                        >
+                          View Services
+                        </button>
+                      </div>
                     )}
-                    <span className="font-semibold">{label}</span>
-                  </div>
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-xs text-gray-400">
-                      {conv.updatedAt?.toLocaleString() || "No messages"}
-                    </p>
-                    <FiMessageCircle className="text-lg text-gray-300" />
+
+                    <div className="flex items-center space-x-2">
+                      {conv.hasUnread && <span className="text-yellow-400">📩</span>}
+                      {purchasedPeers.has(peer) && (
+                        <span className="px-2 py-0.5 bg-blue-600 text-xs rounded-full">
+                          Expert • {formatEther(spentByPeer[peer] || BigInt(0))} ETH
+                        </span>
+                      )}
+                      {soldPeers.has(peer) && (
+                        <span className="px-2 py-0.5 bg-green-600 text-xs rounded-full">
+                          Client • {formatEther(earnedFromPeer[peer] || BigInt(0))} ETH
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  {isGated && (
-                    <div className="mb-2 flex items-center space-x-2">
-                      <span className="text-xs text-yellow-400">
-                        Expert (Gated Chat)
-                      </span>
-                      <button
-                        onClick={() => router.push(`/user/${peer}`)}
-                        className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded"
+                  {isOpen && (
+                    <div className="px-4 pb-4 space-y-2 max-h-[50%] overflow-y-auto">
+                      <div
+                        onClick={() => router.push(`/conversation/${peer}`)}
+                        className="cursor-pointer text-md p-2 rounded-lg bg-[#2a2438] border border-purple-600 hover:bg-[#3a3345] flex justify-center"
                       >
-                        View Services
-                      </button>
+                        Open FULL conversation
+                      </div>
+
+                      {(messages[peer] || [])
+                        .slice(-5)
+                        .map((m, i) => {
+                          const contenido = m.content;
+                          const isString = typeof contenido === "string";
+                          const isAttachment =
+                            !isString && (contenido as any).data !== undefined;
+
+                          return (
+                            <div
+                              key={i}
+                              className={`flex flex-col max-w-[80%] break-words py-1 px-3 rounded-lg ${m.senderInboxId === myInboxId
+                                ? "bg-purple-600 ml-auto"
+                                : "bg-[#2a2438]"
+                                }`}
+                            >
+                              {isAttachment ? (
+                                <div
+                                  className="flex items-center space-x-2 cursor-pointer"
+                                  onClick={() =>
+                                    handleAttachmentClick(contenido as XMTPAttachment)
+                                  }
+                                >
+                                  {(contenido as XMTPAttachment).mimeType.startsWith(
+                                    "image/"
+                                  ) ? (
+                                    <img
+                                      src={attachmentToUrl(contenido as XMTPAttachment)}
+                                      alt={(contenido as XMTPAttachment).filename}
+                                      className="max-h-40 object-contain rounded"
+                                    />
+                                  ) : (
+                                    <>
+                                      <FiFile className="w-6 h-6 text-gray-300" />
+                                      <span className="truncate text-sm">
+                                        {(contenido as XMTPAttachment).filename}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              ) : isString ? (
+                                <div className="text-center break-words">
+                                  {contenido}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-gray-400 italic">
+                                  Conversation started
+                                </div>
+                              )}
+
+                              <span className="text-[10px] text-gray-300 text-right">
+                                {m.sentAtNs
+                                  ? new Date(
+                                    Number(m.sentAtNs / BigInt(1e6))
+                                  ).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                  : ""}
+                              </span>
+                            </div>
+                          );
+                        })}
+
+                      <MessageInput onSend={(t) => handleSend(peer, t)} />
                     </div>
                   )}
-
-                  <div className="flex items-center space-x-2">
-                    {conv.hasUnread && <span className="text-yellow-400">📩</span>}
-                    {purchasedPeers.has(peer) && (
-                      <span className="px-2 py-0.5 bg-blue-600 text-xs rounded-full">
-                        Expert • {formatEther(spentByPeer[peer] || BigInt(0))} ETH
-                      </span>
-                    )}
-                    {soldPeers.has(peer) && (
-                      <span className="px-2 py-0.5 bg-green-600 text-xs rounded-full">
-                        Client • {formatEther(earnedFromPeer[peer] || BigInt(0))} ETH
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {isOpen && (
-                  <div className="px-4 pb-4 space-y-2 max-h-[50%] overflow-y-auto">
-                    <div
-                      onClick={() => router.push(`/conversation/${peer}`)}
-                      className="cursor-pointer text-md p-2 rounded-lg bg-[#2a2438] border border-purple-600 hover:bg-[#3a3345] flex justify-center"
-                    >
-                      Open FULL conversation
-                    </div>
-
-                    {(messages[peer] || [])
-                      .slice(-5)
-                      .map((m, i) => {
-                        const contenido = m.content;
-                        const isString = typeof contenido === "string";
-                        const isAttachment =
-                          !isString && (contenido as any).data !== undefined;
-
-                        return (
-                          <div
-                            key={i}
-                            className={`flex flex-col max-w-[80%] break-words py-1 px-3 rounded-lg ${m.senderInboxId === myInboxId
-                              ? "bg-purple-600 ml-auto"
-                              : "bg-[#2a2438]"
-                              }`}
-                          >
-                            {isAttachment ? (
-                              <div
-                                className="flex items-center space-x-2 cursor-pointer"
-                                onClick={() =>
-                                  handleAttachmentClick(contenido as XMTPAttachment)
-                                }
-                              >
-                                {(contenido as XMTPAttachment).mimeType.startsWith(
-                                  "image/"
-                                ) ? (
-                                  <img
-                                    src={attachmentToUrl(contenido as XMTPAttachment)}
-                                    alt={(contenido as XMTPAttachment).filename}
-                                    className="max-h-40 object-contain rounded"
-                                  />
-                                ) : (
-                                  <>
-                                    <FiFile className="w-6 h-6 text-gray-300" />
-                                    <span className="truncate text-sm">
-                                      {(contenido as XMTPAttachment).filename}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            ) : isString ? (
-                              <div className="text-center break-words">
-                                {contenido}
-                              </div>
-                            ) : (
-                              <div className="text-xs text-gray-400 italic">
-                                Conversation started
-                              </div>
-                            )}
-
-                            <span className="text-[10px] text-gray-300 text-right">
-                              {m.sentAtNs
-                                ? new Date(
-                                  Number(m.sentAtNs / BigInt(1e6))
-                                ).toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })
-                                : ""}
-                            </span>
-                          </div>
-                        );
-                      })}
-
-                    <MessageInput onSend={(t) => handleSend(peer, t)} />
-                  </div>
-                )}
-              </motion.div>
-            );
-          })
-        )}
-      </div>
+                </motion.div>
+              );
+            })
+          )}
+        </div>
 
 
-      <button
-        onClick={() => setShowComposer(true)}
-        className="fixed bottom-6 right-6 z-25 bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
-        aria-label="New Conversation"
-      >
-        <FiPlus />
-      </button>
+        <button
+          onClick={() => setShowComposer(true)}
+          className="fixed bottom-14 right-[10%] z-25 bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
+          aria-label="New Conversation"
+        >
+          <FiPlus />
+        </button>
 
-      {showComposer && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-40 flex items-center justify-center">
-          <div className="bg-[#1a1725] p-6 rounded-xl w-full max-w-md space-y-4">
-            <h3 className="text-lg font-bold text-white">New Ping / Chat</h3>
-            {err && <p className="text-red-400">{err}</p>}
-            <input
-              type="text"
-              placeholder="Farcaster name / Basename or ENS / Wallet"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="w-full p-3 bg-[#2a2438] text-white rounded-lg"
-            />
-            <textarea
-              rows={3}
-              placeholder="Message"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              className="w-full p-3 bg-[#2a2438] text-white rounded-lg"
-            />
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setShowComposer(false)}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-white"
-                disabled={sending}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreate}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white"
-                disabled={sending}
-              >
-                {sending ? "Sending…" : "Send"}
-              </button>
+        {showComposer && (
+          <div className="fixed inset-0 bg-black bg-opacity-70 z-40 flex items-center justify-center">
+            <div className="bg-[#1a1725] p-6 rounded-xl w-full max-w-md space-y-4">
+              <h3 className="text-lg font-bold text-white">New Ping / Chat</h3>
+              {err && <p className="text-red-400">{err}</p>}
+              <input
+                type="text"
+                placeholder="Farcaster name / Basename or ENS / Wallet"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="w-full p-3 bg-[#2a2438] text-white rounded-lg"
+              />
+              <textarea
+                rows={3}
+                placeholder="Message"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                className="w-full p-3 bg-[#2a2438] text-white rounded-lg"
+              />
+              <div className="flex justify-end space-x-2">
+                <button
+                  onClick={() => setShowComposer(false)}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-white"
+                  disabled={sending}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreate}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white"
+                  disabled={sending}
+                >
+                  {sending ? "Sending…" : "Send"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
+        )}
+      </div>
+      <div>
+        <BottomMenu onAction={onAction} />
+      </div>
       {fullImageSrc && (
         <div
           className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50"

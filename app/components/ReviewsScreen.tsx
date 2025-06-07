@@ -11,6 +11,8 @@ import {
   submitReview,
   getAverageRating,
 } from "../services/contractService";
+import { WarpView } from "../page-client";
+import BottomMenu from "./BottomMenu";
 
 interface ServiceDetails {
   id: bigint;
@@ -73,7 +75,11 @@ function StarRating({
   );
 }
 
-export default function ReviewsScreen({ onBack }: { onBack: () => void }) {
+interface ReviewsScreenProps {
+  onAction: (view: WarpView) => void;
+}
+
+export default function ReviewsScreen({ onAction }: ReviewsScreenProps) {
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
 
@@ -302,60 +308,58 @@ export default function ReviewsScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="h-full flex flex-col bg-[#0f0d14] text-white p-4">
-      <button
-        onClick={onBack}
-        className="mb-4 flex items-center justify-center text-purple-400 text-lg px-4 py-2 bg-[#1a1725] rounded-lg max-w-[200px]"
-      >
-        <FiArrowLeft className="w-5 h-5 mr-2" />
-        Back
-      </button>
+      <div className="flex-1 flex flex-col min-h-0 bg-[#0f0d14] text-white pb-10">
 
-      <h2 className="text-2xl font-bold mb-4 text-center">My Reviews</h2>
+        <h2 className="text-2xl font-bold mb-4 text-center">My Reviews</h2>
 
-      {/* Tab Switcher */}
-      <div className="flex justify-center space-x-4 mb-6">
-        <button
-          onClick={() => setActiveTab("pending")}
-          className={`px-4 py-2 font-semibold rounded-t-lg ${activeTab === "pending"
-            ? "bg-purple-600 text-white"
-            : "bg-[#1a1725] text-gray-400 hover:text-white"
-            }`}
-        >
-          Pending
-        </button>
-        <button
-          onClick={() => setActiveTab("completed")}
-          className={`px-4 py-2 font-semibold rounded-t-lg ${activeTab === "completed"
-            ? "bg-purple-600 text-white"
-            : "bg-[#1a1725] text-gray-400 hover:text-white"
-            }`}
-        >
-          Completed
-        </button>
+        {/* Tab Switcher */}
+        <div className="flex justify-center space-x-4 mb-6">
+          <button
+            onClick={() => setActiveTab("pending")}
+            className={`px-4 py-2 font-semibold rounded-t-lg ${activeTab === "pending"
+              ? "bg-purple-600 text-white"
+              : "bg-[#1a1725] text-gray-400 hover:text-white"
+              }`}
+          >
+            Pending
+          </button>
+          <button
+            onClick={() => setActiveTab("completed")}
+            className={`px-4 py-2 font-semibold rounded-t-lg ${activeTab === "completed"
+              ? "bg-purple-600 text-white"
+              : "bg-[#1a1725] text-gray-400 hover:text-white"
+              }`}
+          >
+            Completed
+          </button>
+        </div>
+
+        <div className="overflow-y-auto scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+          {activeTab === "pending" ? (
+            <section>
+              <h3 className="font-semibold mb-2">Pending Reviews</h3>
+              {pendingKeys.length === 0 ? (
+                <p className="text-gray-400">No pending reviews</p>
+              ) : (
+                pendingKeys.map((key) => renderCard(key, true))
+              )}
+            </section>
+          ) : (
+            <section>
+              <h3 className="font-semibold mb-2">Completed Reviews</h3>
+              {completedKeys.length === 0 ? (
+                <p className="text-gray-400">
+                  You haven’t submitted any reviews yet
+                </p>
+              ) : (
+                completedKeys.map((key) => renderCard(key, false))
+              )}
+            </section>
+          )}
+        </div>
       </div>
-
-      <div className="overflow-y-auto scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
-        {activeTab === "pending" ? (
-          <section>
-            <h3 className="font-semibold mb-2">Pending Reviews</h3>
-            {pendingKeys.length === 0 ? (
-              <p className="text-gray-400">No pending reviews</p>
-            ) : (
-              pendingKeys.map((key) => renderCard(key, true))
-            )}
-          </section>
-        ) : (
-          <section>
-            <h3 className="font-semibold mb-2">Completed Reviews</h3>
-            {completedKeys.length === 0 ? (
-              <p className="text-gray-400">
-                You haven’t submitted any reviews yet
-              </p>
-            ) : (
-              completedKeys.map((key) => renderCard(key, false))
-            )}
-          </section>
-        )}
+      <div>
+        <BottomMenu onAction={onAction} />
       </div>
     </div>
   );

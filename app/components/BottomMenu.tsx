@@ -4,10 +4,10 @@
 import React from "react";
 import {
   FiSearch,
-  FiPlusCircle,
   FiStar,
   FiHelpCircle,
   FiMessageSquare,
+  FiBriefcase,
 } from "react-icons/fi";
 import { WarpView } from "../page-client";
 
@@ -18,7 +18,7 @@ interface BottomMenuProps {
 const BottomMenu: React.FC<BottomMenuProps> = ({ onAction }) => {
   return (
     <nav className="fixed bottom-0 left-0 w-full bg-[#1a1725] border-t border-[#2a2735] z-50">
-      <ul className="flex items-center px-4 py-2">
+      <ul className="flex items-center px-4">
         {/* FAQ */}
         <li className="flex-1 flex flex-col items-center">
           <button
@@ -62,7 +62,7 @@ const BottomMenu: React.FC<BottomMenuProps> = ({ onAction }) => {
             className="text-gray-400 hover:text-white transition-colors"
             aria-label="My Services"
           >
-            <FiPlusCircle size={24} />
+            <FiBriefcase size={24} />
           </button>
           <span className="text-xs text-gray-400 mt-1">My Services</span>
         </li>
