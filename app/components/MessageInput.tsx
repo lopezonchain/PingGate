@@ -10,6 +10,8 @@ import {
 } from "react-icons/fi";
 import dynamic from "next/dynamic";
 import { EmojiClickData, Theme } from "emoji-picker-react";
+import { FaWindowClose } from "react-icons/fa";
+import AlertModal from "./AlertModal";
 
 const Picker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -20,7 +22,7 @@ export type XMTPAttachment = {
 };
 
 interface MessageInputProps {
-  /** Ahora acepta: texto (string) o attachment XMTP */
+  /** Accepts either a string (text) or an XMTPAttachment */
   onSend: (payload: string | XMTPAttachment) => void;
 }
 
@@ -33,10 +35,14 @@ export default function MessageInput({ onSend }: MessageInputProps) {
   const [menuAnchor, setMenuAnchor] =
     useState<{ x: number; y: number } | null>(null);
 
+  // Alert modal state
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+
   const inlineTextRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Ajusta la altura del textarea inline según el contenido
+  // Automatically adjust textarea height
   const adjustInlineHeight = (el: HTMLTextAreaElement | null) => {
     if (!el) return;
     el.style.height = "auto";
@@ -69,7 +75,7 @@ export default function MessageInput({ onSend }: MessageInputProps) {
       };
       onSend(attachment);
     } else if (text.trim()) {
-      onSend(text);
+      onSend(text.trim());
     } else {
       return;
     }
@@ -97,9 +103,17 @@ export default function MessageInput({ onSend }: MessageInputProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 1_000_000) {
-      alert("⚠️ El archivo supera 1 MB y podría fallar al enviarse.");
+
+    const MAX_SIZE = 1_000_000; // 1 MB
+    if (file.size > MAX_SIZE) {
+      setAlertMessage(
+        "⚠️ The selected file exceeds 1 MB. Please choose a smaller file."
+      );
+      setShowAlert(true);
+      e.target.value = "";
+      return;
     }
+
     const url = URL.createObjectURL(file);
     setSelectedFile(file);
     setPreviewUrl(url);
@@ -123,7 +137,7 @@ export default function MessageInput({ onSend }: MessageInputProps) {
 
   return (
     <>
-      {/* INLINE INPUT */}
+      {/* INLINE INPUT AREA */}
       <div className="mt-3 flex items-end space-x-2">
         <button
           onClick={openMenu}
@@ -150,11 +164,7 @@ export default function MessageInput({ onSend }: MessageInputProps) {
           ) : (
             <textarea
               ref={inlineTextRef}
-              className="w-full px-4 bg-[#2a2438] text-white rounded-lg resize-none overflow-hidden
-                transition-shadow duration-200
-                focus:shadow-[0_0_8px_rgba(139,92,246,0.5)]
-                focus:outline-none focus:ring-0 focus:border focus:border-[#8b5cf6]
-                focus-visible:outline-none focus-visible:ring-0"
+              className="w-full px-4 bg-[#2a2438] text-white rounded-lg resize-none overflow-hidden transition-shadow duration-200 focus:shadow-[0_0_8px_rgba(139,92,246,0.5)] focus:outline-none focus:ring-0 focus:border focus:border-[#8b5cf6] focus-visible:outline-none focus-visible:ring-0"
               placeholder="Type a message..."
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -166,7 +176,7 @@ export default function MessageInput({ onSend }: MessageInputProps) {
 
         <button
           onClick={submitText}
-          className="p-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white mb-2"
+          className="p-4 bg-purple-600 hover:bg-purple-700 rounded-lg text-white mb-2"
         >
           <FiSend />
         </button>
@@ -182,10 +192,7 @@ export default function MessageInput({ onSend }: MessageInputProps) {
       {/* FLOATING MENU */}
       {menuOpen && menuAnchor && (
         <div
-          className={`
-            fixed z-[60] bg-[#0f0d14] rounded-lg shadow-lg p-4 flex flex-col space-y-1
-            w-56 sm:w-40 min-w-[250px] max-w-[300px] max-h-[50vh] overflow-auto
-          `}
+          className="fixed z-[60] bg-[#0f0d14] rounded-lg shadow-lg p-4 flex flex-col space-y-1 w-56 sm:w-40 min-w-[250px] max-w-[300px] max-h-[50vh] overflow-auto"
           style={{
             top: `${Math.min(menuAnchor.y, window.innerHeight - 10)}px`,
             left: `${Math.min(menuAnchor.x, window.innerWidth - 10)}px`,
@@ -194,17 +201,14 @@ export default function MessageInput({ onSend }: MessageInputProps) {
         >
           <button
             onClick={() => setMenuOpen(false)}
-            className="self-end pt-2 pr-4 hover:bg-[#231c32] rounded text-white"
-            aria-label="Cerrar menú"
+            className="self-end rounded text-white"
+            aria-label="Close"
           >
-            <FiTrash2 />
+            <FaWindowClose size={24} />
           </button>
 
           <button
-            onClick={() => {
-              setShowPicker(true);
-              setMenuOpen(false);
-            }}
+            onClick={() => { setShowPicker(true); setMenuOpen(false); }}
             className="flex items-center px-3 py-2 hover:bg-[#231c32] rounded text-white"
           >
             <FiSmile className="mr-2" /> Emoji
@@ -232,6 +236,14 @@ export default function MessageInput({ onSend }: MessageInputProps) {
         <div className="fixed inset-0 flex items-center justify-center z-[55]">
           <Picker onEmojiClick={onEmojiClick} theme={Theme.DARK} />
         </div>
+      )}
+
+      {/* ALERT MODAL */}
+      {showAlert && (
+        <AlertModal
+          message={alertMessage}
+          onClose={() => setShowAlert(false)}
+        />
       )}
     </>
   );

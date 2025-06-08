@@ -4,7 +4,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useAccount, useWalletClient } from "wagmi";
 import {
-  FiArrowLeft,
   FiEdit2,
   FiPauseCircle,
   FiChevronDown,
@@ -17,7 +16,6 @@ import {
   getServicesBy,
   getService,
   getSalesBy,
-  getAverageRating,
   getReview,
   pauseService,
   editService,
@@ -27,7 +25,6 @@ import {
 } from "../services/contractService";
 import { base } from "viem/chains";
 import { createPublicClient, http } from "viem";
-import { WarpcastService } from "../services/warpcastService";
 import SuccessServiceCreationModal from "../components/SuccessServiceCreationModal";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { WarpView } from "../page-client";
@@ -58,6 +55,14 @@ const publicClient = createPublicClient({
   transport: http("https://base.llamarpc.com"),
 });
 
+// Helper: format wei to ETH string without trailing zeros
+const formatEtherTrimmed = (wei: bigint): string => {
+  const raw = ethers.formatEther(wei);
+  return Number(raw)
+    .toFixed(18)
+    .replace(/\.?0+$/, "");
+};
+
 export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
@@ -76,27 +81,34 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
   const [newDesc, setNewDesc] = useState("");
   const [newPriceEth, setNewPriceEth] = useState("");
   const [newDurationValue, setNewDurationValue] = useState("");
-  const [newDurationUnit, setNewDurationUnit] = useState<
-    "days" | "hours" | "weeks"
-  >("days");
+  const [newDurationUnit, setNewDurationUnit] =
+    useState<"days" | "hours" | "weeks">("days");
+
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingService, setEditingService] = useState<ServiceDetails | null>(
+    null
+  );
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editPriceEth, setEditPriceEth] = useState("");
+  const [editDurationValue, setEditDurationValue] = useState("");
+  const [editDurationUnit, setEditDurationUnit] =
+    useState<"days" | "hours" | "weeks">("days");
+
   const [creationFee, setCreationFee] = useState<bigint>(
     BigInt(7000000000000000)
   );
   const [editFee, setEditFee] = useState<bigint>(BigInt(3500000000000000));
   const [sendingCreate, setSendingCreate] = useState(false);
-  const [sendingEditId, setSendingEditId] = useState<bigint | null>(null);
+  const [sendingEdit, setSendingEdit] = useState(false);
 
-  // Overlay state
+  // Overlay & error/success
   const [showLoadingOverlay, setShowLoadingOverlay] = useState(false);
-
-  // Error modal state
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-
-  // Success modal state
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Track mounted status
   const isMounted = useRef(true);
   useEffect(() => {
     isMounted.current = true;
@@ -105,6 +117,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
     };
   }, []);
 
+  // Initial load: services, sales, compute local ratings & valid reviews only
   useEffect(() => {
     if (!sellerAddress) return;
     (async () => {
@@ -112,10 +125,52 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
       try {
         const ids = await getServicesBy(sellerAddress);
         const details = await Promise.all(ids.map((id) => getService(id)));
-        if (isMounted.current) setServices(details);
-
         const salesRecs = await getSalesBy(sellerAddress);
-        if (isMounted.current) setSales(salesRecs);
+
+        const ratingsObj: Record<string, number> = {};
+        const reviewsObj: Record<string, any[]> = {};
+
+        await Promise.all(
+          details.map(async (svc) => {
+            const recs = salesRecs.filter((s) => s.serviceId === svc.id);
+            const raw = await Promise.all(
+              recs.map((s) =>
+                getReview(svc.id, s.buyer).then((rev) => ({
+                  buyer: s.buyer,
+                  timestamp: s.timestamp,
+                  quality: rev.quality,
+                  communication: rev.communication,
+                  timeliness: rev.timeliness,
+                  comment: rev.comment,
+                }))
+              )
+            );
+            // filter out reviews with no comment and all-zero scores
+            const valid = raw.filter(
+              (r) =>
+                r.comment?.trim() &&
+                (r.quality > 0 || r.communication > 0 || r.timeliness > 0)
+            );
+            reviewsObj[svc.id.toString()] = valid;
+            // compute local average rating: mean of (quality+comm+time)/3
+            if (valid.length > 0) {
+              const sum = valid.reduce(
+                (acc, r) => acc + (r.quality + r.communication + r.timeliness) / 3,
+                0
+              );
+              ratingsObj[svc.id.toString()] = sum / valid.length;
+            } else {
+              ratingsObj[svc.id.toString()] = 0;
+            }
+          })
+        );
+
+        if (isMounted.current) {
+          setServices(details);
+          setSales(salesRecs);
+          setRatings(ratingsObj);
+          setReviews(reviewsObj);
+        }
       } catch (e: any) {
         console.error(e);
         toast.error(e.message || "Failed to load services");
@@ -125,43 +180,19 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
     })();
   }, [sellerAddress]);
 
+  // Load fees
   useEffect(() => {
     getCreationFee()
       .then((f) => {
         if (isMounted.current) setCreationFee(f);
       })
-      .catch((e) => console.error(e));
+      .catch(console.error);
     getEditFee()
       .then((f) => {
         if (isMounted.current) setEditFee(f);
       })
-      .catch((e) => console.error(e));
+      .catch(console.error);
   }, []);
-
-  const toggle = (id: bigint) => {
-    const opening = expanded !== id;
-    setExpanded(opening ? id : null);
-    if (!opening) return;
-    (async () => {
-      try {
-        const avg = await getAverageRating(id);
-        if (isMounted.current) {
-          setRatings((p) => ({ ...p, [id.toString()]: avg }));
-        }
-        const recs = sales.filter((s) => s.serviceId === id);
-        const list = await Promise.all(
-          recs.map((s) =>
-            getReview(id, s.buyer).then((rev) => ({ buyer: s.buyer, ...rev }))
-          )
-        );
-        if (isMounted.current) {
-          setReviews((p) => ({ ...p, [id.toString()]: list }));
-        }
-      } catch (e) {
-        console.error("Failed to load reviews for", id, e);
-      }
-    })();
-  };
 
   const ensureBase = async () => {
     if (!walletClient) throw new Error("Wallet not connected");
@@ -186,120 +217,123 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
     }
   };
 
-  const onEdit = async (svc: ServiceDetails) => {
-    if (!walletClient) return;
-    const newTitleInput = prompt("New title", svc.title) || svc.title;
-    const newDescInput =
-      prompt("New description", svc.description) || svc.description;
-    const newPrice = prompt(
-      `New price (ETH) — edit fee: ${ethers.formatEther(editFee)} ETH`,
-      ethers.formatEther(svc.price)
-    );
-    if (!newPrice) return;
-    const priceWei = ethers.parseEther(newPrice);
+  const onOpenEdit = (svc: ServiceDetails) => {
+    setEditingService(svc);
+    setEditTitle(svc.title);
+    setEditDesc(svc.description);
+    setEditPriceEth(ethers.formatEther(svc.price));
+    const secs = Number(svc.duration);
+    if (secs % 604800 === 0) {
+      setEditDurationUnit("weeks");
+      setEditDurationValue((secs / 604800).toString());
+    } else if (secs % 86400 === 0) {
+      setEditDurationUnit("days");
+      setEditDurationValue((secs / 86400).toString());
+    } else {
+      setEditDurationUnit("hours");
+      setEditDurationValue((secs / 3600).toString());
+    }
+    setShowEditModal(true);
+  };
 
-    setSendingEditId(svc.id);
+  const onEditSubmit = async () => {
+    if (!editingService) return;
+    setSendingEdit(true);
     try {
+      const priceWei = ethers.parseEther(editPriceEth);
+      const durNum = parseInt(editDurationValue, 10);
+      const seconds =
+        durNum *
+        (editDurationUnit === "days"
+          ? 86400
+          : editDurationUnit === "hours"
+          ? 3600
+          : 604800);
       await ensureBase();
       await editService(
-        walletClient,
-        svc.id,
-        newTitleInput,
-        newDescInput,
+        walletClient!,
+        editingService.id,
+        editTitle.trim(),
+        editDesc.trim(),
         priceWei,
         editFee
       );
-      if (isMounted.current) {
-        setServices((p) =>
-          p.map((s) =>
-            s.id === svc.id
-              ? {
+      setServices((prev) =>
+        prev.map((s) =>
+          s.id === editingService.id
+            ? {
                 ...s,
-                title: newTitleInput,
-                description: newDescInput,
+                title: editTitle,
+                description: editDesc,
                 price: priceWei,
+                duration: BigInt(seconds),
               }
-              : s
-          )
-        );
-        toast.success("Service updated");
-      }
+            : s
+        )
+      );
+      toast.success("Service updated");
+      setShowEditModal(false);
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Edit failed");
     } finally {
-      if (isMounted.current) setSendingEditId(null);
+      setSendingEdit(false);
     }
   };
 
   const onCreate = async () => {
-    if (!walletClient) return;
     setSendingCreate(true);
     setErrorMessage("");
     setShowErrorModal(false);
     setShowLoadingOverlay(true);
-
     try {
-      if (!newTitle.trim() || !newDesc.trim()) {
-        throw new Error("Title and description are required");
-      }
+      if (!newTitle.trim() || !newDesc.trim())
+        throw new Error("Title and description required");
       const priceNum = Number(newPriceEth);
-      if (isNaN(priceNum) || priceNum <= 0) {
-        throw new Error("Enter a valid price in ETH");
-      }
+      if (isNaN(priceNum) || priceNum <= 0) throw new Error("Invalid ETH price");
       const priceWei = ethers.parseEther(newPriceEth);
-
-      const durationNum = parseInt(newDurationValue, 10);
-      if (isNaN(durationNum) || durationNum <= 0) {
-        throw new Error("Enter a valid duration");
-      }
-      let seconds = 0;
-      if (newDurationUnit === "days") seconds = durationNum * 24 * 3600;
-      if (newDurationUnit === "hours") seconds = durationNum * 3600;
-      if (newDurationUnit === "weeks") seconds = durationNum * 7 * 24 * 3600;
-
+      const durNum = parseInt(newDurationValue, 10);
+      if (isNaN(durNum) || durNum <= 0) throw new Error("Invalid duration");
+      const seconds =
+        durNum *
+        (newDurationUnit === "days"
+          ? 86400
+          : newDurationUnit === "hours"
+          ? 3600
+          : 604800);
       await ensureBase();
-      // send transaction
       const tx = await createService(
-        walletClient,
+        walletClient!,
         newTitle.trim(),
         newDesc.trim(),
         priceWei,
         seconds,
         creationFee
       );
-      // wait for confirmation
       await publicClient.waitForTransactionReceipt({ hash: tx });
       toast.success("Service created");
-
-      if (isMounted.current) {
-        const ids = await getServicesBy(sellerAddress);
-        const details = await Promise.all(ids.map((id) => getService(id)));
-        setServices(details);
-        setShowCreator(false);
-        setNewTitle("");
-        setNewDesc("");
-        setNewPriceEth("");
-        setNewDurationValue("");
-        setNewDurationUnit("days");
-        setShowSuccess(true);
-      }
+      const ids = await getServicesBy(sellerAddress);
+      const details = await Promise.all(ids.map((id) => getService(id)));
+      setServices(details);
+      setShowCreator(false);
+      setNewTitle("");
+      setNewDesc("");
+      setNewPriceEth("");
+      setNewDurationValue("");
+      setNewDurationUnit("days");
+      setShowSuccess(true);
     } catch (e: any) {
       console.error(e);
-      if (isMounted.current) {
-        setErrorMessage(e.message || "Creation failed");
-        setShowErrorModal(true);
-      }
+      setErrorMessage(e.message || "Creation failed");
+      setShowErrorModal(true);
     } finally {
-      if (isMounted.current) {
-        setSendingCreate(false);
-        setShowLoadingOverlay(false);
-      }
+      setSendingCreate(false);
+      setShowLoadingOverlay(false);
     }
   };
 
   const handleShare = useCallback(() => {
-    const text = `Try PingGate 💬 Chat privately with wallet to wallet encryption. Monetize your inbox or message experts onchain! Powered by @xmtp @base & @farcaster and created by @lopezonchain.eth ✨ https://pinggate.lopezonchain.xyz`;
+    const text = `Try PingGate 💬 Chat privately...`;
     const url = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank");
   }, []);
@@ -312,107 +346,136 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
     );
   }
 
+  // SUMMARY
+  const totalServices = services.length;
+  const totalSales = sales.length;
+  const totalReviews = Object.values(reviews).flat().length;
+  const totalRevenueWei = services.reduce(
+    (sum, svc) =>
+      sum + svc.price * BigInt(sales.filter((s) => s.serviceId === svc.id).length),
+    BigInt(0)
+  );
+  const totalRevenue = formatEtherTrimmed(totalRevenueWei);
+  const weightedSum = services.reduce((sum, svc) => {
+    const valid = reviews[svc.id.toString()] || [];
+    return sum + (ratings[svc.id.toString()] || 0) * valid.length;
+  }, 0);
+  const averageRating =
+    totalReviews > 0 ? (weightedSum / totalReviews).toFixed(1) : "0.0";
+
   return (
-    <div className="h-[99%] flex flex-col bg-[#0f0d14] text-white relative">
-      <div className="flex-1 flex flex-col min-h-0 bg-[#0f0d14] text-white pb-16">
+    <div className="h-full flex flex-col bg-[#0f0d14] text-white relative">
+      <header className="p-4 text-center">
+        <h2 className="text-2xl font-bold mb-2">My Services</h2>
+      </header>
 
-        <h2 className="text-2xl font-bold mb-4 text-center">My Services</h2>
-
-        {services.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center space-y-4 p-4">
-            <p className="text-gray-400 text-center">
-              You don’t have any services available. Want to start monetizing your
-              inbox?
-            </p>
-            <button
-              onClick={() => setShowCreator(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg"
-            >
-              Create Service
-            </button>
+      <main className="flex-1 overflow-y-auto px-4 space-y-4 pb-24 overflow-y-auto scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+        <div className="flex flex-wrap text-center justify-center p-2 text-sm text-gray-400">
+          <div className="w-1/2 sm:w-auto p-2">
+            <p className="text-lg font-bold text-purple-500">{totalServices}</p>
+            Services
           </div>
-        ) : (
-          <div className="space-y-4 overflow-y-auto flex-1 px-2 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
-            {services.map((svc) => {
-              const idStr = svc.id.toString();
-              const soldCount = sales.filter((s) => s.serviceId === svc.id).length;
-              const revenue = Number(
-                ethers.formatEther(svc.price * BigInt(soldCount))
-              );
-              const avg = ratings[idStr] ?? 0;
-              const reviewList = reviews[idStr] || [];
-              const isOpen = expanded === svc.id;
-              const isEditing = sendingEditId === svc.id;
+          <div className="w-1/2 sm:w-auto p-2">
+            <p className="text-lg font-bold text-purple-500">{totalSales}</p>
+            Sales
+          </div>
+          <div className="w-1/2 sm:w-auto p-2">
+            <p className="text-lg font-bold text-purple-500">{totalReviews}</p>
+            Reviews
+          </div>
+          <div className="w-1/2 sm:w-auto p-2">
+            <p className="text-lg font-bold text-purple-500">{averageRating} / 5.0</p>
+            Avg Rating
+          </div>
+          <div className="w-1/2 sm:w-auto p-2">
+            <p className="text-lg font-bold text-purple-500">{totalRevenue} ETH</p>
+            Revenue
+          </div>
+        </div>
 
-              return (
-                <div
-                  key={idStr}
-                  className="bg-[#1a1725] rounded-lg overflow-hidden"
-                >
-                  <div
-                    className="p-4 flex justify-between items-center cursor-pointer hover:bg-[#231c32]"
-                    onClick={() => toggle(svc.id)}
+        {services.map((svc) => {
+          const idStr = svc.id.toString();
+          const soldCount = sales.filter((s) => s.serviceId === svc.id).length;
+          const revenue = formatEtherTrimmed(
+            svc.price * BigInt(soldCount)
+          );
+          const avg = ratings[idStr] || 0;
+          const valid = reviews[idStr] || [];
+          const isOpen = expanded === svc.id;
+          return (
+            <div
+              key={idStr}
+              className="bg-[#1a1725] rounded-lg overflow-hidden"
+            >
+              <button
+                className="w-full p-4 flex justify-between items-center hover:bg-[#231c32]"
+                onClick={() => setExpanded(isOpen ? null : svc.id)}
+              >
+                <div>
+                  <p className="text-base font-medium">{svc.title}</p>
+                  <p className="text-xs text-gray-400">
+                    Sold: {soldCount} · {revenue} ETH
+                  </p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenEdit(svc);
+                    }}
+                    className="p-2 bg-[#2a2438] rounded-full hover:bg-[#3a3248]"
                   >
-                    <div>
-                      <p className="font-semibold">{svc.title}</p>
-                      <p className="text-xs text-gray-400">
-                        Sold: {soldCount} · Revenue: {revenue} ETH
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEdit(svc);
-                        }}
-                        disabled={isEditing}
-                      >
-                        {isEditing ? "Saving…" : <FiEdit2 />}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onPause(svc.id);
-                        }}
-                      >
-                        <FiPauseCircle />
-                      </button>
-                      {isOpen ? <FiChevronUp /> : <FiChevronDown />}
-                    </div>
-                  </div>
+                    <FiEdit2 size={18} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPause(svc.id);
+                    }}
+                    className="p-2 bg-[#2a2438] rounded-full hover:bg-[#3a3248]"
+                  >
+                    <FiPauseCircle size={18} />
+                  </button>
+                  {isOpen ? <FiChevronUp size={20} /> : <FiChevronDown size={20} />}
+                </div>
+              </button>
 
-                  {isOpen && (
-                    <div className="p-4 border-t border-gray-700 space-y-2">
-                      Average: {avg}/5
-                      {reviewList.length > 0 ? (
-                        reviewList.map((r, i) => (
-                          <div key={i} className="bg-[#2a2438] p-2 rounded">
-                            <p className="text-sm">
-                              ⭐ Quality: {r.quality} · Communication: {r.communication} ·
-                              Timeliness: {r.timeliness}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1">{r.comment}</p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 text-sm">No reviews yet</p>
-                      )}
-                    </div>
+              {isOpen && (
+                <div className="p-4 border-t border-gray-700 bg-[#1e1931] space-y-2">
+                  <p className="text-sm font-semibold">
+                    Average Rating: {avg.toFixed(1)} / 5.0
+                  </p>
+                  {valid.length > 0 ? (
+                    valid.map((r, i) => (
+                      <div key={i} className="bg-[#2a2438] p-3 rounded-lg">
+                        <p className="text-sm">
+                          ⭐ Quality: {r.quality.toFixed(1)} <br/> 💬 Communication:{" "}
+                          {r.communication.toFixed(1)} <br/> ⏱️ Timeliness:{" "}
+                          {r.timeliness.toFixed(1)}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-400">{r.comment}</p>
+                        <p className="mt-1 text-xs text-gray-500 italic">
+                          {new Date(
+                            Number(r.timestamp) * 1000
+                          ).toLocaleString()}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-sm">No reviews yet</p>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              )}
+            </div>
+          );
+        })}
+      </main>
 
-      <div>
-        <BottomMenu onAction={onAction} />
-      </div>
+      <BottomMenu onAction={onAction} />
 
       <button
         onClick={() => setShowCreator(true)}
-        className="fixed bottom-14 right-[10%] z-25 bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
+        className="fixed bottom-14 right-[10%] bg-purple-600 hover:bg-purple-700 text-white text-3xl w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
         aria-label="Create Service"
       >
         <FiPlus />
@@ -489,6 +552,77 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
         </div>
       )}
 
+      {/* Edit Modal */}
+      {showEditModal && editingService && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-40 flex items-center justify-center">
+          <div className="bg-[#1a1725] p-6 rounded-xl w-full max-w-md space-y-4">
+            <h3 className="text-lg font-bold text-white">Edit Service</h3>
+            <input
+              type="text"
+              placeholder="Title"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full p-3 rounded-lg bg-[#2a2438] text-white"
+            />
+            <textarea
+              rows={3}
+              placeholder="Description"
+              value={editDesc}
+              onChange={(e) => setEditDesc(e.target.value)}
+              className="w-full p-3 rounded-lg bg-[#2a2438] text-white"
+            />
+            <input
+              type="text"
+              placeholder="Price (ETH)"
+              value={editPriceEth}
+              onChange={(e) => setEditPriceEth(e.target.value)}
+              className="w-full p-3 rounded-lg bg-[#2a2438] text-white"
+            />
+            <div className="flex space-x-2">
+              <input
+                type="number"
+                placeholder="Duration"
+                value={editDurationValue}
+                onChange={(e) => setEditDurationValue(e.target.value)}
+                className="flex-1 p-3 rounded-lg bg-[#2a2438] text-white"
+              />
+              <select
+                value={editDurationUnit}
+                onChange={(e) =>
+                  setEditDurationUnit(
+                    e.target.value as "days" | "hours" | "weeks"
+                  )
+                }
+                className="w-32 p-3 rounded-lg bg-[#2a2438] text-white"
+              >
+                <option value="days">Days</option>
+                <option value="hours">Hours</option>
+                <option value="weeks">Weeks</option>
+              </select>
+            </div>
+            <p className="text-xs text-gray-400">
+              Edit fee: {ethers.formatEther(editFee)} ETH
+            </p>
+            <div className="flex justify-end space-x-3 mt-2">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 text-white"
+                disabled={sendingEdit}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onEditSubmit}
+                className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold"
+                disabled={sendingEdit}
+              >
+                {sendingEdit ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Error Modal */}
       {showErrorModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-40 flex items-center justify-center">
@@ -515,7 +649,9 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
       )}
 
       {/* Loading Overlay */}
-      {showLoadingOverlay && <LoadingOverlay onClose={() => setShowLoadingOverlay(false)} />}
+      {showLoadingOverlay && (
+        <LoadingOverlay onClose={() => setShowLoadingOverlay(false)} />
+      )}
     </div>
   );
 }
