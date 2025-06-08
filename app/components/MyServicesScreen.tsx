@@ -422,7 +422,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
               return (
                 <div
                   key={idStr}
-                  className="bg-[#1a1725] rounded-lg overflow-hidden"
+                  className="bg-[#1a1725] rounded-lg overflow-hidden mb-1"
                 >
                   <button
                     className="w-full p-4 flex justify-between items-center hover:bg-[#231c32]"
