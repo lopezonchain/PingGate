@@ -14,7 +14,7 @@
     "splashBackgroundColor": "#17101f",
     "homeUrl": "https://pinggate.lopezonchain.xyz",
     "webhookUrl": "https://pinggate.lopezonchain.xyz/api/webhook",
-    "subtitle": "Chat. Monetize. Find.",
+    "subtitle": "Chat. Monetize. Find. PingGate",
     "description": "PingGate is a chat where you can monetize your inbox offering one or multiple services. With a review system and much more coming",
     "screenshotUrls": [
       "https://pinggate.lopezonchain.xyz/screen_1.png",
@@ -31,7 +31,7 @@
     ],
     "heroImageUrl": "https://pinggate.lopezonchain.xyz/hero.png",
     "tagline": "Chat. Monetize. Find.",
-    "ogTitle": "PingGate – Chat. Monetize. Find.",
+    "ogTitle": "Chat. Monetize. Find. PingGate",
     "ogDescription": "Chat securely. Offer services. Find experts.",
     "ogImageUrl": "https://pinggate.lopezonchain.xyz/hero.png"
   }
