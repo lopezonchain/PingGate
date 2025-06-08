@@ -280,7 +280,7 @@ export default function Page(): JSX.Element {
   // Forzar Base si cambia de chain
   useEffect(() => {
     if (walletClient && walletClient.chain?.id !== base.id) {
-      walletClient.switchChain({ id: base.id }).catch(() => {});
+      walletClient.switchChain(base).catch(() => {});
     }
   }, [walletClient]);
 

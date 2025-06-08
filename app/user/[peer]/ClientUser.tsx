@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useWalletClient } from "wagmi";
+import { useAccount, useWalletClient } from "wagmi";
 import {
   FiArrowLeft,
   FiUser,
@@ -25,6 +25,8 @@ import ServiceCard, { ServiceDetails } from "../../components/ServiceCard";
 import BottomMenu from "@/app/components/BottomMenu";
 import { WarpView } from "@/app/page-client";
 import { base } from "viem/chains";
+import { ConnectWallet, Wallet, WalletDropdown, WalletDropdownDisconnect } from "@coinbase/onchainkit/wallet";
+import { Address, Avatar, EthBalance, Identity, Name } from "@coinbase/onchainkit/identity";
 
 interface UserProfile {
   displayName: string;
@@ -44,6 +46,7 @@ interface ClientUserProps {
 export default function ClientUser({ peerAddress }: ClientUserProps) {
   const router = useRouter();
   const { data: walletClient } = useWalletClient();
+  const { address, isConnected, chainId } = useAccount();
   const peer = peerAddress.toLowerCase();
 
   // Perfil
@@ -69,21 +72,17 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
     router.push(`/?view=${view}`);
   };
 
-  // Efecto para forzar Base al cargar la página
   useEffect(() => {
-    if (!walletClient) return;
-    const ensureBase = async () => {
-      if (walletClient.chain?.id !== base.id) {
-        try {
-          await walletClient.switchChain({ id: base.id });
-          toast.loading("Switching to Base network...");
-        } catch {
-          toast.error("Please switch your wallet to the Base network");
-        }
-      }
-    };
-    ensureBase();
-  }, [walletClient]);
+    if (!isConnected) return;
+
+    if (chainId !== base.id || walletClient?.chain?.id != base.id) {
+      walletClient?.switchChain(base).then(() => toast.success("Change Base chain…"))
+        .catch(() =>
+          toast.error("Please change to Base network")
+        );
+    }
+
+  }, [isConnected, chainId, walletClient]);
 
   // Cargar perfil (Farcaster + ENS)
   useEffect(() => {
@@ -234,17 +233,27 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
 
   return (
     <div className="bg-[#0f0d14] text-white w-full max-w-md mx-auto flex flex-col h-screen px-1">
-      <header className="p-4">
-        <button
-          onClick={() => router.push(`/?view=home`)}
-          className="flex items-center text-purple-400"
-        >
-          <FiArrowLeft className="mr-2" />
-          Back to home
-        </button>
-      </header>
+    <header className="flex justify-between items-center mb-3 h-11">
+          <div className="flex justify-end space-x-2 w-full z-50 pt-2">
+            <Wallet>
+              <ConnectWallet>
+                <Avatar className="h-6 w-6" />
+                <Name />
+              </ConnectWallet>
+              <WalletDropdown>
+                <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+                  <Avatar />
+                  <Name />
+                  <Address />
+                  <EthBalance />
+                </Identity>
+                <WalletDropdownDisconnect />
+              </WalletDropdown>
+            </Wallet>
+          </div>
+        </header>
 
-      <main className="flex-1 overflow-y-auto p-4 pb-20 space-y-6 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+      <main className="flex-1 overflow-y-auto py-4 pb-20 space-y-6 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
         {/* Perfil */}
         <section className="text-center space-y-2">
           <div className="flex">
@@ -311,7 +320,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
         </section>
 
         {/* Servicios */}
-        <section className="space-y-4">
+        <section>
           {services.length === 0 ? (
             <p className="text-gray-400 text-center">No services found</p>
           ) : (
@@ -343,7 +352,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
         <BottomMenu onAction={onAction} />
       </main>
 
-      {processingId && <LoadingOverlay />}
+      {processingId !== null && <LoadingOverlay />}
       {showSuccess && <SuccessModal peerAddress={peer} onClose={closeSuccess} />}    
     </div>
   );

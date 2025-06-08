@@ -169,7 +169,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
     }
     if (walletClient.chain?.id !== base.id) {
       try {
-        await walletClient.switchChain({ id: base.id });
+        await walletClient.switchChain(base);
         // wallet prompt appears; user must approve
         toast.success("Switched to Base network");
         return false; // transaction must be retried
@@ -227,7 +227,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col gap-4 overflow-y-auto px-4 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+        <div className="flex-1 flex flex-col py-2 overflow-y-auto scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
           {displayed.length === 0 ? (
             <p className="text-gray-400 text-center">No services available</p>
           ) : (
@@ -256,7 +256,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
         <BottomMenu onAction={onAction} />
       </div>
 
-      {processingId && <LoadingOverlay />}
+      {processingId !== null && <LoadingOverlay />}
       {showSuccess && <SuccessModal peerAddress={successPeer} onClose={() => setShowSuccess(false)} />}
     </div>
   );

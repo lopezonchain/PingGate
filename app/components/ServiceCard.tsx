@@ -61,7 +61,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   const count = meaningful.length;
 
   return (
-    <div className="w-full bg-[#1a1725] rounded-2xl shadow-lg hover:shadow-2xl transition p-6 flex flex-col">
+    <div className="w-full bg-[#1a1725] rounded-2xl shadow-lg hover:shadow-2xl transition p-6 flex flex-col mb-2">
       {/* Header vendedor */}
       <div className="flex items-center mb-4 space-x-4">
         {prof.avatarUrl ? (

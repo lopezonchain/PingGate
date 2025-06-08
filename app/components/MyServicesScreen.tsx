@@ -197,7 +197,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
   const ensureBase = async () => {
     if (!walletClient) throw new Error("Wallet not connected");
     if (walletClient.chain?.id !== base.id) {
-      await walletClient.switchChain({ id: base.id });
+      await walletClient.switchChain(base);
     }
   };
 
@@ -466,8 +466,8 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
                         valid.map((r, i) => (
                           <div key={i} className="bg-[#2a2438] p-3 rounded-lg">
                             <p className="text-sm">
-                              ⭐ Quality: {r.quality.toFixed(1)} · 💬 Communication:{" "}
-                              {r.communication.toFixed(1)} · ⏱️ Timeliness:{" "}
+                              ⭐ Quality: {r.quality.toFixed(1)} <br/> 💬 Communication:{" "}
+                              {r.communication.toFixed(1)} <br/> ⏱️ Timeliness:{" "}
                               {r.timeliness.toFixed(1)}
                             </p>
                             <p className="mt-1 text-xs text-gray-400">{r.comment}</p>
