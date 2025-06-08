@@ -346,7 +346,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
     );
   }
 
-  // SUMMARY
+  // Summary calculations
   const totalServices = services.length;
   const totalSales = sales.length;
   const totalReviews = Object.values(reviews).flat().length;
@@ -369,106 +369,125 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
         <h2 className="text-2xl font-bold mb-2">My Services</h2>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 space-y-4 pb-24 overflow-y-auto scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
-        <div className="flex flex-wrap text-center justify-center p-2 text-sm text-gray-400">
-          <div className="w-1/2 sm:w-auto p-2">
-            <p className="text-lg font-bold text-purple-500">{totalServices}</p>
-            Services
-          </div>
-          <div className="w-1/2 sm:w-auto p-2">
-            <p className="text-lg font-bold text-purple-500">{totalSales}</p>
-            Sales
-          </div>
-          <div className="w-1/2 sm:w-auto p-2">
-            <p className="text-lg font-bold text-purple-500">{totalReviews}</p>
-            Reviews
-          </div>
-          <div className="w-1/2 sm:w-auto p-2">
-            <p className="text-lg font-bold text-purple-500">{averageRating} / 5.0</p>
-            Avg Rating
-          </div>
-          <div className="w-1/2 sm:w-auto p-2">
-            <p className="text-lg font-bold text-purple-500">{totalRevenue} ETH</p>
-            Revenue
-          </div>
-        </div>
-
-        {services.map((svc) => {
-          const idStr = svc.id.toString();
-          const soldCount = sales.filter((s) => s.serviceId === svc.id).length;
-          const revenue = formatEtherTrimmed(
-            svc.price * BigInt(soldCount)
-          );
-          const avg = ratings[idStr] || 0;
-          const valid = reviews[idStr] || [];
-          const isOpen = expanded === svc.id;
-          return (
-            <div
-              key={idStr}
-              className="bg-[#1a1725] rounded-lg overflow-hidden"
+      <main className="flex-1 overflow-y-auto px-4 pb-24 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+        {services.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center space-y-4 p-4">
+            <p className="text-gray-400 text-center">
+              You don’t have any services available. Want to start monetizing your
+              inbox?
+            </p>
+            <button
+              onClick={() => setShowCreator(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg"
             >
-              <button
-                className="w-full p-4 flex justify-between items-center hover:bg-[#231c32]"
-                onClick={() => setExpanded(isOpen ? null : svc.id)}
-              >
-                <div>
-                  <p className="text-base font-medium">{svc.title}</p>
-                  <p className="text-xs text-gray-400">
-                    Sold: {soldCount} · {revenue} ETH
-                  </p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenEdit(svc);
-                    }}
-                    className="p-2 bg-[#2a2438] rounded-full hover:bg-[#3a3248]"
-                  >
-                    <FiEdit2 size={18} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPause(svc.id);
-                    }}
-                    className="p-2 bg-[#2a2438] rounded-full hover:bg-[#3a3248]"
-                  >
-                    <FiPauseCircle size={18} />
-                  </button>
-                  {isOpen ? <FiChevronUp size={20} /> : <FiChevronDown size={20} />}
-                </div>
-              </button>
+              Create Service
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap text-center justify-center p-2 text-sm text-gray-400">
+              <div className="w-1/2 sm:w-auto p-2">
+                <p className="text-lg font-bold text-purple-500">{totalServices}</p>
+                Services
+              </div>
+              <div className="w-1/2 sm:w-auto p-2">
+                <p className="text-lg font-bold text-purple-500">{totalSales}</p>
+                Sales
+              </div>
+              <div className="w-1/2 sm:w-auto p-2">
+                <p className="text-lg font-bold text-purple-500">{totalReviews}</p>
+                Reviews
+              </div>
+              <div className="w-1/2 sm:w-auto p-2">
+                <p className="text-lg font-bold text-purple-500">
+                  {averageRating} / 5.0
+                </p>
+                Avg Rating
+              </div>
+              <div className="w-1/2 sm:w-auto p-2">
+                <p className="text-lg font-bold text-purple-500">{totalRevenue} ETH</p>
+                Revenue
+              </div>
+            </div>
 
-              {isOpen && (
-                <div className="p-4 border-t border-gray-700 bg-[#1e1931] space-y-2">
-                  <p className="text-sm font-semibold">
-                    Average Rating: {avg.toFixed(1)} / 5.0
-                  </p>
-                  {valid.length > 0 ? (
-                    valid.map((r, i) => (
-                      <div key={i} className="bg-[#2a2438] p-3 rounded-lg">
-                        <p className="text-sm">
-                          ⭐ Quality: {r.quality.toFixed(1)} <br/> 💬 Communication:{" "}
-                          {r.communication.toFixed(1)} <br/> ⏱️ Timeliness:{" "}
-                          {r.timeliness.toFixed(1)}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-400">{r.comment}</p>
-                        <p className="mt-1 text-xs text-gray-500 italic">
-                          {new Date(
-                            Number(r.timestamp) * 1000
-                          ).toLocaleString()}
-                        </p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 text-sm">No reviews yet</p>
+            {services.map((svc) => {
+              const idStr = svc.id.toString();
+              const soldCount = sales.filter((s) => s.serviceId === svc.id).length;
+              const revenue = formatEtherTrimmed(
+                svc.price * BigInt(soldCount)
+              );
+              const avg = ratings[idStr] || 0;
+              const valid = reviews[idStr] || [];
+              const isOpen = expanded === svc.id;
+              return (
+                <div
+                  key={idStr}
+                  className="bg-[#1a1725] rounded-lg overflow-hidden"
+                >
+                  <button
+                    className="w-full p-4 flex justify-between items-center hover:bg-[#231c32]"
+                    onClick={() => setExpanded(isOpen ? null : svc.id)}
+                  >
+                    <div>
+                      <p className="text-base font-medium">{svc.title}</p>
+                      <p className="text-xs text-gray-400">
+                        Sold: {soldCount} · {revenue} ETH
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenEdit(svc);
+                        }}
+                        className="p-2 bg-[#2a2438] rounded-full hover:bg-[#3a3248]"
+                      >
+                        <FiEdit2 size={18} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPause(svc.id);
+                        }}
+                        className="p-2 bg-[#2a2438] rounded-full hover:bg-[#3a3248]"
+                      >
+                        <FiPauseCircle size={18} />
+                      </button>
+                      {isOpen ? <FiChevronUp size={20} /> : <FiChevronDown size={20} />}
+                    </div>
+                  </button>
+
+                  {isOpen && (
+                    <div className="p-4 border-t border-gray-700 bg-[#1e1931] space-y-2">
+                      <p className="text-sm font-semibold">
+                        Average Rating: {avg.toFixed(1)} / 5.0
+                      </p>
+                      {valid.length > 0 ? (
+                        valid.map((r, i) => (
+                          <div key={i} className="bg-[#2a2438] p-3 rounded-lg">
+                            <p className="text-sm">
+                              ⭐ Quality: {r.quality.toFixed(1)} · 💬 Communication:{" "}
+                              {r.communication.toFixed(1)} · ⏱️ Timeliness:{" "}
+                              {r.timeliness.toFixed(1)}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-400">{r.comment}</p>
+                            <p className="mt-1 text-xs text-gray-500 italic">
+                              {new Date(
+                                Number(r.timestamp) * 1000
+                              ).toLocaleString()}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-gray-500 text-sm">No reviews yet</p>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
+          </>
+        )}
       </main>
 
       <BottomMenu onAction={onAction} />
