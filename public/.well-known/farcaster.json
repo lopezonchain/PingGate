@@ -14,8 +14,8 @@
     "splashBackgroundColor": "#17101f",
     "homeUrl": "https://pinggate.lopezonchain.xyz",
     "webhookUrl": "https://pinggate.lopezonchain.xyz/api/webhook",
-    "subtitle": "All-in-one easy payments",
-    "description": "PingGate is a chat where you can just chat to any wallet that joined, or even monetize your inbox offering one or multiple services. With a review system and much more coming",
+    "subtitle": "Chat. Offer services. Find Experts",
+    "description": "PingGate is a chat, but you can monetize your inbox offering one or multiple services. With a review system and much more coming",
     "screenshotUrls": [
       "https://pinggate.lopezonchain.xyz/screen_1.png",
       "https://pinggate.lopezonchain.xyz/screen_2.png",
@@ -30,8 +30,8 @@
       "monetization"
     ],
     "heroImageUrl": "https://pinggate.lopezonchain.xyz/hero.png",
-    "tagline": "Your inbox. Your rules",
-    "ogTitle": "PingGate – Monetize your inbox",
+    "tagline": "Chat. Offer services. Find Experts",
+    "ogTitle": "PingGate – Chat. Monetize your inbox. Find experts",
     "ogDescription": "Chat securely. Or start offering a chat service. Wallet to wallet messages with Farcaster integration!",
     "ogImageUrl": "https://pinggate.lopezonchain.xyz/hero.png"
   }
