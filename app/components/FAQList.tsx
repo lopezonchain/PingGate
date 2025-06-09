@@ -14,12 +14,12 @@ export default function FaqList() {
         {
             question: "What is PingGate?",
             answer:
-                "PingGate is a free and decentralized chat, where you can also offer services or hire experts, send crypto and much more. It lets you send messages directly between crypto wallets, so only you and the person you ping can read them.",
+                "PingGate is a free and decentralized chat, where you can also offer services or hire experts, send crypto and much more. It lets you send messages directly between crypto wallets, and only you and the person you ping can read them.",
         },
         {
             question: "How do I chat with someone?",
             answer:
-                "Find Experts in Explore. Try to reach anyone with their farcaster name, ens or wallet in the Pings Inbox + icon (right bottom corner).",
+                "Find Experts in Explore. Try to reach anyone with their farcaster name, ens or wallet in the Pings Inbox + icon (right bottom).",
         },
         {
             question: "How can I earn on PingGate?",
@@ -29,7 +29,7 @@ export default function FaqList() {
         {
             question: "How do I find services or Experts?",
             answer:
-                "Use the Explore tab: type any words you like, such as “coaching”, “design”, or “crypto”. The search checks each word anywhere in the question or answer, so it finds all matching services.",
+                "Use the Explore tab: type any words you like, such as “coaching”, “design”, or “crypto”. You can search them by Title or Expert's name"
         },
         {
             question: "How do I receive chat notifications?",
@@ -39,27 +39,32 @@ export default function FaqList() {
         {
             question: "What is an Expert?",
             answer:
-                "An Expert is anyone who creates a paid service. When you list a service, your chat becomes gated. Only people who pay that price can message you in that gated chat.",
+                "An Expert is anyone who creates a paid service. When you list a service, your chat becomes gated. Only people who pay that price can message you in PingGate",
         },
         {
             question: "What is a Client?",
             answer:
-                "A Client is someone who pays for an Expert’s service. After payment, the Client gets access to a private chat with that Expert’s wallet.",
+                "A Client is someone who pays for an Expert’s service. After payment, the Client gets access to a private chat with that Expert’s wallet",
         },
         {
             question: "Can I offer free pings?",
             answer:
-                "Yes. By default it is completely free to chat with anyone. Even if you offer a service and your chat is gated, you can add a free service so people can still send you free pings anytime.",
+                "Yes. By default it is completely free to chat with anyone. Even if you offer a service and your chat is gated, you can add a free service so people can still send you free pings anytime",
         },
         {
             question: "Why Base and ETH?",
             answer:
-                "Base is an Ethereum layer-2 with very low gas fees and fast confirmations. Using ETH ensures payments are secure and wallet-native.",
+                "Base is an Ethereum layer-2 with very low gas fees and fast confirmations. Using ETH ensures payments are secure and wallet-native",
         },
         {
             question: "How do I create my own service?",
             answer:
-                "Go to My Services, click the + button, enter title, description, price in ETH, and estimated duration. Pay a creation fee in ETH (Base). Your service goes live immediately.",
+                "Go to My Services, click the + button, enter title, description, price in ETH, and estimated duration. Pay a creation fee in ETH (Base). Your service goes live immediately",
+        },
+        {
+            question: "Why the creation fee?",
+            answer:
+                "This is mainly for preventing misusage, while also helps the platform",
         },
         {
             question: "When someone buys my service, what happens?",
@@ -72,9 +77,14 @@ export default function FaqList() {
                 "There is a fixed fee to create and edit services, and 8% fee of every service buy. This will help the platform keep improving and offering more and more!",
         },
         {
+            question: "How platform gains will be used?",
+            answer:
+                "PingGate is not meant to be just a marketplace, it wants to help the community by providing security in transactions. Any kind of funds will allow PingGate improving, and when all the job is done it'll start rewarding its users",
+        },
+        {
             question: "How do reviews work?",
             answer:
-                "After buying a service, a Client can leave a rating and comment. Reviews help other people know which Experts are reliable. And gives info to the expert about the experience offered.",
+                "After buying a service, a Client can leave a rating and comment. Reviews help other people know which Experts are reliable. And gives info to the expert about the experience offered",
         },
     ];
 
