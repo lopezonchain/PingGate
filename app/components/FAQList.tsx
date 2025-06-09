@@ -14,17 +14,22 @@ export default function FaqList() {
         {
             question: "What is PingGate?",
             answer:
-                "PingGate is a free and decentralized chat, where you can also offer services or hire experts, send crypto and much more. It lets you send messages directly between crypto wallets, and only you and the person you ping can read them.",
+                "PingGate is a free to use and decentralized chat, where you can also offer services or hire experts, send crypto and much more. It lets you send messages directly between crypto wallets, and only you and the person you ping can read them",
+        },
+        {
+            question: "What is XMTP?",
+            answer:
+                "XMTP is the chat tech! PingGate uses it because it is just incredible, you can find more about it on xmtp.org",
         },
         {
             question: "How do I chat with someone?",
             answer:
-                "Find Experts in Explore. Try to reach anyone with their farcaster name, ens or wallet in the Pings Inbox + icon (right bottom).",
+                "Find Experts in Explore. Try to reach anyone with their farcaster name, ens or wallet in the Pings Inbox + icon (right bottom)",
         },
         {
             question: "How can I earn on PingGate?",
             answer:
-                "You can earn by offering paid services like coding, consulting, reviews, mentorship, support or whatever you want! Set a price in ETH, and clients who pay unlock a private chat with you.",
+                "You can earn by offering paid services like coding, consulting, reviews, mentorship, support or whatever you want! Set a price in ETH, and clients who pay unlock a private chat with you. And all the data is stored onchain",
         },
         {
             question: "How do I find services or Experts?",
@@ -85,6 +90,11 @@ export default function FaqList() {
             question: "How do reviews work?",
             answer:
                 "After buying a service, a Client can leave a rating and comment. Reviews help other people know which Experts are reliable. And gives info to the expert about the experience offered",
+        },
+        {
+            question: "What are next steps for PingGate?",
+            answer:
+                "Next logical step is having a decentralized escrow system to give more security to everyone and share gains with anyone that wants to contribute. While also remaining focused about having a best chat implementation from all XMTP capabilities",
         },
     ];
 

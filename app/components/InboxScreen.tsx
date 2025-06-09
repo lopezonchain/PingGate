@@ -136,6 +136,10 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   const [showGatedModal, setShowGatedModal] = useState(false)
   const [modalPeer, setModalPeer] = useState<string>("")
 
+  const [showCastModal, setShowCastModal] = useState(false)
+  const [castPeer,    setCastPeer]    = useState<string>("")
+  const [castHandle,  setCastHandle]  = useState<string>("")
+
   // Obtener mi inboxId para saber mis mensajes no leídos
   const [myInboxId, setMyInboxId] = useState<string>("");
   useEffect(() => {
@@ -181,9 +185,9 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   const loadConversations = async () => {
     if (!xmtpClient) return
     setLoadingList(true)
-    // 1) sincroniza
+    // sincroniza
     await xmtpClient?.conversations.syncAll([ConsentState.Allowed])
-    // 2) lista
+    // lista
     const list = await xmtpClient!.conversations.list()
 
     const enriched: ExtendedConversation[] = []
@@ -270,19 +274,19 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
       for await (const newConv of streamDms as AsyncStream<Dm>) {
         if (!active || !newConv) break;
 
-        // → Construir el stub como antes
+        // Construir el stub
         let peerInbox: string | undefined;
         let peerWallet: string | undefined
         if (peerInbox) {
-          // 1) Llamada **sin** optional chaining
+          // Llamada sin optional chaining
           const states: SafeInboxState[] = await xmtpClient.preferences.inboxStateFromInboxIds(
             [peerInbox],
             true
           )
-          // 2) Comprueba que vino algo
+          // Comprueba que vino algo
           if (states.length > 0) {
             const state = states[0]
-            // 3) Anota el tipo de 'i' para que TS sepa qué lleva dentro
+            // Anota el tipo de 'i' para que TS sepa qué lleva dentro
             const ethId = state.accountIdentifiers?.find(
               (i: { identifierKind: IdentifierKind; identifier: string }) =>
                 i.identifierKind == "Ethereum"
@@ -307,7 +311,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         ext.updatedAt = updatedAt;
         ext.hasUnread = hasUnread;
 
-        // 1) Añadir a la lista
+        // Añadir a la lista
         setConversations(prev => {
           if (prev.find(c => c.id === ext.id)) return prev;
           const next = [ext, ...prev];
@@ -315,7 +319,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
           return next;
         });
 
-        // 2) ¡Refetch inmediato para pillar el contenido YA indexado!
+        // Refetch inmediato para pillar el contenido YA indexado
         try {
           await xmtpClient.conversations.syncAll();
           const rawList = await xmtpClient.conversations.list();
@@ -507,26 +511,26 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         if (!active) break;
 
         setConversations((prevConvs) => {
-          // 1) Buscamos la conversación a la que llegó el mensaje
+          // Buscamos la conversación a la que llegó el mensaje
           const idx = prevConvs.findIndex((c) => c.id === msg?.conversationId);
           if (idx < 0) return prevConvs;
 
-          // 2) Calculamos si el mensaje vino de mí o del otro, y la fecha en ms
+          // Calculamos si el mensaje vino de mí o del otro, y la fecha en ms
           const isMe = msg?.senderInboxId === myInboxId;
           const sentAtMs =
             msg?.sentAtNs !== undefined
               ? Number(msg.sentAtNs / BigInt(1e6))
               : Date.now();
 
-          // 3) Creamos un nuevo array clonando la lista anterior
+          // Creamos un nuevo array clonando la lista anterior
           const newConvs = [...prevConvs];
 
-          // 4) En la misma instancia (ExtendedConversation) actualizamos los campos
+          // En la misma instancia (ExtendedConversation) actualizamos los campos
           const target = newConvs[idx];
           target.updatedAt = new Date(sentAtMs);
           target.hasUnread = !isMe;
 
-          // 5) Ordenamos por updatedAt descendente
+          // Ordenamos por updatedAt descendente
           newConvs.sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
 
           return newConvs;
@@ -546,11 +550,11 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
     let active = true;
 
     (async () => {
-      // 1) En lugar de newDmWithIdentifier, traes la misma instancia que ya está en el store
+      // Instancia previa
       const convo = await xmtpClient.conversations.getConversationById(expanded);
-      // 2) Sincronizas con la red los mensajes históricos
+      // Sincronizas con la red los mensajes históricos
       await convo?.sync();
-      // 3) Lees los últimos 5 mensajes
+      // Lees los últimos 5 mensajes
       const initial = await convo?.messages({
         limit: BigInt(5),
         direction: SortDirection.Descending,
@@ -590,7 +594,6 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
       identifierKind: "Ethereum" as IdentifierKind,
     };
     const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
-    const initial = await convo.messages({ limit: BigInt(5), direction: SortDirection.Descending })
 
     // Primero enviamos el texto/attachment por XMTP
     if (typeof text === "string") {
@@ -669,7 +672,6 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
       const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier)
       await convo.send(body)
 
-      // ←—— Aquí refrescas el listado
       await loadConversations()
 
       setShowComposer(false)
@@ -979,6 +981,40 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         >
           <FiPlus />
         </button>
+
+        {showCastModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
+            <div className="bg-[#1a1725] text-white p-6 rounded-lg max-w-sm w-full mx-4">
+              <h2 className="text-xl font-semibold">Post on Farcaster</h2>
+              <p className="mt-2">
+                We couldn’t find an XMTP inbox for <strong>@{castHandle}</strong>, but they’re on Farcaster. 
+                Would you like to send them a cast?
+              </p>
+              <div className="mt-4 flex flex-col space-y-2">
+                <a
+                  href={
+                    `https://farcaster.xyz/compose?text=` +
+                    encodeURIComponent(
+                      `Hello @${castHandle}! 👋\n\nDo you want to chat with me on PingGate? A nice tool by @lopezonchain.eth\n\nhttps://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/conversation/${castPeer}`
+                    )
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded text-white text-center"
+                >
+                  Post Cast to @{castHandle}
+                </a>
+                <button
+                  onClick={() => setShowCastModal(false)}
+                  className="px-4 py-2 text-gray-400 hover:underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {showGatedModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
