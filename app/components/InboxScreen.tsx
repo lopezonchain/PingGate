@@ -133,6 +133,9 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
 
+  const [showGatedModal, setShowGatedModal] = useState(false)
+  const [modalPeer, setModalPeer] = useState<string>("")
+
   // Obtener mi inboxId para saber mis mensajes no leídos
   const [myInboxId, setMyInboxId] = useState<string>("");
   useEffect(() => {
@@ -175,174 +178,174 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   };
 
   // Fuera de cualquier useEffect, dentro de InboxScreen:
-const loadConversations = async () => {
-   if (!xmtpClient) return 
-  setLoadingList(true)
-  // 1) sincroniza
-  await xmtpClient?.conversations.syncAll([ConsentState.Allowed])
-  // 2) lista
-  const list = await xmtpClient!.conversations.list()
+  const loadConversations = async () => {
+    if (!xmtpClient) return
+    setLoadingList(true)
+    // 1) sincroniza
+    await xmtpClient?.conversations.syncAll([ConsentState.Allowed])
+    // 2) lista
+    const list = await xmtpClient!.conversations.list()
 
-  const enriched: ExtendedConversation[] = []
-  for (const conv of list) {
-    if (!(conv.id && typeof conv.id === "string")) continue
+    const enriched: ExtendedConversation[] = []
+    for (const conv of list) {
+      if (!(conv.id && typeof conv.id === "string")) continue
 
-    // — obtener peerInboxId
-    let peerInbox: string | undefined
-    if (conv instanceof Dm) {
+      // — obtener peerInboxId
+      let peerInbox: string | undefined
+      if (conv instanceof Dm) {
+        try {
+          peerInbox = await conv.peerInboxId()
+        } catch (e) {
+          console.warn("No pude obtener peerInboxId", e)
+        }
+      }
+
+      // — resolver peerWalletAddress a partir de peerInboxId
+      let peerWallet: string | undefined
+      if (peerInbox) {
+        try {
+          const [state] = await xmtpClient.preferences.inboxStateFromInboxIds(
+            [peerInbox],
+            true
+          )
+          const ethId = state?.accountIdentifiers?.find(
+            (i) => i.identifierKind === "Ethereum"
+          )
+          peerWallet = ethId?.identifier.toLowerCase()
+        } catch (e) {
+          console.warn("Error resolviendo peerWalletAddress", e)
+        }
+      }
+
+      // — última fecha y unread
+      let updatedAt: Date | undefined
+      let hasUnread = false
       try {
-        peerInbox = await conv.peerInboxId()
-      } catch (e) {
-        console.warn("No pude obtener peerInboxId", e)
+        const [last] = await conv.messages({
+          limit: BigInt(1),
+          direction: SortDirection.Descending,
+        })
+        if (last) {
+          updatedAt = new Date(Number(last.sentAtNs / BigInt(1e6)))
+          hasUnread = last.senderInboxId !== myInboxId
+        }
+      } catch {
+        /* swallow */
       }
+
+      // — arma el objeto extendido
+      const ext = conv as unknown as ExtendedConversation
+      ext.peerInboxId = peerInbox
+      ext.peerWalletAddress = peerWallet
+      ext.updatedAt = updatedAt
+      ext.hasUnread = hasUnread
+      // — peerKey usa preferentemente wallet
+      ext.peerKey = peerWallet || peerInbox!
+
+      enriched.push(ext)
     }
 
-    // — resolver peerWalletAddress a partir de peerInboxId
-    let peerWallet: string | undefined
-    if (peerInbox) {
-      try {
-        const [state] = await xmtpClient.preferences.inboxStateFromInboxIds(
-          [peerInbox],
-          true
-        )
-        const ethId = state?.accountIdentifiers?.find(
-          (i) => i.identifierKind === "Ethereum"
-        )
-        peerWallet = ethId?.identifier.toLowerCase()
-      } catch (e) {
-        console.warn("Error resolviendo peerWalletAddress", e)
-      }
-    }
-
-    // — última fecha y unread
-    let updatedAt: Date | undefined
-    let hasUnread = false
-    try {
-      const [last] = await conv.messages({
-        limit: BigInt(1),
-        direction: SortDirection.Descending,
-      })
-      if (last) {
-        updatedAt = new Date(Number(last.sentAtNs / BigInt(1e6)))
-        hasUnread = last.senderInboxId !== myInboxId
-      }
-    } catch {
-      /* swallow */
-    }
-
-    // — arma el objeto extendido
-    const ext = conv as unknown as ExtendedConversation
-    ext.peerInboxId = peerInbox
-    ext.peerWalletAddress = peerWallet
-    ext.updatedAt = updatedAt
-    ext.hasUnread = hasUnread
-    // — peerKey usa preferentemente wallet
-    ext.peerKey = peerWallet || peerInbox!
-
-    enriched.push(ext)
+    // ordena por updatedAt desc
+    enriched.sort(
+      (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
+    )
+    setConversations(enriched)
+    setLoadingList(false)
   }
 
-  // ordena por updatedAt desc
-  enriched.sort(
-    (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
-  )
-  setConversations(enriched)
-  setLoadingList(false)
-}
-
-useEffect(() => {
-  if (!xmtpClient || !myInboxId) return
-  let active = true
-  loadConversations().catch(console.error)
-  return () => { active = false }
-}, [xmtpClient, myInboxId])
+  useEffect(() => {
+    if (!xmtpClient || !myInboxId) return
+    let active = true
+    loadConversations().catch(console.error)
+    return () => { active = false }
+  }, [xmtpClient, myInboxId])
 
   // Stream de nuevas conversaciones (DMs) para agregarlas al estado al vuelo
   useEffect(() => {
-  if (!xmtpClient) return;
-  let active = true;
+    if (!xmtpClient) return;
+    let active = true;
 
-  (async () => {
-    const streamDms = await xmtpClient.conversations.streamDms();
-    for await (const newConv of streamDms as AsyncStream<Dm>) {
-      if (!active || !newConv) break;
+    (async () => {
+      const streamDms = await xmtpClient.conversations.streamDms();
+      for await (const newConv of streamDms as AsyncStream<Dm>) {
+        if (!active || !newConv) break;
 
-      // → Construir el stub como antes
-      let peerInbox: string | undefined;
-      let peerWallet: string | undefined
-      if (peerInbox) {
-        // 1) Llamada **sin** optional chaining
-        const states: SafeInboxState[] = await xmtpClient.preferences.inboxStateFromInboxIds(
-          [peerInbox],
-          true
-        )
-        // 2) Comprueba que vino algo
-        if (states.length > 0) {
-          const state = states[0]
-          // 3) Anota el tipo de 'i' para que TS sepa qué lleva dentro
-          const ethId = state.accountIdentifiers?.find(
-            (i: { identifierKind: IdentifierKind; identifier: string }) =>
-              i.identifierKind == "Ethereum"
+        // → Construir el stub como antes
+        let peerInbox: string | undefined;
+        let peerWallet: string | undefined
+        if (peerInbox) {
+          // 1) Llamada **sin** optional chaining
+          const states: SafeInboxState[] = await xmtpClient.preferences.inboxStateFromInboxIds(
+            [peerInbox],
+            true
           )
-          peerWallet = ethId?.identifier.toLowerCase()
+          // 2) Comprueba que vino algo
+          if (states.length > 0) {
+            const state = states[0]
+            // 3) Anota el tipo de 'i' para que TS sepa qué lleva dentro
+            const ethId = state.accountIdentifiers?.find(
+              (i: { identifierKind: IdentifierKind; identifier: string }) =>
+                i.identifierKind == "Ethereum"
+            )
+            peerWallet = ethId?.identifier.toLowerCase()
+          }
+        }
+
+        const metas = await newConv.messages({
+          limit: BigInt(1),
+          direction: SortDirection.Descending,
+        });
+        const lastMsg = metas[0];
+        const updatedAt = lastMsg
+          ? new Date(Number(lastMsg.sentAtNs / BigInt(1e6)))
+          : new Date();
+        const hasUnread = lastMsg ? lastMsg.senderInboxId !== myInboxId : true;
+
+        const ext = newConv as unknown as ExtendedConversation;
+        ext.peerInboxId = peerInbox;
+        ext.peerWalletAddress = peerWallet;
+        ext.updatedAt = updatedAt;
+        ext.hasUnread = hasUnread;
+
+        // 1) Añadir a la lista
+        setConversations(prev => {
+          if (prev.find(c => c.id === ext.id)) return prev;
+          const next = [ext, ...prev];
+          next.sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()));
+          return next;
+        });
+
+        // 2) ¡Refetch inmediato para pillar el contenido YA indexado!
+        try {
+          await xmtpClient.conversations.syncAll();
+          const rawList = await xmtpClient.conversations.list();
+          const enriched: ExtendedConversation[] = [];
+          for (const conv of rawList) {
+            const [msg] = await conv.messages({ limit: BigInt(1), direction: SortDirection.Descending });
+            const date = msg
+              ? new Date(Number(msg.sentAtNs / BigInt(1e6)))
+              : new Date();
+            const unread = msg ? msg.senderInboxId !== myInboxId : false;
+            const ec = conv as unknown as ExtendedConversation;
+            ec.updatedAt = date;
+            ec.hasUnread = unread;
+            try {
+              if (conv instanceof Dm) {
+                ec.peerInboxId = await conv.peerInboxId();
+              }
+            } catch { }
+            enriched.push(ec);
+          }
+          enriched.sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()));
+          if (active) setConversations(enriched);
+        } catch {
+          /* ignora errores de refetch */
         }
       }
+    })().catch(console.error);
 
-      const metas = await newConv.messages({
-        limit: BigInt(1),
-        direction: SortDirection.Descending,
-      });
-      const lastMsg = metas[0];
-      const updatedAt = lastMsg
-        ? new Date(Number(lastMsg.sentAtNs / BigInt(1e6)))
-        : new Date();
-      const hasUnread = lastMsg ? lastMsg.senderInboxId !== myInboxId : true;
-
-      const ext = newConv as unknown as ExtendedConversation;
-      ext.peerInboxId = peerInbox;
-      ext.peerWalletAddress = peerWallet;
-      ext.updatedAt = updatedAt;
-      ext.hasUnread = hasUnread;
-
-      // 1) Añadir a la lista
-      setConversations(prev => {
-        if (prev.find(c => c.id === ext.id)) return prev;
-        const next = [ext, ...prev];
-        next.sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()));
-        return next;
-      });
-
-      // 2) ¡Refetch inmediato para pillar el contenido YA indexado!
-      try {
-        await xmtpClient.conversations.syncAll();
-        const rawList = await xmtpClient.conversations.list();
-        const enriched: ExtendedConversation[] = [];
-        for (const conv of rawList) {
-          const [msg] = await conv.messages({ limit: BigInt(1), direction: SortDirection.Descending });
-          const date = msg
-            ? new Date(Number(msg.sentAtNs / BigInt(1e6)))
-            : new Date();
-          const unread = msg ? msg.senderInboxId !== myInboxId : false;
-          const ec = conv as unknown as ExtendedConversation;
-          ec.updatedAt = date;
-          ec.hasUnread = unread;
-          try {
-            if (conv instanceof Dm) {
-              ec.peerInboxId = await conv.peerInboxId();
-            }
-          } catch { }
-          enriched.push(ec);
-        }
-        enriched.sort((a, b) => (b.updatedAt!.getTime() - a.updatedAt!.getTime()));
-        if (active) setConversations(enriched);
-      } catch {
-        /* ignora errores de refetch */
-      }
-    }
-  })().catch(console.error);
-
-  return () => { active = false; };
-}, [xmtpClient, myInboxId]);
+    return () => { active = false; };
+  }, [xmtpClient, myInboxId]);
 
 
   // Obtener compras y ventas: ahora “peerWalletAddress” en lugar de inbox ID
@@ -539,41 +542,41 @@ useEffect(() => {
 
   // Cargar mensajes de la conversación “expanded” (igual que antes, usando peerInboxId para crear el DM)
   useEffect(() => {
-  if (!xmtpClient || !expanded) return;
-  let active = true;
+    if (!xmtpClient || !expanded) return;
+    let active = true;
 
-  (async () => {
-    // 1) En lugar de newDmWithIdentifier, traes la misma instancia que ya está en el store
-    const convo = await xmtpClient.conversations.getConversationById(expanded);
-    // 2) Sincronizas con la red los mensajes históricos
-    await convo?.sync();
-    // 3) Lees los últimos 5 mensajes
-    const initial = await convo?.messages({
-      limit: BigInt(5),
-      direction: SortDirection.Descending,
-    });
-    if (!active) return;
+    (async () => {
+      // 1) En lugar de newDmWithIdentifier, traes la misma instancia que ya está en el store
+      const convo = await xmtpClient.conversations.getConversationById(expanded);
+      // 2) Sincronizas con la red los mensajes históricos
+      await convo?.sync();
+      // 3) Lees los últimos 5 mensajes
+      const initial = await convo?.messages({
+        limit: BigInt(5),
+        direction: SortDirection.Descending,
+      });
+      if (!active) return;
 
-    setMessages((prev) => ({
-      ...prev,
-      [expanded]: initial !== undefined ? initial.slice().reverse() : [],
-    }));
-
-    // Stream para nuevos mensajes
-    const streamSingle = await convo?.stream();
-    for await (const msg of streamSingle as AsyncStream<DecodedMessage>) {
-      if (!active) break;
       setMessages((prev) => ({
         ...prev,
-        [expanded]: ([...(prev[expanded] || []), msg] as DecodedMessage[]),
+        [expanded]: initial !== undefined ? initial.slice().reverse() : [],
       }));
-    }
-  })().catch(console.error);
 
-  return () => {
-    active = false;
-  };
-}, [xmtpClient, expanded]);
+      // Stream para nuevos mensajes
+      const streamSingle = await convo?.stream();
+      for await (const msg of streamSingle as AsyncStream<DecodedMessage>) {
+        if (!active) break;
+        setMessages((prev) => ({
+          ...prev,
+          [expanded]: ([...(prev[expanded] || []), msg] as DecodedMessage[]),
+        }));
+      }
+    })().catch(console.error);
+
+    return () => {
+      active = false;
+    };
+  }, [xmtpClient, expanded]);
 
 
   // 📤 Envío de mensaje + notificación (ya estabas usando la dirección ETH en “peer”)
@@ -643,6 +646,22 @@ useEffect(() => {
       if (!to || !body) throw new Error("Fill all fields")
 
       const addr = await resolveRecipient(to)
+
+      // Servicios activos
+      const serviceIds = await fetchServiceIdsBySeller(addr as `0x${string}`)
+      let hasActive = false
+      for (const id of serviceIds) {
+        const svc = await fetchServiceDetails(id)
+        if (svc.active) { hasActive = true; break }
+      }
+      // Si hay servicios activos y aún no los he comprado, muestro modal
+      if (hasActive && !purchasedPeers.has(addr)) {
+        setModalPeer(addr)
+        setShowGatedModal(true)
+        setSending(false)
+        return
+      }
+
       const peerIdentifier = {
         identifier: addr,
         identifierKind: "Ethereum" as IdentifierKind,
@@ -656,7 +675,7 @@ useEffect(() => {
       setShowComposer(false)
       setTo("")
       setBody("")
-    
+
       // Obtenemos nuevamente el fid para la notificación
       const profile = profilesMap[addr] as Web3BioProfile | null;
       let fid = 0;
@@ -691,10 +710,10 @@ useEffect(() => {
         console.error("Notify error:", e);
       }
     } catch (e: any) {
-    setErr(e.message)
-  } finally {
-    setSending(false)
-  }
+      setErr(e.message)
+    } finally {
+      setSending(false)
+    }
   };
 
   // — Filtrar conversaciones según pestaña (“sales”/“purchases”/“all”), pero ahora usando peerWalletAddress
@@ -702,7 +721,7 @@ useEffect(() => {
     const key = c.peerKey;
     if (!key) return false;
 
-    if (tab === "sales")   return soldPeers.has(key);
+    if (tab === "sales") return soldPeers.has(key);
     if (tab === "purchases") return purchasedPeers.has(key);
     return true; // “all” muestra todo, incluso sin wallet
   });
@@ -882,66 +901,66 @@ useEffect(() => {
                       </div>
 
                       {(messages[conv.id] || []).slice(-5).map((m, i) => {
-                           const contenido = m.content;
-                          const isString = typeof contenido === "string";
-                          const isAttachment =
-                            !isString && (contenido as any).data !== undefined;
+                        const contenido = m.content;
+                        const isString = typeof contenido === "string";
+                        const isAttachment =
+                          !isString && (contenido as any).data !== undefined;
 
-                          return (
-                            <div
-                              key={i}
-                              className={`flex flex-col max-w-[80%] break-words py-1 px-3 rounded-lg ${m.senderInboxId === myInboxId
-                                ? "bg-purple-600 ml-auto"
-                                : "bg-[#2a2438]"
-                                }`}
-                            >
-                              {isAttachment ? (
-                                <div
-                                  className="flex items-center space-x-2 cursor-pointer"
-                                  onClick={() =>
-                                    handleAttachmentClick(contenido as XMTPAttachment)
-                                  }
-                                >
-                                  {(contenido as XMTPAttachment).mimeType.startsWith(
-                                    "image/"
-                                  ) ? (
-                                    <img
-                                      src={attachmentToUrl(contenido as XMTPAttachment)}
-                                      alt={(contenido as XMTPAttachment).filename}
-                                      className="max-h-40 object-contain rounded"
-                                    />
-                                  ) : (
-                                    <>
-                                      <FiFile className="w-6 h-6 text-gray-300" />
-                                      <span className="truncate text-sm">
-                                        {(contenido as XMTPAttachment).filename}
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              ) : isString ? (
-                                <div className="text-center break-words">
-                                  {contenido}
-                                </div>
-                              ) : (
-                                <div className="text-xs text-gray-400 italic">
-                                  Conversation started
-                                </div>
-                              )}
+                        return (
+                          <div
+                            key={i}
+                            className={`flex flex-col max-w-[80%] break-words py-1 px-3 rounded-lg ${m.senderInboxId === myInboxId
+                              ? "bg-purple-600 ml-auto"
+                              : "bg-[#2a2438]"
+                              }`}
+                          >
+                            {isAttachment ? (
+                              <div
+                                className="flex items-center space-x-2 cursor-pointer"
+                                onClick={() =>
+                                  handleAttachmentClick(contenido as XMTPAttachment)
+                                }
+                              >
+                                {(contenido as XMTPAttachment).mimeType.startsWith(
+                                  "image/"
+                                ) ? (
+                                  <img
+                                    src={attachmentToUrl(contenido as XMTPAttachment)}
+                                    alt={(contenido as XMTPAttachment).filename}
+                                    className="max-h-40 object-contain rounded"
+                                  />
+                                ) : (
+                                  <>
+                                    <FiFile className="w-6 h-6 text-gray-300" />
+                                    <span className="truncate text-sm">
+                                      {(contenido as XMTPAttachment).filename}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            ) : isString ? (
+                              <div className="text-center break-words">
+                                {contenido}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-400 italic">
+                                Conversation started
+                              </div>
+                            )}
 
-                              <span className="text-[10px] text-gray-300 text-right">
-                                {m.sentAtNs
-                                  ? new Date(
-                                    Number(m.sentAtNs / BigInt(1e6))
-                                  ).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
-                                  : ""}
-                              </span>
-                            </div>
-                          );
-                        })}
+                            <span className="text-[10px] text-gray-300 text-right">
+                              {m.sentAtNs
+                                ? new Date(
+                                  Number(m.sentAtNs / BigInt(1e6))
+                                ).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                                : ""}
+                            </span>
+                          </div>
+                        );
+                      })}
 
                       <MessageInput onSend={(t) => handleSend(peer, t)} />
                     </div>
@@ -960,6 +979,31 @@ useEffect(() => {
         >
           <FiPlus />
         </button>
+
+        {showGatedModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
+            <div className="bg-[#1a1725] text-white p-6 rounded-lg max-w-sm w-full mx-4">
+              <h2 className="text-xl font-semibold">Gated Chat</h2>
+              <p className="mt-2">
+                This user has a private chat. To continue, please purchase their service first.
+              </p>
+              <div className="mt-4 flex flex-col space-y-2">
+                <button
+                  onClick={() => router.push(`/user/${modalPeer}`)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded text-white"
+                >
+                  View this user’s services
+                </button>
+                <button
+                  onClick={() => setShowGatedModal(false)}
+                  className="px-4 py-2 text-gray-400 hover:underline"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showComposer && (
           <div className="fixed inset-0 bg-black bg-opacity-70 z-40 flex items-center justify-center">
