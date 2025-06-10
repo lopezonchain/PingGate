@@ -1005,8 +1005,8 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
             <div className="bg-[#1a1725] text-white p-6 rounded-lg max-w-sm w-full mx-4">
               <h2 className="text-xl font-semibold">Post on Farcaster</h2>
               <p className="mt-2">
-                We couldn’t find an XMTP inbox for <strong>@{castHandle}</strong>, but they’re on Farcaster.<br/>
-                Would you like to send them a cast?
+                This user doesn't have an inbox yet, but found this related Farcaster account!.<br/>
+                Would you like to send an invite to <strong>@{castHandle}</strong>?
               </p>
               <div className="mt-4 flex flex-col space-y-2">
                 <a
