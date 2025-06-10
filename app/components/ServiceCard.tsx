@@ -96,7 +96,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
                     onClick={() => onToggleReviews(svc.id)}
                     className="ml-2 text-xs text-gray-300"
                 >
-                    <p className="text-sm text-yellow-400 mb-2">
+                    <p className="text-sm text-yellow-400 mb-2 flex flex-start items-end">
                         ⭐ {avgRating.toFixed(1)} / 5.0 ({count} {count === 1 ? "review" : "reviews"})
 
                         {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
@@ -114,7 +114,9 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
                     {meaningful.map((r, idx) => (
                         <div key={idx} className="mb-3">
                             <p className="text-sm">
-                                ⭐ Quality: {r.quality} · Communication: {r.communication} · Timeliness: {r.timeliness}
+                              ⭐ Quality: {r.quality.toFixed(1)} <br/> 💬 Communication:{" "}
+                              {r.communication.toFixed(1)} <br/> ⏱️ Timeliness:{" "}
+                              {r.timeliness.toFixed(1)}
                             </p>
                             <p className="text-xs text-gray-300 mt-1">{r.comment}</p>
                         </div>
