@@ -369,7 +369,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
         <h2 className="text-2xl font-bold mb-2">My Services</h2>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 pb-24 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+      <main className="flex-1 overflow-y-auto pb-24 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
         {services.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center space-y-4 p-4">
             <p className="text-gray-400 text-center">
@@ -428,9 +428,9 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
                     className="w-full p-4 flex justify-between items-center hover:bg-[#231c32]"
                     onClick={() => setExpanded(isOpen ? null : svc.id)}
                   >
-                    <div>
-                      <p className="text-base font-medium">{svc.title}</p>
-                      <p className="text-xs text-gray-400">
+                    <div className="w-full">
+                      <p className="text-base font-medium pr-4">{svc.title}</p>
+                      <p className="text-xs text-gray-400 pr-4">
                         Sold: {soldCount} · {revenue} ETH
                       </p>
                     </div>

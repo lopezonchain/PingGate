@@ -110,7 +110,11 @@ export function useXmtpClient() {
 
           // Store key after first init
           if (!saved) {
+            try {
             localStorage.setItem(STORAGE_KEY, encodeKey(dbKey));
+            } catch {
+              /* ignore if localStorage is unavailable */
+            }
           }
 
           _cachedClient = client;

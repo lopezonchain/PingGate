@@ -225,7 +225,7 @@ export default function Page(): JSX.Element {
     // if the walletClient is ready, call switchChain once on load
     if (walletClient && walletClient.chain?.id !== base.id) {
       walletClient
-        .switchChain({ id: base.id })
+        .switchChain(base)
         .catch(() => {
           // user may reject—but we'll also listen to chainChanged below
         });
@@ -267,9 +267,32 @@ export default function Page(): JSX.Element {
     sdk.actions.ready({ disableNativeGestures: true });
   }, [isFrameReady, setFrameReady]);
 
+  // Detectar conexión y establecer flag
+  useEffect(() => {
+    if (address) {
+      try {
+        localStorage.setItem("wagmiDidManualConnect", "true");
+      } catch {
+        /* ignore if localStorage is unavailable */
+      }
+    }
+  }, [address]);
+
   // Auto-conectar wallet inyectada
   useEffect(() => {
-    if (!triedAutoConnect.current && !address && connectors.length) {
+    let didManual = false;
+    try {
+      didManual = localStorage.getItem("wagmiDidManualConnect") === "true";
+    } catch {
+      /* localStorage might be unavailable */
+    }
+
+    if (
+      didManual &&                    // only after first manual connect
+      !triedAutoConnect.current &&    // haven’t tried this session yet
+      !address &&                     // not already connected
+      connectors.length                // have at least one connector
+    ) {
       triedAutoConnect.current = true;
       const injected =
         connectors.find((c) => c.id === "injected") ?? connectors[0];
@@ -333,7 +356,9 @@ export default function Page(): JSX.Element {
                 <Avatar className="h-6 w-6" />
                 <Name />
               </ConnectWallet>
-              <WalletDropdown>
+              <WalletDropdown classNames={{
+                container: 'max-sm:pb-20'
+              }}>
                 <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
                   <Avatar />
                   <Name />
