@@ -69,6 +69,16 @@ function MiniKitWrapper({ children }: { children: ReactNode }) {
           name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME,
           logo: process.env.NEXT_PUBLIC_ICON_URL,
         },
+        wallet: { 
+          display: 'modal', 
+          termsUrl: 'https://pinggate.lopezonchain.xyz', 
+          privacyUrl: 'https://pinggate.lopezonchain.xyz',
+          supportedWallets: { 
+            rabby: true, 
+            trust: true, 
+            frame: true, 
+          }, 
+        },
       }}
     >
       <Suspense fallback={<div className="bg-[#0F1E14]">Loading...</div>}>{children}</Suspense>

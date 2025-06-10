@@ -95,9 +95,8 @@ export function Button({
   return (
     <button
       type={type}
-      className={`${baseClasses} ${variantClasses[variant]} ${
-        sizeClasses[size]
-      } ${className}`}
+      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]
+        } ${className}`}
       onClick={onClick}
       disabled={disabled}
     >
@@ -206,12 +205,14 @@ export function Icon({ name, size = "md", className = "" }: IconProps) {
     </span>
   );
 }
-export default function Page(): JSX.Element {
+export default async function Page(): Promise<JSX.Element> {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { address } = useAccount();
   const { connectAsync, connectors } = useConnect();
   const { data: walletClient } = useWalletClient();
+
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
   // inicializar warpView desde la query o "home"
   const initialView = (searchParams.get("view") ?? "home") as WarpView;
@@ -222,7 +223,23 @@ export default function Page(): JSX.Element {
   const [frameAdded, setFrameAdded] = useState(false);
   const triedAutoConnect = useRef(false);
 
-   useEffect(() => {
+  const [farcasterContext, setFarcasterContext] = useState<any>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    sdk.context
+      .then((ctx) => {
+        if (mounted) setFarcasterContext(ctx);
+      })
+      .catch((err) => {
+        console.error("failed to load Farcaster context", err);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     // if the walletClient is ready, call switchChain once on load
     if (walletClient && walletClient.chain?.id !== base.id) {
       walletClient
@@ -304,7 +321,7 @@ export default function Page(): JSX.Element {
   // Forzar Base si cambia de chain
   useEffect(() => {
     if (walletClient && walletClient.chain?.id !== base.id) {
-      walletClient.switchChain(base).catch(() => {});
+      walletClient.switchChain(base).catch(() => { });
     }
   }, [walletClient]);
 
@@ -352,25 +369,40 @@ export default function Page(): JSX.Element {
       <div className="w-full max-w-md mx-auto px-1 h-screen flex flex-col">
         <header className="flex justify-end items-center mb-3 h-11">
           <Link href="/?view=home" shallow>
-            <img src="/PingGateLogoNoBG.png" alt="PingGate Home" className="w-12 h-12"/>
+            <img src="/PingGateLogoNoBG.png" alt="PingGate Home" className="w-12 h-12" />
           </Link>
           <div className="flex justify-end space-x-2 w-full z-50 pt-2">
             <Wallet>
-              <ConnectWallet>
-                <Avatar className="h-6 w-6" />
-                <Name />
-              </ConnectWallet>
-              <WalletDropdown classNames={{
-                container: 'max-sm:pb-20'
-              }}>
-                <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
-                  <Avatar />
-                  <Name />
-                  <Address />
-                  <EthBalance />
-                </Identity>
-                <WalletDropdownDisconnect />
-              </WalletDropdown>
+              {address || farcasterContext ? (
+                <>
+                  <ConnectWallet>
+                    <Avatar className="h-6 w-6" />
+                    <Name />
+                  </ConnectWallet>
+                  <WalletDropdown classNames={{
+                    container: 'max-sm:pb-20'
+                  }}>
+                    <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+                      <Avatar />
+                      <Name />
+                      <Address />
+                      <EthBalance />
+                    </Identity>
+                    <WalletDropdownDisconnect />
+                  </WalletDropdown>
+                </>
+              ) : (
+                // if not connected, show our own connect button
+                <Button
+                  onClick={() => setIsWalletModalOpen(true)}
+                  variant="primary"
+                  size="sm"
+                  className={`cursor-pointer ock-bg-primary hover:bg-[var(--ock-bg-primary-hover)] active:bg-[var(--ock-bg-primary-active)] ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]`}
+                >
+                  Connect
+                </Button>
+
+              )}
             </Wallet>
             <div className="ml-4">{saveFrameButton}</div>
           </div>
@@ -389,9 +421,9 @@ export default function Page(): JSX.Element {
       </div>
 
       <WalletModal
-        isOpen={false}
+        isOpen={isWalletModalOpen}
         onClose={() => {
-          /* implementar si es necesario */
+          setIsWalletModalOpen(false);
         }}
       />
     </div>

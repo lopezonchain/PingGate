@@ -248,7 +248,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
         <div className="mt-1 grid grid-cols-2 gap-1 flex-shrink-0">
           {[
             { a: "faq", Icon: FiHelpCircle, label: "FAQ", desc: "Frequently asked questions, answered here" },
-            { a: "inbox", Icon: FiMessageSquare, label: "Pings", desc: "Check your messages, begin new conversations. START PINGING!" },
+            { a: "inbox", Icon: FiMessageSquare, label: "Pings", desc: "Check your messages. START PINGING!" },
             { a: "reviews", Icon: FiStar, label: "Reviews", desc: "Create and manage reviews of services you bought" },
             { a: "myservices", Icon: FiBriefcase, label: "My Services", desc: "Create and manage your offerings" },
           ].map(({ a, Icon, label, desc }) => (
