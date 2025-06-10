@@ -208,16 +208,16 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
           <motion.button
             onClick={() => changeSlide(-1)}
             aria-label="Previous"
-            className="absolute left-4 top-[80%] p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-full hover:bg-opacity-40 transition z-20"
+            className="absolute left-4 top-[90%] p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-full hover:bg-opacity-40 transition z-20"
             initial={{ y: '-50%' }}
             whileHover={{ y: '-50%', scale: 1.2, rotate: -10 }}
           >
             <FiChevronLeft size={32} />
           </motion.button>
           <motion.button
-            onClick={() => changeSlide(-1)}
+            onClick={() => changeSlide(1)}
             aria-label="Previous"
-            className="absolute right-4 top-[80%] p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-full hover:bg-opacity-40 transition z-20"
+            className="absolute right-4 top-[90%] p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-full hover:bg-opacity-40 transition z-20"
             initial={{ y: '-50%' }}
             whileHover={{ y: '-50%', scale: 1.2, rotate: 10 }}
           >

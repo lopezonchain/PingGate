@@ -137,8 +137,8 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   const [modalPeer, setModalPeer] = useState<string>("")
 
   const [showCastModal, setShowCastModal] = useState(false)
-  const [castPeer,    setCastPeer]    = useState<string>("")
-  const [castHandle,  setCastHandle]  = useState<string>("")
+  const [castPeer, setCastPeer] = useState<string>("")
+  const [castHandle, setCastHandle] = useState<string>("")
 
   // Obtener mi inboxId para saber mis mensajes no leídos
   const [myInboxId, setMyInboxId] = useState<string>("");
@@ -644,41 +644,47 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   const handleCreate = async () => {
     setSending(true)
     setErr(null)
+    let addr = ""
+
     try {
       if (!xmtpClient) throw new Error("XMTP not ready")
       if (!to || !body) throw new Error("Fill all fields")
 
-      const addr = await resolveRecipient(to)
+      // 1) resuelvo la dirección
+      addr = await resolveRecipient(to)
 
-      // Servicios activos
+      // 2) compruebo gated chat como antes...
       const serviceIds = await fetchServiceIdsBySeller(addr as `0x${string}`)
       let hasActive = false
       for (const id of serviceIds) {
         const svc = await fetchServiceDetails(id)
         if (svc.active) { hasActive = true; break }
       }
-      // Si hay servicios activos y aún no los he comprado, muestro modal
       if (hasActive && !purchasedPeers.has(addr)) {
         setModalPeer(addr)
         setShowGatedModal(true)
-        setSending(false)
         return
       }
 
+      // 3) intento enviar por XMTP
       const peerIdentifier = {
         identifier: addr,
         identifierKind: "Ethereum" as IdentifierKind,
       }
-      const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier)
-      await convo.send(body)
+      const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
+      if (typeof body === "string") {
+        await convo.send(body);
+      } else {
+        await convo.send(body, ContentTypeAttachment);
+      }
 
-      await loadConversations()
+      // 4) refresco y cierro composer
+      await loadConversations();
+      setShowComposer(false);
+      setTo("");
+      setBody("");
 
-      setShowComposer(false)
-      setTo("")
-      setBody("")
-
-      // Obtenemos nuevamente el fid para la notificación
+      // 5) notificación Warpcast (igual que antes)
       const profile = profilesMap[addr] as Web3BioProfile | null;
       let fid = 0;
       if (profile?.social?.uid) {
@@ -687,36 +693,48 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         try {
           fid = await warpcast.getFidByName(addr);
         } catch {
-          // Si no hay FID, dejamos fid = 0
+          // leave fid = 0
         }
       }
-
-      const title = `New ping from ${myName}`;
-      const bodyText = body;
-
-      // Sólo aquí llamamos a /api/notify, con try/catch
-      try {
-        const res = await fetch("/api/notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fid,
-            notification: { title, body: bodyText },
-            targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
-          }),
-        });
-        if (!res.ok) {
-          console.error(`Notify failed: ${res.status} ${res.statusText}`);
-        }
-      } catch (e) {
-        console.error("Notify error:", e);
+      if (fid !== 0) {
+        const title = `New ping from ${myName}`;
+        const bodyText = typeof body === "string" ? body : (body as XMTPAttachment).filename;
+        try {
+          const res = await fetch("/api/notify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fid,
+              notification: { title, body: bodyText },
+              targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
+            }),
+          })
+          if (!res.ok) console.error(`Notify failed: ${res.status}`);
+        } catch { /* ignore */ }
       }
+
     } catch (e: any) {
-      setErr(e.message)
+      // —— NUEVO: lookup Farcaster on-demand si no hay inbox
+      if (e.message.includes("not found")) {
+        let displayName: string | undefined;
+        try {
+          const [bio] = await warpcast.getWeb3BioProfiles([`farcaster,${addr}`]);
+          displayName = bio?.identity;
+        } catch { /* ignore */ }
+
+        if (displayName) {
+          setCastPeer(myAddr);
+          setCastHandle(displayName);
+          setShowCastModal(true);
+          return
+        }
+      }
+      // cualquier otro error:
+      setErr(e.message);
     } finally {
-      setSending(false)
+      setSending(false);
     }
-  };
+  }
 
   // — Filtrar conversaciones según pestaña (“sales”/“purchases”/“all”), pero ahora usando peerWalletAddress
   const filtered = conversations.filter((c) => {
@@ -987,15 +1005,15 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
             <div className="bg-[#1a1725] text-white p-6 rounded-lg max-w-sm w-full mx-4">
               <h2 className="text-xl font-semibold">Post on Farcaster</h2>
               <p className="mt-2">
-                We couldn’t find an XMTP inbox for <strong>@{castHandle}</strong>, but they’re on Farcaster. 
+                We couldn’t find an XMTP inbox for <strong>@{castHandle}</strong>, but they’re on Farcaster.<br/>
                 Would you like to send them a cast?
               </p>
               <div className="mt-4 flex flex-col space-y-2">
                 <a
                   href={
-                    `https://farcaster.xyz/compose?text=` +
+                    `https://farcaster.xyz/~/compose?text=` +
                     encodeURIComponent(
-                      `Hello @${castHandle}! 👋\n\nDo you want to chat with me on PingGate? A nice tool by @lopezonchain.eth\n\nhttps://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/conversation/${castPeer}`
+                      `Hello @${castHandle}! 👋\n\nDo you want to chat??\nPING ME on PingGate when you have any time!! \n\nA chat, but also a marketplace 👀\nCreated by @lopezonchain.eth \n\nhttps://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/conversation/${castPeer}`
                     )
                   }
                   target="_blank"
@@ -1014,7 +1032,6 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
             </div>
           </div>
         )}
-
 
         {showGatedModal && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">

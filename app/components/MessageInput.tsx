@@ -217,16 +217,16 @@ export default function MessageInput({ onSend }: MessageInputProps) {
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center px-3 py-2 hover:bg-[#231c32] rounded text-white"
           >
-            <FiImage className="mr-2" /> Image
+            <FiImage className="mr-2" /> Image (&lt;1MB)
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center px-3 py-2 hover:bg-[#231c32] rounded text-white"
           >
-            <FiFile className="mr-2" /> File
+            <FiFile className="mr-2" /> File (&lt;1MB)
           </button>
           <button className="flex items-center px-3 py-2 hover:bg-[#231c32] rounded text-white">
-            <FiDollarSign className="mr-2" /> Crypto
+            <FiDollarSign className="mr-2" /> Crypto (soon)
           </button>
         </div>
       )}
