@@ -12,6 +12,7 @@ import React, {
 import { useAccount, useWalletClient, useConnect } from "wagmi";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMiniKit, useAddFrame } from "@coinbase/onchainkit/minikit";
+import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
 import {
   Name,
   Identity,
@@ -225,6 +226,12 @@ export default function Page(): JSX.Element {
 
   const [farcasterContext, setFarcasterContext] = useState<any>(null);
 
+    // Preparar OnChainKit frame
+  useEffect(() => {
+    if (!isFrameReady) setFrameReady();
+    sdk.actions.ready({ disableNativeGestures: true });
+  }, [isFrameReady, setFrameReady]);
+
   useEffect(() => {
     let mounted = true;
     sdk.context
@@ -278,12 +285,6 @@ export default function Page(): JSX.Element {
     const v = (searchParams.get("view") ?? "home") as WarpView;
     setWarpView(v);
   }, [searchParams]);
-
-  // Preparar OnChainKit frame
-  useEffect(() => {
-    if (!isFrameReady) setFrameReady();
-    sdk.actions.ready({ disableNativeGestures: true });
-  }, [isFrameReady, setFrameReady]);
 
   // Detectar conexión y establecer flag
   useEffect(() => {
@@ -373,7 +374,7 @@ export default function Page(): JSX.Element {
           </Link>
           <div className="flex justify-end space-x-2 w-full z-50 pt-2">
             <Wallet>
-              {address || farcasterContext ? (
+              {address ? (
                 <>
                   <ConnectWallet>
                     <Avatar className="h-6 w-6" />
@@ -391,6 +392,15 @@ export default function Page(): JSX.Element {
                     <WalletDropdownDisconnect />
                   </WalletDropdown>
                 </>
+                ) : farcasterContext ? (
+                <Button
+                  onClick={() => connectAsync({ connector: farcasterFrame() })}
+                  variant="primary"
+                  size="sm"
+                  className="cursor-pointer ock-bg-primary hover:bg-[var(--ock-bg-primary-hover)] active:bg-[var(--ock-bg-primary-active)] ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]"
+                >
+                  Connect Farcaster
+                </Button>
               ) : (
                 // if not connected, show our own connect button
                 <Button
@@ -401,7 +411,6 @@ export default function Page(): JSX.Element {
                 >
                   Connect
                 </Button>
-
               )}
             </Wallet>
             <div className="ml-4">{saveFrameButton}</div>
