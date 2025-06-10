@@ -205,7 +205,7 @@ export function Icon({ name, size = "md", className = "" }: IconProps) {
     </span>
   );
 }
-export default async function Page(): Promise<JSX.Element> {
+export default function Page(): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { address } = useAccount();
