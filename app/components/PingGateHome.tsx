@@ -16,13 +16,15 @@ import { WarpView } from "../page-client";
 import { getActiveServices, Service } from "../services/contractService";
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 import { motion, AnimatePresence } from "framer-motion";
+import { useWalletClient } from "wagmi";
+import AlertModal from "./AlertModal";
 
 interface PingGateHomeProps {
   onAction: (view: WarpView) => void;
 }
 
-const DISPLAY_DURATION = 5000; // ms per slide
-const FADE_DURATION = 0.8;    // segundos
+const DISPLAY_DURATION = 5000;
+const FADE_DURATION = 0.8;
 const SLIDE_VARIANTS = {
   enter: (direction: number) => ({
     x: direction > 0 ? 300 : -300,
@@ -35,7 +37,7 @@ const SLIDE_VARIANTS = {
     scale: 1,
     transition: {
       duration: FADE_DURATION,
-      ease: [0.175, 0.885, 0.32, 1.275], // easeOutBack
+      ease: [0.175, 0.885, 0.32, 1.275],
     },
   },
   exit: (direction: number) => ({
@@ -53,24 +55,37 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
   const [ready, setReady] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [showAlert, setShowAlert] = useState(false);
+
+  // Wagmi wallet client → usar su address para saber si hay conexión
+  const { data: walletClient } = useWalletClient();
+  const myAddr = walletClient?.account.address.toLowerCase() || "";
+  const isConnected = Boolean(myAddr);
+
   // Fetch services
   useEffect(() => {
     let active = true;
-    getActiveServices().then(d => active && setServices(d)).catch(console.error);
-    return () => { active = false; };
+    getActiveServices()
+      .then((d) => active && setServices(d))
+      .catch(console.error);
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Fetch profiles
   useEffect(() => {
     if (!services.length) return;
-    const uniq = Array.from(new Set(services.map(s => s.seller.toLowerCase())));
-    const ids = uniq.map(a => `farcaster,${a}`);
+    const uniq = Array.from(
+      new Set(services.map((s) => s.seller.toLowerCase()))
+    );
+    const ids = uniq.map((a) => `farcaster,${a}`);
     new WarpcastService()
       .getWeb3BioProfiles(ids)
-      .then(bios => {
+      .then((bios) => {
         const map: Record<string, Web3BioProfile> = {};
-        bios.forEach(p =>
-          p.aliases?.forEach(alias => {
+        bios.forEach((p) =>
+          p.aliases?.forEach((alias) => {
             const [pl, addr] = alias.split(",");
             if (pl === "farcaster") map[addr.toLowerCase()] = p;
           })
@@ -91,21 +106,24 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
   }, [services]);
 
   // Preload avatar
-  const preload = useCallback(async (idx: number) => {
-    setReady(false);
-    const svc = shuffled[idx];
-    const url = profiles[svc.seller.toLowerCase()]?.avatar;
-    if (url) {
-      await new Promise<void>(res => {
-        const img = new Image();
-        img.src = url;
-        img.onload = img.onerror = () => res();
-      });
-    }
-    setReady(true);
-  }, [shuffled, profiles]);
+  const preload = useCallback(
+    async (idx: number) => {
+      setReady(false);
+      const svc = shuffled[idx];
+      const url = profiles[svc.seller.toLowerCase()]?.avatar;
+      if (url) {
+        await new Promise<void>((res) => {
+          const img = new Image();
+          img.src = url;
+          img.onload = img.onerror = () => res();
+        });
+      }
+      setReady(true);
+    },
+    [shuffled, profiles]
+  );
 
-  // Handle auto-slide
+  // Auto-slide
   useEffect(() => {
     if (!shuffled.length) return;
     preload(currentIdx);
@@ -134,8 +152,28 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
     return `${whole.toString()}.${s}`;
   };
 
+  const handleActionClick = useCallback(
+    (view: WarpView) => {
+      if (view === "faq") {
+        onAction(view);
+      } else if (!isConnected) {
+        setShowAlert(true);
+      } else {
+        onAction(view);
+      }
+    },
+    [isConnected, onAction]
+  );
+
   return (
     <div className="bg-[#0f0d14] text-white flex flex-col h-full">
+      {showAlert && (
+        <AlertModal
+          message="Please Connect first!"
+          onClose={() => setShowAlert(false)}
+        />
+      )}
+
       {/* HEADER */}
       <header className="flex flex-col items-center pb-1 px-4 flex-shrink-0">
         <div className="flex items-center space-x-3">
@@ -148,7 +186,8 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
         </div>
         <p className="text-gray-400 text-sm text-center leading-snug">
           Monetize your inbox, connect with experts,
-          <br />or just chat!!
+          <br />
+          or just chat!!
         </p>
       </header>
 
@@ -172,20 +211,28 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
                   className="block w-full h-full bg-center bg-cover rounded-lg shadow-2xl"
                   aria-label="View service"
                   style={{
-                    backgroundImage: profiles[shuffled[currentIdx].seller.toLowerCase()]?.avatar
-                      ? `url("${profiles[shuffled[currentIdx].seller.toLowerCase()].avatar}")`
-                      : undefined,
-                    backgroundColor: profiles[shuffled[currentIdx].seller.toLowerCase()]?.avatar
-                      ? undefined
-                      : "#1b1826",
+                    backgroundImage:
+                      profiles[shuffled[currentIdx].seller.toLowerCase()]
+                        ?.avatar
+                        ? `url("${
+                            profiles[
+                              shuffled[currentIdx].seller.toLowerCase()
+                            ].avatar
+                          }")`
+                        : undefined,
+                    backgroundColor:
+                      profiles[shuffled[currentIdx].seller.toLowerCase()]
+                        ?.avatar === undefined
+                        ? "#1b1826"
+                        : undefined,
                   }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-black/70 to-gray-900/50" />
                   <div className="relative z-10 flex flex-col items-center justify-center h-full px-6">
                     <span className="text-purple-400 text-base sm:text-xl md:text-2xl font-medium mb-1">
                       {
-                        profiles[shuffled[currentIdx].seller.toLowerCase()]?.displayName
-                        ?? shuffled[currentIdx].seller
+                        profiles[shuffled[currentIdx].seller.toLowerCase()]
+                          ?.displayName ?? shuffled[currentIdx].seller
                       }
                     </span>
                     <h2 className="text-white text-2xl font-extrabold text-center leading-tight">
@@ -209,17 +256,17 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
             onClick={() => changeSlide(-1)}
             aria-label="Previous"
             className="absolute left-4 top-[88%] p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-full hover:bg-opacity-40 transition z-20"
-            initial={{ y: '-50%' }}
-            whileHover={{ y: '-50%', scale: 1.2, rotate: -10 }}
+            initial={{ y: "-50%" }}
+            whileHover={{ y: "-50%", scale: 1.2, rotate: -10 }}
           >
             <FiChevronLeft size={32} />
           </motion.button>
           <motion.button
             onClick={() => changeSlide(1)}
-            aria-label="Previous"
+            aria-label="Next"
             className="absolute right-4 top-[88%] p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-full hover:bg-opacity-40 transition z-20"
-            initial={{ y: '-50%' }}
-            whileHover={{ y: '-50%', scale: 1.2, rotate: 10 }}
+            initial={{ y: "-50%" }}
+            whileHover={{ y: "-50%", scale: 1.2, rotate: 10 }}
           >
             <FiChevronRight size={32} />
           </motion.button>
@@ -233,13 +280,15 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
           <div
             role="button"
             aria-label="Explore services"
-            onClick={() => onAction("explore")}
+            onClick={() => handleActionClick("explore")}
             className="relative bg-[#1a1725] overflow-hidden p-4 cursor-pointer group"
           >
             <FiSearch className="absolute text-indigo-600 text-6xl opacity-10 top-4 right-4 transform group-hover:rotate-12 transition" />
             <div className="flex items-center justify-center space-x-2 py-1">
               <FiSearch size={28} className="text-purple-400" />
-              <span className="text-purple-400 font-semibold text-xl">Explore Services</span>
+              <span className="text-purple-400 font-semibold text-xl">
+                Explore Services
+              </span>
             </div>
           </div>
         </div>
@@ -247,16 +296,36 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
         {/* GRID */}
         <div className="mt-1 grid grid-cols-2 gap-1 flex-shrink-0">
           {[
-            { a: "faq", Icon: FiHelpCircle, label: "FAQ", desc: "Frequently asked questions, answered here" },
-            { a: "inbox", Icon: FiMessageSquare, label: "Pings", desc: "Check your messages. START PINGING!" },
-            { a: "reviews", Icon: FiStar, label: "Reviews", desc: "Create and manage reviews of services you bought" },
-            { a: "myservices", Icon: FiBriefcase, label: "My Services", desc: "Create and manage your offerings" },
+            {
+              a: "faq",
+              Icon: FiHelpCircle,
+              label: "FAQ",
+              desc: "Frequently asked questions, answered",
+            },
+            {
+              a: "inbox",
+              Icon: FiMessageSquare,
+              label: "Pings",
+              desc: "Check your messages. START PINGING!",
+            },
+            {
+              a: "reviews",
+              Icon: FiStar,
+              label: "Reviews",
+              desc: "Send or edit reviews of your purchases",
+            },
+            {
+              a: "myservices",
+              Icon: FiBriefcase,
+              label: "My Services",
+              desc: "Create and manage your offerings",
+            },
           ].map(({ a, Icon, label, desc }) => (
             <div
               key={a}
               role="button"
               aria-label={label}
-              onClick={() => onAction(a as WarpView)}
+              onClick={() => handleActionClick(a as WarpView)}
               className="relative bg-[#1a1725] overflow-hidden p-2 flex flex-col items-center justify-center cursor-pointer group"
             >
               <Icon className="absolute text-indigo-600 text-8xl opacity-10 bottom-0 right-0 translate-x-1/4 translate-y-1/4 group-hover:text-indigo-400 transition" />
@@ -264,7 +333,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
                 <Icon size={24} className="text-purple-400" />
                 <span className="text-purple-400 font-medium">{label}</span>
               </div>
-              <p className="text-xs text-gray-400 mt-1 max-width-[50%]">{desc}</p>
+              <p className="text-xs text-gray-400 mt-1 max-w-[80%]">{desc}</p>
             </div>
           ))}
         </div>
