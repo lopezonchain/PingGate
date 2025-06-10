@@ -36,6 +36,7 @@ import ExploreScreen from "./components/ExploreScreen";
 import MyServicesScreen from "./components/MyServicesScreen";
 import FAQScreen from "./components/FAQScreen";
 import toast from "react-hot-toast";
+import Link from "next/link";
 
 export type WarpView =
   | "home"
@@ -349,7 +350,10 @@ export default function Page(): JSX.Element {
   return (
     <div className="flex flex-col bg-[#0f0d14] font-sans text-[var(--app-foreground)] mini-app-theme">
       <div className="w-full max-w-md mx-auto px-1 h-screen flex flex-col">
-        <header className="flex justify-between items-center mb-3 h-11">
+        <header className="flex justify-end items-center mb-3 h-11">
+          <Link href="/?view=home" shallow>
+            <img src="/PingGateLogoNoBG.png" alt="PingGate Home" className="w-12 h-12"/>
+          </Link>
           <div className="flex justify-end space-x-2 w-full z-50 pt-2">
             <Wallet>
               <ConnectWallet>

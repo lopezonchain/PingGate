@@ -29,6 +29,7 @@ import { ConnectWallet, Wallet, WalletDropdown, WalletDropdownDisconnect } from 
 import { Address, Avatar, EthBalance, Identity, Name } from "@coinbase/onchainkit/identity";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import sdk from "@farcaster/frame-sdk";
+import Link from "next/link";
 
 interface UserProfile {
     displayName: string;
@@ -246,6 +247,9 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
     return (
         <div className="bg-[#0f0d14] text-white w-full max-w-md mx-auto flex flex-col h-screen px-1">
             <header className="flex justify-between items-center mb-3 h-11">
+                <Link href="/?view=home" shallow>
+                    <img src="/PingGateLogoNoBG.png" alt="PingGate Home" className="w-12 h-12"/>
+                </Link>
                 <div className="flex justify-end space-x-2 w-full z-50 pt-2">
                     <Wallet>
                         <ConnectWallet>
