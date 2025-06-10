@@ -221,7 +221,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         }
       }
 
-      // — última fecha y unread
+      // última fecha y unread
       let updatedAt: Date | undefined
       let hasUnread = false
       try {
@@ -237,13 +237,13 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         /* swallow */
       }
 
-      // — arma el objeto extendido
+      // arma el objeto extendido
       const ext = conv as unknown as ExtendedConversation
       ext.peerInboxId = peerInbox
       ext.peerWalletAddress = peerWallet
       ext.updatedAt = updatedAt
       ext.hasUnread = hasUnread
-      // — peerKey usa preferentemente wallet
+      // peerKey usa preferentemente wallet
       ext.peerKey = peerWallet || peerInbox!
 
       enriched.push(ext)
