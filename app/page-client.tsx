@@ -396,7 +396,7 @@ export default function Page(): JSX.Element {
                 <Button
                   onClick={() => connectAsync({ connector: farcasterFrame() })}
                   variant="primary"
-                  size="sm"
+                  size="md"
                   className="cursor-pointer ock-bg-primary hover:bg-[var(--ock-bg-primary-hover)] active:bg-[var(--ock-bg-primary-active)] ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]"
                 >
                   Connect Farcaster
@@ -406,7 +406,7 @@ export default function Page(): JSX.Element {
                 <Button
                   onClick={() => setIsWalletModalOpen(true)}
                   variant="primary"
-                  size="sm"
+                  size="md"
                   className={`cursor-pointer ock-bg-primary hover:bg-[var(--ock-bg-primary-hover)] active:bg-[var(--ock-bg-primary-active)] ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]`}
                 >
                   Connect

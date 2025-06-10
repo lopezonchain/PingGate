@@ -188,7 +188,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
                         ?? shuffled[currentIdx].seller
                       }
                     </span>
-                    <h2 className="text-white text-2xl md:text-4xl font-extrabold text-center leading-tight">
+                    <h2 className="text-white text-2xl font-extrabold text-center leading-tight">
                       {shuffled[currentIdx].title}
                     </h2>
                     <span className="inline-block bg-purple-800 text-white text-lg sm:text-xl font-semibold px-3 py-1 rounded-full mt-4">
