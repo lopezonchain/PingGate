@@ -270,7 +270,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
           >
             <FiChevronRight size={32} />
           </motion.button>
-          <div className="absolute bottom-1 left-6 text-[0.625rem] text-gray-400 uppercase tracking-widest">
+          <div className="absolute bottom-1 w-full flex justify-center text-[0.625rem] text-gray-400 uppercase tracking-widest">
             Random services. Thanks for using PingGate
           </div>
         </section>
