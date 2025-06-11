@@ -54,7 +54,7 @@ export default function FaqList() {
         {
             question: "Can I offer free pings?",
             answer:
-                "Yes. By default it is completely free to chat with anyone. Even if you offer a service and your chat is gated, you can add a free service so people can still send you free pings anytime",
+                "By default it is completely free to chat with anyone. But when you offer a service your PingGate chat will gated",
         },
         {
             question: "Why Base and ETH?",
@@ -67,9 +67,9 @@ export default function FaqList() {
                 "Go to My Services, click the + button, enter title, description, price in ETH, and estimated duration. Pay a creation fee in ETH (Base). Your service goes live immediately",
         },
         {
-            question: "Why the creation fee?",
+            question: "Why the creation and edit fees?",
             answer:
-                "This is mainly for preventing misusage, while also helps the platform",
+                "This is mainly for preventing misusage, flooding and attracting only serious people, while also helps the platform running",
         },
         {
             question: "When someone buys my service, what happens?",
