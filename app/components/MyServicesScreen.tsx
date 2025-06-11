@@ -461,6 +461,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
             <h3 className="text-lg font-bold text-white">Add New Service</h3>
             <input
               type="text"
+              maxLength={100}
               placeholder="Title"
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
@@ -469,6 +470,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
             <textarea
               rows={3}
               placeholder="Description"
+              maxLength={1000}
               value={newDesc}
               onChange={(e) => setNewDesc(e.target.value)}
               className="w-full p-3 rounded-lg bg-[#2a2438] text-white"
@@ -510,6 +512,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
             <h3 className="text-lg font-bold text-white">Edit Service</h3>
             <input
               type="text"
+              maxLength={100}
               placeholder="Title"
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
@@ -517,6 +520,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
             />
             <textarea
               rows={3}
+              maxLength={1000}
               placeholder="Description"
               value={editDesc}
               onChange={(e) => setEditDesc(e.target.value)}
