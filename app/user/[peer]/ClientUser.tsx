@@ -16,12 +16,13 @@ import {
     getReview,
     getSalesBy,
     publicClient,
+    Service,
 } from "../../services/contractService";
 import { resolveEnsName } from "../../services/nameResolver";
 import { WarpcastService, Web3BioProfile } from "../../services/warpcastService";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import SuccessModal from "../../components/SuccessModal";
-import ServiceCard, { ServiceDetails } from "../../components/ServiceCard";
+import ServiceCard from "../../components/ServiceCard";
 import BottomMenu from "@/app/components/BottomMenu";
 import { WarpView } from "@/app/page-client";
 import { base } from "viem/chains";
@@ -60,7 +61,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
     const [loadingProfile, setLoadingProfile] = useState(true);
 
     // Servicios
-    const [services, setServices] = useState<ServiceDetails[]>([]);
+    const [services, setServices] = useState<Service[]>([]);
     const [ratings, setRatings] = useState<Record<string, number>>({});
     const [reviews, setReviews] = useState<Record<string, any[]>>({});
     const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -158,7 +159,7 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
         (async () => {
             try {
                 const ids = await getServicesBy(peer as `0x${string}`);
-                const svcs: ServiceDetails[] = [];
+                const svcs: Service[] = [];
                 for (const id of ids) {
                     const svc = await getService(id);
                     if (svc.active && svc.seller.toLowerCase() === peer) {

@@ -1,6 +1,6 @@
 // src/services/contractService.ts
 
-import { createPublicClient, http, type WalletClient } from "viem";
+import { createPublicClient, http, parseEther, type WalletClient } from "viem";
 import { base } from "viem/chains";
 import contractAbi from "./contractAbi.json";
 import { resolveEnsName } from "./nameResolver";
@@ -12,9 +12,7 @@ const CONTRACT_ADDRESS =
 // Public read‐only client
 export const publicClient = createPublicClient({
   chain: base,
-  transport: http(
-    "https://base.llamarpc.com"
-  ),
+  transport: http("https://base.llamarpc.com"),
 });
 
 function getContractConfig() {
@@ -30,7 +28,6 @@ export interface Service {
   title: string;
   description: string;
   price: bigint;
-  duration: bigint;
   active: boolean;
 }
 
@@ -50,7 +47,7 @@ export async function resolveRecipient(
   if (input.startsWith("0x")) return input as `0x${string}`;
   const name = input.replace(/^@/, "");
   if (name.toLowerCase().endsWith(".eth")) {
-      return resolveEnsName(name);
+    return resolveEnsName(name);
   }
   const svc = new WarpcastService();
   const fid = await svc.getFidByName(name);
@@ -73,10 +70,10 @@ export async function getService(
     ...getContractConfig(),
     functionName: "services",
     args: [id],
-  })) as [bigint, `0x${string}`, string, string, bigint, bigint, boolean];
+  })) as [bigint, `0x${string}`, string, string, bigint, boolean];
 
-  const [sid, seller, title, description, price, duration, active] = res;
-  return { id: sid, seller, title, description, price, duration, active };
+  const [sid, seller, title, description, price, active] = res;
+  return { id: sid, seller, title, description, price, active };
 }
 
 /** List all active services */
@@ -180,15 +177,14 @@ export async function createService(
   title: string,
   description: string,
   price: bigint,
-  duration: number,
   fee: bigint
 ) {
   return walletClient.writeContract({
     account: walletClient.account ?? null,
-    chain: base,               // ← forzamos Base aquí
+    chain: base,
     ...getContractConfig(),
     functionName: "createService",
-    args: [title, description, price, BigInt(duration)],
+    args: [title, description, price],
     value: fee,
   });
 }
@@ -266,9 +262,7 @@ export async function submitReview(
   });
 }
 
-/**
- * Fetch the onchain creation fee (in wei)
- */
+/** Fetch the onchain creation fee (in wei) */
 export async function getCreationFee(): Promise<bigint> {
   return publicClient.readContract({
     ...getContractConfig(),
@@ -276,13 +270,10 @@ export async function getCreationFee(): Promise<bigint> {
   }) as Promise<bigint>;
 }
 
-/**
- * Fetch the onchain edit fee (in wei)
- */
+/** Fetch the onchain edit fee (in wei) */
 export async function getEditFee(): Promise<bigint> {
   return publicClient.readContract({
     ...getContractConfig(),
     functionName: "editFee",
   }) as Promise<bigint>;
 }
-

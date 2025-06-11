@@ -12,6 +12,7 @@ import {
   getReview,
   getSalesBy,
   publicClient,
+  Service,
 } from "../services/contractService";
 import { resolveEnsName } from "../services/nameResolver";
 import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
@@ -21,16 +22,6 @@ import ServiceCard from "./ServiceCard";
 import BottomMenu from "./BottomMenu";
 import { WarpView } from "../page-client";
 import { base } from "viem/chains";
-
-interface ServiceDetails {
-  id: bigint;
-  seller: `0x${string}`;
-  title: string;
-  description: string;
-  price: bigint;
-  duration: bigint;
-  active: boolean;
-}
 
 interface SellerProfile {
   name: string;
@@ -45,8 +36,8 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
 
-  const [services, setServices] = useState<ServiceDetails[]>([]);
-  const [displayed, setDisplayed] = useState<ServiceDetails[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [displayed, setDisplayed] = useState<Service[]>([]);
   const [profiles, setProfiles] = useState<Record<string, SellerProfile>>({});
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [reviews, setReviews] = useState<

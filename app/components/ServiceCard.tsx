@@ -5,6 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { FiUser, FiChevronDown, FiChevronUp, FiShoppingCart } from "react-icons/fi";
 import { ethers } from "ethers";
+import { Service } from "../services/contractService";
 
 interface Review {
     buyer: string;
@@ -14,23 +15,13 @@ interface Review {
     comment: string;
 }
 
-export interface ServiceDetails {
-    id: bigint;
-    seller: `0x${string}`;
-    title: string;
-    description: string;
-    price: bigint;
-    duration: bigint;
-    active: boolean;
-}
-
 export interface SellerProfile {
     name: string;
     avatarUrl?: string;
 }
 
 interface ServiceCardProps {
-    svc: ServiceDetails;
+    svc: Service;
     prof: SellerProfile;
     avgRating: number;
     reviews: Review[];

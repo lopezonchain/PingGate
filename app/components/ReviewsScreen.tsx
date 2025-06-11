@@ -10,19 +10,10 @@ import {
   getReview,
   submitReview,
   getAverageRating,
+  Service,
 } from "../services/contractService";
 import { WarpView } from "../page-client";
 import BottomMenu from "./BottomMenu";
-
-interface ServiceDetails {
-  id: bigint;
-  seller: `0x${string}`;
-  title: string;
-  description: string;
-  price: bigint;
-  duration: bigint;
-  active: boolean;
-}
 
 interface ReviewRecord {
   quality: number;
@@ -84,7 +75,7 @@ export default function ReviewsScreen({ onAction }: ReviewsScreenProps) {
   const { data: walletClient } = useWalletClient();
 
   const [servicesMap, setServicesMap] = useState<
-    Record<string, ServiceDetails>
+    Record<string, Service>
   >({});
   const [reviewsMap, setReviewsMap] = useState<Record<string, ReviewRecord>>(
     {}

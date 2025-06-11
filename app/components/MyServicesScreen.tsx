@@ -22,6 +22,7 @@ import {
   createService,
   getCreationFee,
   getEditFee,
+  Service,
 } from "../services/contractService";
 import { base } from "viem/chains";
 import { createPublicClient, http } from "viem";
@@ -32,16 +33,6 @@ import BottomMenu from "./BottomMenu";
 
 interface MyServicesScreenProps {
   onAction: (view: WarpView) => void;
-}
-
-interface ServiceDetails {
-  id: bigint;
-  seller: `0x${string}`;
-  title: string;
-  description: string;
-  price: bigint;
-  duration: bigint;
-  active: boolean;
 }
 
 interface SaleRecord {
@@ -68,7 +59,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
   const { data: walletClient } = useWalletClient();
   const sellerAddress = address as `0x${string}`;
 
-  const [services, setServices] = useState<ServiceDetails[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [expanded, setExpanded] = useState<bigint | null>(null);
   const [ratings, setRatings] = useState<Record<string, number>>({});
@@ -80,26 +71,20 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newPriceEth, setNewPriceEth] = useState("");
-  const [newDurationValue, setNewDurationValue] = useState("");
-  const [newDurationUnit, setNewDurationUnit] =
-    useState<"days" | "hours" | "weeks">("days");
 
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingService, setEditingService] = useState<ServiceDetails | null>(
+  const [editingService, setEditingService] = useState<Service | null>(
     null
   );
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editPriceEth, setEditPriceEth] = useState("");
-  const [editDurationValue, setEditDurationValue] = useState("");
-  const [editDurationUnit, setEditDurationUnit] =
-    useState<"days" | "hours" | "weeks">("days");
 
   const [creationFee, setCreationFee] = useState<bigint>(
-    BigInt(7000000000000000)
+    BigInt(5000000000000000)
   );
-  const [editFee, setEditFee] = useState<bigint>(BigInt(3500000000000000));
+  const [editFee, setEditFee] = useState<bigint>(BigInt(2500000000000000));
   const [sendingCreate, setSendingCreate] = useState(false);
   const [sendingEdit, setSendingEdit] = useState(false);
 
@@ -217,22 +202,11 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
     }
   };
 
-  const onOpenEdit = (svc: ServiceDetails) => {
+  const onOpenEdit = (svc: Service) => {
     setEditingService(svc);
     setEditTitle(svc.title);
     setEditDesc(svc.description);
     setEditPriceEth(ethers.formatEther(svc.price));
-    const secs = Number(svc.duration);
-    if (secs % 604800 === 0) {
-      setEditDurationUnit("weeks");
-      setEditDurationValue((secs / 604800).toString());
-    } else if (secs % 86400 === 0) {
-      setEditDurationUnit("days");
-      setEditDurationValue((secs / 86400).toString());
-    } else {
-      setEditDurationUnit("hours");
-      setEditDurationValue((secs / 3600).toString());
-    }
     setShowEditModal(true);
   };
 
@@ -241,14 +215,6 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
     setSendingEdit(true);
     try {
       const priceWei = ethers.parseEther(editPriceEth);
-      const durNum = parseInt(editDurationValue, 10);
-      const seconds =
-        durNum *
-        (editDurationUnit === "days"
-          ? 86400
-          : editDurationUnit === "hours"
-          ? 3600
-          : 604800);
       await ensureBase();
       await editService(
         walletClient!,
@@ -266,7 +232,6 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
                 title: editTitle,
                 description: editDesc,
                 price: priceWei,
-                duration: BigInt(seconds),
               }
             : s
         )
@@ -292,22 +257,13 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
       const priceNum = Number(newPriceEth);
       if (isNaN(priceNum) || priceNum <= 0) throw new Error("Invalid ETH price");
       const priceWei = ethers.parseEther(newPriceEth);
-      const durNum = parseInt(newDurationValue, 10);
-      if (isNaN(durNum) || durNum <= 0) throw new Error("Invalid duration");
-      const seconds =
-        durNum *
-        (newDurationUnit === "days"
-          ? 86400
-          : newDurationUnit === "hours"
-          ? 3600
-          : 604800);
+  
       await ensureBase();
       const tx = await createService(
         walletClient!,
         newTitle.trim(),
         newDesc.trim(),
         priceWei,
-        seconds,
         creationFee
       );
       await publicClient.waitForTransactionReceipt({ hash: tx });
@@ -319,8 +275,6 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
       setNewTitle("");
       setNewDesc("");
       setNewPriceEth("");
-      setNewDurationValue("");
-      setNewDurationUnit("days");
       setShowSuccess(true);
     } catch (e: any) {
       console.error(e);
@@ -526,28 +480,6 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
               onChange={(e) => setNewPriceEth(e.target.value)}
               className="w-full p-3 rounded-lg bg-[#2a2438] text-white"
             />
-            <div className="flex space-x-2">
-              <input
-                type="number"
-                placeholder="Duration"
-                value={newDurationValue}
-                onChange={(e) => setNewDurationValue(e.target.value)}
-                className="flex-1 p-3 rounded-lg bg-[#2a2438] text-white"
-              />
-              <select
-                value={newDurationUnit}
-                onChange={(e) =>
-                  setNewDurationUnit(
-                    e.target.value as "days" | "hours" | "weeks"
-                  )
-                }
-                className="w-32 p-3 rounded-lg bg-[#2a2438] text-white"
-              >
-                <option value="days">Days</option>
-                <option value="hours">Hours</option>
-                <option value="weeks">Weeks</option>
-              </select>
-            </div>
             <p className="text-xs text-gray-400">
               Creation fee: {ethers.formatEther(creationFee)} ETH
             </p>
@@ -597,28 +529,6 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
               onChange={(e) => setEditPriceEth(e.target.value)}
               className="w-full p-3 rounded-lg bg-[#2a2438] text-white"
             />
-            <div className="flex space-x-2">
-              <input
-                type="number"
-                placeholder="Duration"
-                value={editDurationValue}
-                onChange={(e) => setEditDurationValue(e.target.value)}
-                className="flex-1 p-3 rounded-lg bg-[#2a2438] text-white"
-              />
-              <select
-                value={editDurationUnit}
-                onChange={(e) =>
-                  setEditDurationUnit(
-                    e.target.value as "days" | "hours" | "weeks"
-                  )
-                }
-                className="w-32 p-3 rounded-lg bg-[#2a2438] text-white"
-              >
-                <option value="days">Days</option>
-                <option value="hours">Hours</option>
-                <option value="weeks">Weeks</option>
-              </select>
-            </div>
             <p className="text-xs text-gray-400">
               Edit fee: {ethers.formatEther(editFee)} ETH
             </p>
@@ -647,7 +557,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
         <div className="fixed inset-0 bg-black bg-opacity-70 z-40 flex items-center justify-center">
           <div className="bg-[#1a1725] p-6 rounded-xl w-full max-w-md space-y-4">
             <h3 className="text-lg font-bold text-red-500">Error</h3>
-            <p className="text-gray-300">{errorMessage}</p>
+            <p className="text-gray-300 h-[200px] overflow-y-scroll overflow-x-hidden">{errorMessage}</p>
             <button
               onClick={() => setShowErrorModal(false)}
               className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
