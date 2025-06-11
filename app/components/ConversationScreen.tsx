@@ -22,6 +22,9 @@ import { useRouter } from "next/navigation";
 import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import sdk from "@farcaster/frame-sdk";
+import Link from "next/link";
+import { ConnectWallet, Wallet, WalletDropdown, WalletDropdownDisconnect } from "@coinbase/onchainkit/wallet";
+import { Avatar, Name, Identity, Address, EthBalance } from "@coinbase/onchainkit/identity";
 
 interface ConversationScreenProps {
   peerAddress: string;
@@ -344,6 +347,28 @@ export default function ConversationScreen({
   // Render principal
   return (
     <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
+      <header className="flex justify-between items-center mb-3 h-11">
+        <Link href="/?view=home" shallow>
+          <img src="/PingGateLogoNoBG.png" alt="PingGate Home" className="w-12 h-12" />
+        </Link>
+        <div className="flex justify-end space-x-2 w-full z-50 pt-2">
+          <Wallet>
+            <ConnectWallet>
+              <Avatar className="h-6 w-6" />
+              <Name />
+            </ConnectWallet>
+            <WalletDropdown className="z-[200]">
+              <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+                <Avatar />
+                <Name />
+                <Address />
+                <EthBalance />
+              </Identity>
+              <WalletDropdownDisconnect />
+            </WalletDropdown>
+          </Wallet>
+        </div>
+      </header>
       <div className="flex items-center px-4 py-2 border-b border-gray-700">
         <button
           onClick={onBack}
@@ -421,7 +446,7 @@ export default function ConversationScreen({
           })}
         </div>
 
-        <div className="border-t border-gray-700 p-4">
+        <div className="border-t border-gray-700 px-1">
           <MessageInput onSend={(t) => handleSend(t)} />
         </div>
       </div>

@@ -138,7 +138,7 @@ export default function MessageInput({ onSend }: MessageInputProps) {
   return (
     <>
       {/* INLINE INPUT AREA */}
-      <div className="mt-3 flex items-end space-x-2">
+      <div className="mt-1 flex items-end space-x-2">
         <button
           onClick={openMenu}
           className="p-4 mb-2 bg-[#2a2438] text-white rounded-lg"
