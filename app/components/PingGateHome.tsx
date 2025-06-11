@@ -54,6 +54,10 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
   const [[currentIdx, direction], setIndex] = useState<[number, number]>([0, 0]);
   const [ready, setReady] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const badWords = useMemo(
+    () => ["dick", "fuck", "shit", "bitch"],
+    []
+  );
 
   const [showAlert, setShowAlert] = useState(false);
 
@@ -95,9 +99,17 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
       .catch(console.error);
   }, [services]);
 
+  const filteredServices = useMemo(() => {
+    return services.filter((svc) => {
+      const text = `${svc.title} ${svc.seller}`.toLowerCase();
+      // Si alguna palabra prohibida está contenida, lo excluimos
+      return !badWords.some((word) => text.includes(word));
+    });
+  }, [services, badWords]);
+
   // Shuffle once
   const shuffled = useMemo(() => {
-    const a = [...services];
+    const a = [...filteredServices];
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [a[i], a[j]] = [a[j], a[i]];
