@@ -222,6 +222,20 @@ export async function pauseService(
   });
 }
 
+/** Reactivate a service */
+export async function resumeService(
+  walletClient: WalletClient,
+  id: bigint
+) {
+  return walletClient.writeContract({
+    account: walletClient.account ?? null,
+    chain: base,
+    ...getContractConfig(),
+    functionName: "unpauseService",
+    args: [id],
+  });
+}
+
 /** Purchase a service (unlock contact) */
 export async function purchaseService(
   walletClient: WalletClient,

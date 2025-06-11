@@ -346,7 +346,7 @@ export default function ConversationScreen({
 
   // Render principal
   return (
-    <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto">
+    <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto px-1">
       <header className="flex justify-between items-center mb-3 h-11">
         <Link href="/?view=home" shallow>
           <img src="/PingGateLogoNoBG.png" alt="PingGate Home" className="w-12 h-12" />

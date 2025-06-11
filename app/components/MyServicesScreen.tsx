@@ -9,6 +9,7 @@ import {
   FiChevronDown,
   FiChevronUp,
   FiPlus,
+  FiPlayCircle,
 } from "react-icons/fi";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
@@ -18,6 +19,7 @@ import {
   getSalesBy,
   getReview,
   pauseService,
+  resumeService,
   editService,
   createService,
   getCreationFee,
@@ -186,19 +188,26 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
     }
   };
 
-  const onPause = async (id: bigint) => {
+  const onTogglePause = async (id: bigint, isActive: boolean) => {
     try {
       await ensureBase();
-      await pauseService(walletClient!, id);
+      if (isActive) {
+        await pauseService(walletClient!, id);
+      } else {
+        await resumeService(walletClient!, id);
+      }
+
       if (isMounted.current) {
-        setServices((p) =>
-          p.map((s) => (s.id === id ? { ...s, active: false } : s))
+        setServices((prev) =>
+          prev.map((s) =>
+            s.id === id ? { ...s, active: !isActive } : s
+          )
         );
-        toast.success("Service paused");
+        toast.success(isActive ? "Service paused" : "Service reactivated");
       }
     } catch (e: any) {
       console.error(e);
-      toast.error(e.message || "Pause failed");
+      toast.error(e.message || "Action failed");
     }
   };
 
@@ -287,10 +296,12 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
   };
 
   const handleShare = useCallback(() => {
-    const text = `Try PingGate 💬 Chat privately...`;
-    const url = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(text)}`;
-    window.open(url, "_blank");
+    const serviceUrl = `https://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/user/${sellerAddress}`;
+    const text = `🚀 I just created a service with PingGate by @lopezonchain.eth!\nCheck it out here: ${serviceUrl}`;
+    const shareUrl = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(text)}`;
+    window.open(shareUrl, "_blank");
   }, []);
+
 
   if (loading) {
     return (
@@ -401,11 +412,11 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onPause(svc.id);
+                          onTogglePause(svc.id, svc.active);
                         }}
                         className="p-2 bg-[#2a2438] rounded-full hover:bg-[#3a3248]"
                       >
-                        <FiPauseCircle size={18} />
+                        {svc.active ? <FiPauseCircle size={18} /> : <FiPlayCircle size={18} />}
                       </button>
                       {isOpen ? <FiChevronUp size={20} /> : <FiChevronDown size={20} />}
                     </div>

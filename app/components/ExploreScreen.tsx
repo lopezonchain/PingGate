@@ -173,7 +173,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
   }
 
   // 3) Buy flow
-  const onBuy = async (id: bigint, price: bigint, sellerName: string) => {
+  const onBuy = async (id: bigint, price: bigint, sellerAddress: string) => {
     setProcessingId(id);
     try {
       const ok = await ensureBaseNetwork();
@@ -183,7 +183,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
       }
       const hash = await purchaseService(walletClient!, id, price);
       await publicClient.waitForTransactionReceipt({ hash });
-      setSuccessPeer(sellerName);
+      setSuccessPeer(sellerAddress);
       setShowSuccess(true);
     } catch (e: any) {
       console.error(e);
@@ -235,7 +235,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
                   reviews={reviews[key] || []}
                   isExpanded={expandedService === key}
                   onToggleReviews={() => toggleReviews(svc.id)}
-                  onBuy={(id, price) => onBuy(id, price, prof.name)}
+                  onBuy={(id, price) => onBuy(id, price, addr)}
                   processingId={processingId}
                   walletConnected={!!walletClient}
                 />
