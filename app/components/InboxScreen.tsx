@@ -15,11 +15,14 @@ import {
 } from "@xmtp/browser-sdk";
 import { useWalletClient } from "wagmi";
 import {
+  FiCopy,
   FiFile,
   FiHelpCircle,
   FiMenu,
   FiMessageCircle,
   FiPlus,
+  FiSend,
+  FiShare2,
 } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { useXmtpClient } from "../hooks/useXmtpClient";
@@ -40,6 +43,7 @@ import { formatEther } from "ethers";
 import FaqList from "./FAQList";
 import BottomMenu from "./BottomMenu";
 import { WarpView } from "../page-client";
+import toast from "react-hot-toast";
 
 interface InboxScreenProps {
   onAction: (view: WarpView) => void;
@@ -139,6 +143,10 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   const [showCastModal, setShowCastModal] = useState(false)
   const [castPeer, setCastPeer] = useState<string>("")
   const [castHandle, setCastHandle] = useState<string>("")
+
+  const [showShareOptions, setShowShareOptions] = useState(false);
+  const conversationUrl = `https://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/conversation/${myAddr}`;
+  const conversationWebUrl = `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`;
 
   // Obtener mi inboxId para saber mis mensajes no leídos
   const [myInboxId, setMyInboxId] = useState<string>("");
@@ -736,6 +744,36 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
     }
   }
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(conversationUrl);
+      toast.success("Link copied to clipboard");
+    } catch (err) {
+      console.error("Copy failed", err);
+      toast.error("Failed to copy link");
+    }
+    setShowShareOptions(false);
+  };
+
+  const handleCopyWeb = async () => {
+    try {
+      await navigator.clipboard.writeText(conversationWebUrl);
+      toast.success("Link copied to clipboard");
+    } catch (err) {
+      console.error("Copy failed", err);
+      toast.error("Failed to copy link");
+    }
+    setShowShareOptions(false);
+  };
+
+
+  const handleCast = () => {
+    const text = `Chat with me... or better said: PING ME!!\nYou also can monetize your inbox or find experts, built by @lopezonchain.eth 💬🛠️\n\n${conversationUrl}`;
+    const shareUrl = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(text)}`;
+    window.open(shareUrl, "_blank");
+    setShowShareOptions(false);
+  };
+
   // — Filtrar conversaciones según pestaña (“sales”/“purchases”/“all”), pero ahora usando peerWalletAddress
   const filtered = conversations.filter((c) => {
     const key = c.peerKey;
@@ -786,25 +824,61 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   return (
     <div className="flex-1 flex flex-col min-h-0 h-[99%] bg-[#0f0d14] text-white">
       <div className="flex-1 flex flex-col min-h-0 bg-[#0f0d14] text-white pb-14">
-        <div className="flex justify-center mb-2 divide-x divide-purple-600">
-          {(["all", "purchases", "sales"] as Tab[]).map((t) => (
+        <div className="flex justify-center items center">
+          <div className="relative mr-2 flex items-start justify-center">
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`
+              onClick={() => setShowShareOptions((prev) => !prev)}
+              className="flex items-center space-x-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+            >
+              <FiShare2 />
+              <span>Share</span>
+            </button>
+
+            {showShareOptions && (
+              <div className="absolute top-[40px] left-[40px] mt-2 bg-[#1a1725] border border-gray-700 rounded-lg shadow-lg w-52 z-[150]">
+                <button
+                  onClick={handleCast}
+                  className="w-full flex items-center px-4 py-2 text-sm hover:bg-[#2a2438] text-white"
+                >
+                  <FiSend className="mr-2" />
+                  Cast my conversation
+                </button>
+                <button
+                  onClick={handleCopy}
+                  className="w-full flex items-center px-4 py-2 text-sm hover:bg-[#2a2438] text-white"
+                >
+                  <FiCopy className="mr-2" />
+                  Copy My conversation link (Miniapp)
+                </button>
+                <button
+                  onClick={handleCopyWeb}
+                  className="w-full flex items-center px-4 py-2 text-sm hover:bg-[#2a2438] text-white"
+                >
+                  <FiCopy className="mr-2" />
+                  Copy My conversation link (Web)
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-center items-center mb-2 divide-x divide-purple-600">
+            {(["all", "purchases", "sales"] as Tab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`
               px-6 py-3
               first:rounded-l-lg last:rounded-r-lg
               ${tab === t
-                  ? "bg-purple-600 text-white"
-                  : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
-                }
+                    ? "bg-purple-600 text-white"
+                    : "bg-[#1a1725] text-gray-400 hover:bg-[#231c32]"
+                  }
             `}
-            >
-              {t === "sales" ? "Clients" : t === "purchases" ? "Experts" : "All"}
-            </button>
-          ))}
+              >
+                {t === "sales" ? "Clients" : t === "purchases" ? "Experts" : "All"}
+              </button>
+            ))}
+          </div>
         </div>
-
         {xmtpError && <p className="text-red-500 text-center mb-2">{xmtpError}</p>}
 
         <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
@@ -1005,7 +1079,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
             <div className="bg-[#1a1725] text-white p-6 rounded-lg max-w-sm w-full mx-4">
               <h2 className="text-xl font-semibold">Post on Farcaster</h2>
               <p className="mt-2">
-                This user doesn&apos;t have an inbox yet, but found this related Farcaster account!.<br/>
+                This user doesn&apos;t have an inbox yet, but found this related Farcaster account!.<br />
                 Would you like to send an invite to <strong>@{castHandle}</strong>?
               </p>
               <div className="mt-4 flex flex-col space-y-2">

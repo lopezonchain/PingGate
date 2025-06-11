@@ -10,6 +10,9 @@ import {
   FiChevronUp,
   FiPlus,
   FiPlayCircle,
+  FiCopy,
+  FiSend,
+  FiShare2,
 } from "react-icons/fi";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
@@ -95,6 +98,11 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
+
+  const [showShareOptions, setShowShareOptions] = useState(false);
+  const serviceUrl = `https://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/user/${sellerAddress}`;
+  const serviceWebUrl = `https://pinggate.lopezonchain.xyz/user/${sellerAddress}`;
+
 
   const isMounted = useRef(true);
   useEffect(() => {
@@ -237,11 +245,11 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
         prev.map((s) =>
           s.id === editingService.id
             ? {
-                ...s,
-                title: editTitle,
-                description: editDesc,
-                price: priceWei,
-              }
+              ...s,
+              title: editTitle,
+              description: editDesc,
+              price: priceWei,
+            }
             : s
         )
       );
@@ -266,7 +274,7 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
       const priceNum = Number(newPriceEth);
       if (isNaN(priceNum) || priceNum <= 0) throw new Error("Invalid ETH price");
       const priceWei = ethers.parseEther(newPriceEth);
-  
+
       await ensureBase();
       const tx = await createService(
         walletClient!,
@@ -296,12 +304,40 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
   };
 
   const handleShare = useCallback(() => {
-    const serviceUrl = `https://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/user/${sellerAddress}`;
     const text = `🚀 I just created a service with PingGate by @lopezonchain.eth!\nCheck it out here: ${serviceUrl}`;
     const shareUrl = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(text)}`;
     window.open(shareUrl, "_blank");
   }, []);
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(serviceUrl);
+      toast.success("Link copied to clipboard");
+    } catch (err) {
+      console.error("Copy failed", err);
+      toast.error("Failed to copy link");
+    }
+    setShowShareOptions(false);
+  };
+
+  const handleCopyWeb = async () => {
+    try {
+      await navigator.clipboard.writeText(serviceWebUrl);
+      toast.success("Link copied to clipboard");
+    } catch (err) {
+      console.error("Copy failed", err);
+      toast.error("Failed to copy link");
+    }
+    setShowShareOptions(false);
+  };
+
+
+  const handleCast = () => {
+    const text = `🚀 Check out my services on PingGate, the onchain chat marketplace!\nBuilt by @lopezonchain.eth 💬🛠️\n\n${serviceUrl}`;
+    const shareUrl = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(text)}`;
+    window.open(shareUrl, "_blank");
+    setShowShareOptions(false);
+  };
 
   if (loading) {
     return (
@@ -373,6 +409,42 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
                 <p className="text-lg font-bold text-purple-500">{totalRevenue} ETH</p>
                 Revenue
               </div>
+
+            </div>
+            <div className="relative flex w-full justify-center ">
+              <button
+                onClick={() => setShowShareOptions((prev) => !prev)}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+              >
+                <FiShare2 />
+                <span>Services share</span>
+              </button>
+
+              {showShareOptions && (
+                <div className="absolute top-full mt-2 bg-[#1a1725] border border-gray-700 rounded-lg shadow-lg w-52 z-[150]">
+                  <button
+                    onClick={handleCast}
+                    className="w-full flex items-center px-4 py-2 text-sm hover:bg-[#2a2438] text-white"
+                  >
+                    <FiSend className="mr-2" />
+                    Cast My Services
+                  </button>
+                  <button
+                    onClick={handleCopy}
+                    className="w-full flex items-center px-4 py-2 text-sm hover:bg-[#2a2438] text-white"
+                  >
+                    <FiCopy className="mr-2" />
+                    Copy My services link (Miniapp)
+                  </button>
+                  <button
+                    onClick={handleCopyWeb}
+                    className="w-full flex items-center px-4 py-2 text-sm hover:bg-[#2a2438] text-white"
+                  >
+                    <FiCopy className="mr-2" />
+                    Copy My services link (Web)
+                  </button>
+                </div>
+              )}
             </div>
 
             {services.map((svc) => {
@@ -431,8 +503,8 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
                         valid.map((r, i) => (
                           <div key={i} className="bg-[#2a2438] p-3 rounded-lg">
                             <p className="text-sm">
-                              ⭐ Quality: {r.quality.toFixed(1)} <br/> 💬 Communication:{" "}
-                              {r.communication.toFixed(1)} <br/> ⏱️ Timeliness:{" "}
+                              ⭐ Quality: {r.quality.toFixed(1)} <br /> 💬 Communication:{" "}
+                              {r.communication.toFixed(1)} <br /> ⏱️ Timeliness:{" "}
                               {r.timeliness.toFixed(1)}
                             </p>
                             <p className="mt-1 text-xs text-gray-400">{r.comment}</p>
