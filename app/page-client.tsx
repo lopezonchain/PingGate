@@ -74,7 +74,7 @@ export function Button({
   icon,
 }: ButtonProps) {
   const baseClasses =
-    "inline-flex items-center justify-center font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0052FF] disabled:opacity-50 disabled:pointer-events-none";
+    "inline-flex items-center justify-center font-medium transition-colors focus:outline-none disabled:opacity-50 disabled:pointer-events-none";
 
   const variantClasses = {
     primary:
@@ -396,7 +396,7 @@ export default function Page(): JSX.Element {
                 <Button
                   onClick={() => connectAsync({ connector: farcasterFrame() })}
                   size="md"
-                  className="cursor-pointer ock-bg-primary ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]"
+                  className="cursor-pointer ock-bg-primary active:bg-[var(--ock-bg-primary-active)] active:shadow-inner ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]"
                 >
                   Connect Farcaster
                 </Button>
@@ -405,7 +405,7 @@ export default function Page(): JSX.Element {
                 <Button
                   onClick={() => setIsWalletModalOpen(!isWalletModalOpen)}
                   size="md"
-                  className={`cursor-pointer ock-bg-primary  ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]`}
+                  className={`cursor-pointer ock-bg-primary active:bg-[var(--ock-bg-primary-active)] active:shadow-inner ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]`}
                 >
                   Connect
                 </Button>
