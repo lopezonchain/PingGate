@@ -240,18 +240,29 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
     // — última fecha y unread
     let updatedAt: Date | undefined;
     let hasUnread = false;
-    try {
-      const [last] = await conv.messages({
-        limit: BigInt(1),
-        direction: SortDirection.Descending,
-      });
-      if (last) {
-        updatedAt = new Date(Number(last.sentAtNs / BigInt(1e6)));
-        hasUnread = last.senderInboxId !== myInboxId;
-      }
-    } catch (e) {
-      console.warn("Error leyendo último mensaje de conv", conv.id, e);
+    // Descarga historial
+    await conv.sync();
+
+    // Lee unos cuantos (para filtrar)
+    const raws = await conv.messages({
+      limit: BigInt(5),
+      direction: SortDirection.Descending,
+    });
+
+    // Filtra sólo mensajes de usuario (texto o attachment)
+    const reales = raws.filter(m =>
+      typeof m.content === "string" ||
+      // o, si usas attachments, que tenga data
+      ((m.content as any).data !== undefined)
+    );
+
+    // Ahora sí, toma el primero de los reales
+    const last = reales[0];
+    if (last) {
+      updatedAt = new Date(Number(last.sentAtNs / BigInt(1e6)));
+      hasUnread = last.senderInboxId !== myInboxId;
     }
+
 
     // arma el objeto extendido
     const ext = conv as unknown as ExtendedConversation;
