@@ -33,6 +33,15 @@ interface ExploreScreenProps {
   onAction: (view: WarpView) => void;
 }
 
+function shuffleArray<T>(array: T[]): T[] {
+  const a = [...array];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export default function ExploreScreen({ onAction }: ExploreScreenProps) {
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
@@ -64,10 +73,12 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
           const text = `${svc.title} ${svc.seller}`.toLowerCase();
           return !badWords.some((w) => text.includes(w));
         });
+        
+        const shuffled = shuffleArray(filtered);
 
         // Guardamos los filtrados
-        setServices(filtered);
-        setDisplayed(filtered);
+        setServices(shuffled);
+        setDisplayed(shuffled);
 
         // Load profiles usando `filtered`
         const sellers = Array.from(
