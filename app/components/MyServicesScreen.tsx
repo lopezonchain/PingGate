@@ -414,10 +414,10 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
             <div className="relative flex w-full justify-center ">
               <button
                 onClick={() => setShowShareOptions((prev) => !prev)}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg mb-1"
               >
                 <FiShare2 />
-                <span>Services share</span>
+                <span>Share My Services</span>
               </button>
 
               {showShareOptions && (
