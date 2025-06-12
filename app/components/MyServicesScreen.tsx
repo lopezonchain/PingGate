@@ -103,6 +103,8 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
   const serviceUrl = `https://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/user/${sellerAddress}`;
   const serviceWebUrl = `https://pinggate.lopezonchain.xyz/user/${sellerAddress}`;
 
+  const TITLE_MAX_BYTES = 100;
+  const DESC_MAX_BYTES = 1000;
 
   const isMounted = useRef(true);
   useEffect(() => {
@@ -189,6 +191,23 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
       .catch(console.error);
   }, []);
 
+    const countBytes = (str: string): number =>
+  new TextEncoder().encode(str).length;
+
+  const handleNewTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    if (countBytes(v) <= TITLE_MAX_BYTES) {
+      setNewTitle(v);
+    }
+  };
+
+  const handleNewDescChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const v = e.target.value;
+    if (countBytes(v) <= DESC_MAX_BYTES) {
+      setNewDesc(v);
+    }
+  };
+  
   const ensureBase = async () => {
     if (!walletClient) throw new Error("Wallet not connected");
     if (walletClient.chain?.id !== base.id) {
@@ -544,20 +563,25 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
             <h3 className="text-lg font-bold text-white">Add New Service</h3>
             <input
               type="text"
-              maxLength={100}
               placeholder="Title"
               value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
+              onChange={handleNewTitleChange}
               className="w-full p-3 rounded-lg bg-[#2a2438] text-white"
             />
+            <p className="text-xs text-gray-400">
+              {countBytes(newTitle)} / {TITLE_MAX_BYTES} bytes
+            </p>
+
             <textarea
               rows={3}
               placeholder="Description"
-              maxLength={1000}
               value={newDesc}
-              onChange={(e) => setNewDesc(e.target.value)}
+              onChange={handleNewDescChange}
               className="w-full p-3 rounded-lg bg-[#2a2438] text-white"
             />
+            <p className="text-xs text-gray-400">
+              {countBytes(newDesc)} / {DESC_MAX_BYTES} bytes
+            </p>
             <input
               type="text"
               placeholder="Price (ETH)"
@@ -595,20 +619,25 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
             <h3 className="text-lg font-bold text-white">Edit Service</h3>
             <input
               type="text"
-              maxLength={100}
               placeholder="Title"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
+              value={newTitle}
+              onChange={handleNewTitleChange}
               className="w-full p-3 rounded-lg bg-[#2a2438] text-white"
             />
+            <p className="text-xs text-gray-400">
+              {countBytes(newTitle)} / {TITLE_MAX_BYTES} bytes
+            </p>
+
             <textarea
               rows={3}
-              maxLength={1000}
               placeholder="Description"
-              value={editDesc}
-              onChange={(e) => setEditDesc(e.target.value)}
+              value={newDesc}
+              onChange={handleNewDescChange}
               className="w-full p-3 rounded-lg bg-[#2a2438] text-white"
             />
+            <p className="text-xs text-gray-400">
+              {countBytes(newDesc)} / {DESC_MAX_BYTES} bytes
+            </p>
             <input
               type="text"
               placeholder="Price (ETH)"
