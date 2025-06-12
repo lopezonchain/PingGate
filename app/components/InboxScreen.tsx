@@ -189,101 +189,107 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
     }
   };
 
-  // Fuera de cualquier useEffect, dentro de InboxScreen:
   const loadConversations = async () => {
-  if (!xmtpClient) return;
-  setLoadingList(true);
+    if (!xmtpClient) return;
+    setLoadingList(true);
 
-  // Sincroniza la lista de conversaciones
-  await xmtpClient.conversations.syncAll([ConsentState.Allowed]);
-  const list = await xmtpClient.conversations.list();
+    // 1) sincroniza la lista de conversaciones (metadatos)
+    await xmtpClient.conversations.syncAll([ConsentState.Allowed]);
+    const list = await xmtpClient.conversations.list();
 
-  const enriched: ExtendedConversation[] = [];
+    // 2) procesa en paralelo cada conversación
+    const enriched = await Promise.all(
+      list.map(async (conv) => {
+        if (!(conv.id && typeof conv.id === "string")) return null;
 
-  for (const conv of list) {
-    if (!(conv.id && typeof conv.id === "string")) continue;
+        // — peerInboxId
+        let peerInbox: string | undefined;
+        if (conv instanceof Dm) {
+          try {
+            peerInbox = await conv.peerInboxId();
+          } catch {
+            /* swallow */
+          }
+        }
 
-    // obtener peerInboxId
-    let peerInbox: string | undefined;
-    if (conv instanceof Dm) {
-      try {
-        peerInbox = await conv.peerInboxId();
-      } catch (e) {
-        console.warn("No pude obtener peerInboxId", e);
-      }
-    }
+        // — peerWalletAddress
+        let peerWallet: string | undefined;
+        if (peerInbox) {
+          try {
+            const [state] = await xmtpClient.preferences.inboxStateFromInboxIds(
+              [peerInbox],
+              true
+            );
+            const ethId = state?.accountIdentifiers?.find(
+              (i) => i.identifierKind === "Ethereum"
+            );
+            peerWallet = ethId?.identifier.toLowerCase();
+          } catch {
+            /* swallow */
+          }
+        }
 
-    // resolver peerWalletAddress a partir de peerInboxId
-    let peerWallet: string | undefined;
-    if (peerInbox) {
-      try {
-        const [state] = await xmtpClient.preferences.inboxStateFromInboxIds(
-          [peerInbox],
-          true
-        );
-        const ethId = state?.accountIdentifiers?.find(
-          (i) => i.identifierKind === "Ethereum"
-        );
-        peerWallet = ethId?.identifier.toLowerCase();
-      } catch (e) {
-        console.warn("Error resolviendo peerWalletAddress", e);
-      }
-    }
+        // — trata de leer el último mensaje real sin sync
+        let lastMsg: DecodedMessage | undefined;
+        try {
+          const raws = await conv.messages({
+            limit: BigInt(1),
+            direction: SortDirection.Descending,
+          });
+          lastMsg = raws.find(
+            (m) =>
+              typeof m.content === "string" ||
+              ((m.content as any).data !== undefined)
+          );
+        } catch {
+          /* swallow */
+        }
 
-    // 2) Fuerza la descarga del historial de esta conversación
-    try {
-      await conv.sync();
-    } catch (e) {
-      console.warn("Error sincronizando mensajes de conv", conv.id, e);
-    }
+        // — si no hay ninguno, entonces sí sincroniza esta conversación
+        if (!lastMsg) {
+          try {
+            await conv.sync();
+            const raws2 = await conv.messages({
+              limit: BigInt(1),
+              direction: SortDirection.Descending,
+            });
+            lastMsg = raws2.find(
+              (m) =>
+                typeof m.content === "string" ||
+                ((m.content as any).data !== undefined)
+            );
+          } catch {
+            /* swallow */
+          }
+        }
 
-    // — última fecha y unread
-    let updatedAt: Date | undefined;
-    let hasUnread = false;
-    // Descarga historial
-    await conv.sync();
+        // — extrae fecha y unread
+        let updatedAt: Date | undefined;
+        let hasUnread = false;
+        if (lastMsg) {
+          updatedAt = new Date(Number(lastMsg.sentAtNs! / BigInt(1e6)));
+          hasUnread = lastMsg.senderInboxId !== myInboxId;
+        }
 
-    // Lee unos cuantos (para filtrar)
-    const raws = await conv.messages({
-      limit: BigInt(5),
-      direction: SortDirection.Descending,
-    });
+        const ext = conv as unknown as ExtendedConversation;
+        ext.peerInboxId = peerInbox;
+        ext.peerWalletAddress = peerWallet;
+        ext.updatedAt = updatedAt;
+        ext.hasUnread = hasUnread;
+        ext.peerKey = peerWallet || peerInbox!;
 
-    // Filtra sólo mensajes de usuario (texto o attachment)
-    const reales = raws.filter(m =>
-      typeof m.content === "string" ||
-      // o, si usas attachments, que tenga data
-      ((m.content as any).data !== undefined)
+        return ext;
+      })
     );
 
-    // Ahora sí, toma el primero de los reales
-    const last = reales[0];
-    if (last) {
-      updatedAt = new Date(Number(last.sentAtNs / BigInt(1e6)));
-      hasUnread = last.senderInboxId !== myInboxId;
-    }
+    // 3) filtra nulos y ordena
+    const finalList = enriched
+      .filter((c): c is ExtendedConversation => c !== null)
+      .sort((a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0));
 
-
-    // arma el objeto extendido
-    const ext = conv as unknown as ExtendedConversation;
-    ext.peerInboxId = peerInbox;
-    ext.peerWalletAddress = peerWallet;
-    ext.updatedAt = updatedAt;
-    ext.hasUnread = hasUnread;
-    // peerKey usa preferentemente wallet
-    ext.peerKey = peerWallet || peerInbox!;
-
-    enriched.push(ext);
-  }
-
-  // 3) ordena por fecha descendente
-  enriched.sort(
-    (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
-  );
-  setConversations(enriched);
-  setLoadingList(false);
-};
-
+    setConversations(finalList);
+    setLoadingList(false);
+  };
 
   useEffect(() => {
     if (!xmtpClient || !myInboxId) return
