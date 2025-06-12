@@ -43,7 +43,7 @@ export default function SuccessServiceCreationModal({
         <FiCheckCircle size={64} className="text-green-500" />
       </div>
       <p className="text-center text-gray-300 mb-6">
-        Your new service is live! Don't forget to join your Pings Inbox at least once to create your inbox, and Enable notifications in Farcaster!!
+        Your new service is live! Don&apos;t forget to join your Pings Inbox at least once to create your inbox, and Enable notifications in Farcaster!!
       </p>
       <button
         onClick={goToServices}

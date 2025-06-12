@@ -635,7 +635,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
           body: JSON.stringify({
             fid,
             notification: { title, body: bodyText },
-            targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
+            targetUrl: `https://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/conversation/${myAddr}`,
           }),
         });
         if (!res.ok) {

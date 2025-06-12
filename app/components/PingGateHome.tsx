@@ -190,7 +190,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
           />
           <h1 className="text-3xl font-bold">PingGate</h1>
         </div>
-         <p className="text-gray-300 text-sm text-center leading-snug italic tracking-wide py-2">
+         <p className="text-gray-300 text-[12px] text-center leading-snug italic tracking-wide py-2">
           <span className="text-purple-400 font-extrabold uppercase">Monetize</span> your inbox,{" "}
           <span className="text-purple-400 font-extrabold uppercase">find</span> and hire experts...
           <span> or just{" "}
