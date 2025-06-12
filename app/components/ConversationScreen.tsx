@@ -65,12 +65,12 @@ export default function ConversationScreen({
   const { setFrameReady, isFrameReady } = useMiniKit();
 
   // SDK Farcaster ready
-  useEffect(() => {
-    if (!isFrameReady) setFrameReady();
-    (async () => {
-      await sdk.actions.ready({ disableNativeGestures: true });
-    })();
-  }, [isFrameReady, setFrameReady]);
+      useEffect(() => {
+          if (!isFrameReady) setFrameReady();
+          (async () => {
+              await sdk.actions.ready({ disableNativeGestures: true });
+          })();
+      }, [isFrameReady, setFrameReady]);
 
   // Obtener mi inboxId
   useEffect(() => {
