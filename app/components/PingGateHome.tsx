@@ -187,7 +187,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
       )}
 
       {/* HEADER */}
-      <header className="flex flex-col items-center pb-1 px-4 flex-shrink-0">
+      <header className="flex flex-col items-center pb-1 px-1 flex-shrink-0">
         <div className="flex items-center space-x-3">
           <img
             src="/PingGateLogo.png"
