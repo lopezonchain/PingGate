@@ -70,7 +70,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   const { context } = useMiniKit();
   const { data: walletClient } = useWalletClient();
   const { xmtpClient, error: xmtpError } = useXmtpClient();
-  const myAddr = walletClient?.account.address.toLowerCase() || "";
+  const myAddr = walletClient?.account.address || "";
 
   // Instanciar WarpcastService
   const warpcast = useMemo(() => new WarpcastService(), []);
