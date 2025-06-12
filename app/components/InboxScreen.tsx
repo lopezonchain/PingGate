@@ -191,79 +191,99 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
 
   // Fuera de cualquier useEffect, dentro de InboxScreen:
   const loadConversations = async () => {
-    if (!xmtpClient) return
-    setLoadingList(true)
-    // sincroniza
-    await xmtpClient?.conversations.syncAll([ConsentState.Allowed])
-    // lista
-    const list = await xmtpClient!.conversations.list()
+  if (!xmtpClient) return;
+  setLoadingList(true);
 
-    const enriched: ExtendedConversation[] = []
-    for (const conv of list) {
-      if (!(conv.id && typeof conv.id === "string")) continue
+  // Sincroniza la lista de conversaciones
+  await xmtpClient.conversations.syncAll([ConsentState.Allowed]);
+  const list = await xmtpClient.conversations.list();
 
-      // — obtener peerInboxId
-      let peerInbox: string | undefined
-      if (conv instanceof Dm) {
-        try {
-          peerInbox = await conv.peerInboxId()
-        } catch (e) {
-          console.warn("No pude obtener peerInboxId", e)
-        }
-      }
+  const enriched: ExtendedConversation[] = [];
 
-      // — resolver peerWalletAddress a partir de peerInboxId
-      let peerWallet: string | undefined
-      if (peerInbox) {
-        try {
-          const [state] = await xmtpClient.preferences.inboxStateFromInboxIds(
-            [peerInbox],
-            true
-          )
-          const ethId = state?.accountIdentifiers?.find(
-            (i) => i.identifierKind === "Ethereum"
-          )
-          peerWallet = ethId?.identifier.toLowerCase()
-        } catch (e) {
-          console.warn("Error resolviendo peerWalletAddress", e)
-        }
-      }
+  for (const conv of list) {
+    if (!(conv.id && typeof conv.id === "string")) continue;
 
-      // última fecha y unread
-      let updatedAt: Date | undefined
-      let hasUnread = false
+    // obtener peerInboxId
+    let peerInbox: string | undefined;
+    if (conv instanceof Dm) {
       try {
-        const [last] = await conv.messages({
-          limit: BigInt(1),
-          direction: SortDirection.Descending,
-        })
-        if (last) {
-          updatedAt = new Date(Number(last.sentAtNs / BigInt(1e6)))
-          hasUnread = last.senderInboxId !== myInboxId
-        }
-      } catch {
-        /* swallow */
+        peerInbox = await conv.peerInboxId();
+      } catch (e) {
+        console.warn("No pude obtener peerInboxId", e);
       }
-
-      // arma el objeto extendido
-      const ext = conv as unknown as ExtendedConversation
-      ext.peerInboxId = peerInbox
-      ext.peerWalletAddress = peerWallet
-      ext.updatedAt = updatedAt
-      ext.hasUnread = hasUnread
-      // peerKey usa preferentemente wallet
-      ext.peerKey = peerWallet || peerInbox!
-
-      enriched.push(ext)
     }
 
-    // ordena por updatedAt desc
-    enriched.sort(
-      (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
-    )
-    setConversations(enriched)
-    setLoadingList(false)
+    // resolver peerWalletAddress a partir de peerInboxId
+    let peerWallet: string | undefined;
+    if (peerInbox) {
+      try {
+        const [state] = await xmtpClient.preferences.inboxStateFromInboxIds(
+          [peerInbox],
+          true
+        );
+        const ethId = state?.accountIdentifiers?.find(
+          (i) => i.identifierKind === "Ethereum"
+        );
+        peerWallet = ethId?.identifier.toLowerCase();
+      } catch (e) {
+        console.warn("Error resolviendo peerWalletAddress", e);
+      }
+    }
+
+    // 2) Fuerza la descarga del historial de esta conversación
+    try {
+      await conv.sync();
+    } catch (e) {
+      console.warn("Error sincronizando mensajes de conv", conv.id, e);
+    }
+
+    // — última fecha y unread
+    let updatedAt: Date | undefined;
+    let hasUnread = false;
+    // Descarga historial
+    await conv.sync();
+
+    // Lee unos cuantos (para filtrar)
+    const raws = await conv.messages({
+      limit: BigInt(5),
+      direction: SortDirection.Descending,
+    });
+
+    // Filtra sólo mensajes de usuario (texto o attachment)
+    const reales = raws.filter(m =>
+      typeof m.content === "string" ||
+      // o, si usas attachments, que tenga data
+      ((m.content as any).data !== undefined)
+    );
+
+    // Ahora sí, toma el primero de los reales
+    const last = reales[0];
+    if (last) {
+      updatedAt = new Date(Number(last.sentAtNs / BigInt(1e6)));
+      hasUnread = last.senderInboxId !== myInboxId;
+    }
+
+
+    // arma el objeto extendido
+    const ext = conv as unknown as ExtendedConversation;
+    ext.peerInboxId = peerInbox;
+    ext.peerWalletAddress = peerWallet;
+    ext.updatedAt = updatedAt;
+    ext.hasUnread = hasUnread;
+    // peerKey usa preferentemente wallet
+    ext.peerKey = peerWallet || peerInbox!;
+
+    enriched.push(ext);
   }
+
+  // 3) ordena por fecha descendente
+  enriched.sort(
+    (a, b) => (b.updatedAt?.getTime() || 0) - (a.updatedAt?.getTime() || 0)
+  );
+  setConversations(enriched);
+  setLoadingList(false);
+};
+
 
   useEffect(() => {
     if (!xmtpClient || !myInboxId) return
@@ -658,38 +678,27 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
       if (!xmtpClient) throw new Error("XMTP not ready")
       if (!to || !body) throw new Error("Fill all fields")
 
-      // resuelvo la dirección
-      addr = await resolveRecipient(to);
+      // 1) resuelvo la dirección
+      addr = await resolveRecipient(to)
 
-      // compruebo gated chat: peer tiene servicios?
-      const serviceIds = await fetchServiceIdsBySeller(addr as `0x${string}`);
-      let hasActive = false;
+      // 2) compruebo gated chat como antes...
+      const serviceIds = await fetchServiceIdsBySeller(addr as `0x${string}`)
+      let hasActive = false
       for (const id of serviceIds) {
-        const svc = await fetchServiceDetails(id);
-        if (svc.active) {
-          hasActive = true;
-          break;
-        }
+        const svc = await fetchServiceDetails(id)
+        if (svc.active) { hasActive = true; break }
+      }
+      if (hasActive && !purchasedPeers.has(addr)) {
+        setModalPeer(addr)
+        setShowGatedModal(true)
+        return
       }
 
-      // bloqueo solo si peer tiene servicios activos y ni tú le has comprado, ni él te ha comprado a ti
-      if (
-        hasActive &&
-        !(
-          purchasedPeers.has(addr) ||
-          soldPeers.has(addr)
-        )
-      ) {
-        setModalPeer(addr);
-        setShowGatedModal(true);
-        return;
-      }
-
-      // si pasas el gating, envías por XMTP
+      // 3) intento enviar por XMTP
       const peerIdentifier = {
         identifier: addr,
         identifierKind: "Ethereum" as IdentifierKind,
-      };
+      }
       const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
       if (typeof body === "string") {
         await convo.send(body);
@@ -697,13 +706,13 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         await convo.send(body, ContentTypeAttachment);
       }
 
-      // refresco UI y envíos de notificación (igual que antes)…
+      // 4) refresco y cierro composer
       await loadConversations();
       setShowComposer(false);
       setTo("");
       setBody("");
 
-      // notificación Warpcast 
+      // 5) notificación Warpcast (igual que antes)
       const profile = profilesMap[addr] as Web3BioProfile | null;
       let fid = 0;
       if (profile?.social?.uid) {
@@ -725,7 +734,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
             body: JSON.stringify({
               fid,
               notification: { title, body: bodyText },
-              targetUrl: `https://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/conversation/${myAddr}`,
+              targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
             }),
           })
           if (!res.ok) console.error(`Notify failed: ${res.status}`);
@@ -933,8 +942,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
                 : abbreviateAddress(peer);
               const avatarUrl = (profile as any)?.avatar || null;
               const isOpen = expanded === conv.id;
-              
-              const isGated = gatedPeers.has(peer) && !(purchasedPeers.has(peer) || soldPeers.has(peer));
+              const isGated = gatedPeers.has(peer) && !purchasedPeers.has(peer);
 
               return (
                 <motion.div
