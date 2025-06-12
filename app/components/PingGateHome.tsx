@@ -166,13 +166,7 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
 
   const handleActionClick = useCallback(
     (view: WarpView) => {
-      if (view === "faq") {
         onAction(view);
-      } else if (!isConnected) {
-        setShowAlert(true);
-      } else {
-        onAction(view);
-      }
     },
     [isConnected, onAction]
   );

@@ -4,12 +4,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import {
   AsyncStream,
-  Client,
-  ConsentState,
   type DecodedMessage,
   IdentifierKind,
   SortDirection,
-  Conversation,
 } from "@xmtp/browser-sdk";
 import { useWalletClient, useConnect } from "wagmi";
 import { FiArrowLeft, FiFile } from "react-icons/fi";
@@ -23,8 +20,10 @@ import { ContentTypeAttachment } from "@xmtp/content-type-remote-attachment";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import sdk from "@farcaster/frame-sdk";
 import Link from "next/link";
-import { ConnectWallet, Wallet, WalletDropdown, WalletDropdownDisconnect } from "@coinbase/onchainkit/wallet";
+import { ConnectWallet, Wallet, WalletDropdown, WalletDropdownDisconnect, WalletModal } from "@coinbase/onchainkit/wallet";
 import { Avatar, Name, Identity, Address, EthBalance } from "@coinbase/onchainkit/identity";
+import farcasterFrame from "@farcaster/frame-wagmi-connector";
+import { Button } from "../page-client";
 
 interface ConversationScreenProps {
   peerAddress: string;
@@ -43,7 +42,7 @@ export default function ConversationScreen({
 }: ConversationScreenProps) {
   const router = useRouter();
   const { data: walletClient } = useWalletClient();
-  const { connect, connectors } = useConnect();
+  const { connectAsync, connectors } = useConnect();
   const { xmtpClient, error: xmtpError } = useXmtpClient();
   const [myInboxId, setMyInboxId] = useState<string>("");
   const myAddress = walletClient?.account.address.toLowerCase() || "";
@@ -61,16 +60,32 @@ export default function ConversationScreen({
   const [messages, setMessages] = useState<DecodedMessage[]>([]);
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [fullFileText, setFullFileText] = useState<string | null>(null);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [farcasterContext, setFarcasterContext] = useState<any>(null);
 
   const { setFrameReady, isFrameReady } = useMiniKit();
 
   // SDK Farcaster ready
-      useEffect(() => {
-          if (!isFrameReady) setFrameReady();
-          (async () => {
-              await sdk.actions.ready({ disableNativeGestures: true });
-          })();
-      }, [isFrameReady, setFrameReady]);
+  useEffect(() => {
+    if (!isFrameReady) setFrameReady();
+    (async () => {
+      await sdk.actions.ready({ disableNativeGestures: true });
+    })();
+  }, [isFrameReady, setFrameReady]);
+
+  useEffect(() => {
+    let mounted = true;
+    sdk.context
+      .then((ctx) => {
+        if (mounted) setFarcasterContext(ctx);
+      })
+      .catch((err) => {
+        console.error("failed to load Farcaster context", err);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Obtener mi inboxId
   useEffect(() => {
@@ -98,14 +113,14 @@ export default function ConversationScreen({
           setMyName(prof.displayName);
           return;
         }
-      } catch {}
+      } catch { }
       try {
         const ens = await resolveNameLabel(walletClient.account.address);
         if (active && ens) {
           setMyName(ens);
           return;
         }
-      } catch {}
+      } catch { }
       if (active) {
         setMyName(abbreviateAddress(walletClient.account.address));
       }
@@ -134,7 +149,7 @@ export default function ConversationScreen({
           setDisplayName(aliasMap[addr].displayName);
           return;
         }
-      } catch {}
+      } catch { }
       if (active) {
         try {
           const ens = await resolveNameLabel(addr);
@@ -142,7 +157,7 @@ export default function ConversationScreen({
             setDisplayName(ens);
             return;
           }
-        } catch {}
+        } catch { }
         setDisplayName(peerAddress);
       }
     })();
@@ -161,7 +176,7 @@ export default function ConversationScreen({
       let peerServiceIds: bigint[] = [];
       try {
         peerServiceIds = await getServicesBy(addrPeer);
-      } catch {}
+      } catch { }
       if (!active) return;
 
       if (peerServiceIds.length === 0) {
@@ -175,7 +190,7 @@ export default function ConversationScreen({
       let myPurchaseIds: bigint[] = [];
       try {
         myPurchaseIds = await getPurchasesBy(addrMe);
-      } catch {}
+      } catch { }
       if (!active) return;
 
       const peerSet = new Set(peerServiceIds.map((b) => b.toString()));
@@ -283,8 +298,8 @@ export default function ConversationScreen({
     const bytes = att.data instanceof Uint8Array
       ? att.data
       : Array.isArray(att.data)
-      ? Uint8Array.from(att.data as number[])
-      : new Uint8Array(att.data as ArrayBuffer);
+        ? Uint8Array.from(att.data as number[])
+        : new Uint8Array(att.data as ArrayBuffer);
     return URL.createObjectURL(new Blob([bytes], { type: att.mimeType }));
   };
   const handleAttachmentClick = async (att: XMTPAttachment) => {
@@ -311,8 +326,61 @@ export default function ConversationScreen({
   }
   if (!checkedGate) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#0f0d14] text-white">
-        <span className="text-gray-400">Loading chat…</span>
+      <div className="flex flex-col h-screen bg-[#0f0d14] text-white w-full max-w-md mx-auto px-1">
+        <header className="flex justify-between items-center mb-3 h-11">
+          <Link href="/?view=home" shallow>
+            <img src="/PingGateLogoNoBG.png" alt="PingGate Home" className="w-12 h-12" />
+          </Link>
+          <div className="flex justify-end space-x-2 w-full z-50 pt-2">
+            <Wallet>
+              {myAddress ? (
+                <>
+                  <ConnectWallet>
+                    <Avatar className="h-6 w-6" />
+                    <Name />
+                  </ConnectWallet>
+                  <WalletDropdown classNames={{
+                    container: 'max-sm:pb-20'
+                  }}>
+                    <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+                      <Avatar />
+                      <Name />
+                      <Address />
+                      <EthBalance />
+                    </Identity>
+                    <WalletDropdownDisconnect />
+                  </WalletDropdown>
+                </>
+              ) : farcasterContext ? (
+                <Button
+                  onClick={() => connectAsync({ connector: farcasterFrame() })}
+                  size="md"
+                  className="cursor-pointer ock-bg-primary active:bg-[var(--ock-bg-primary-active)] active:shadow-inner ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]"
+                >
+                  Connect Farcaster
+                </Button>
+              ) : (
+                // if not connected, show our own connect button
+                <Button
+                  onClick={() => setIsWalletModalOpen(!isWalletModalOpen)}
+                  size="md"
+                  className={`cursor-pointer ock-bg-primary active:bg-[var(--ock-bg-primary-active)] active:shadow-inner ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]`}
+                >
+                  Connect
+                </Button>
+              )}
+            </Wallet>
+          </div>
+        </header>
+        <div className="flex justify-center items-center h-full px-4 py-2">
+          <span className="text-gray-400">Loading chat… Connect a wallet if you didn't yet</span>
+        </div>
+        <WalletModal
+        isOpen={isWalletModalOpen}
+        onClose={() => {
+          setIsWalletModalOpen(false);
+        }}
+      />
       </div>
     );
   }
@@ -353,19 +421,42 @@ export default function ConversationScreen({
         </Link>
         <div className="flex justify-end space-x-2 w-full z-50 pt-2">
           <Wallet>
-            <ConnectWallet>
-              <Avatar className="h-6 w-6" />
-              <Name />
-            </ConnectWallet>
-            <WalletDropdown className="z-[200]">
-              <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
-                <Avatar />
-                <Name />
-                <Address />
-                <EthBalance />
-              </Identity>
-              <WalletDropdownDisconnect />
-            </WalletDropdown>
+            {myAddress ? (
+              <>
+                <ConnectWallet>
+                  <Avatar className="h-6 w-6" />
+                  <Name />
+                </ConnectWallet>
+                <WalletDropdown classNames={{
+                  container: 'max-sm:pb-20'
+                }}>
+                  <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+                    <Avatar />
+                    <Name />
+                    <Address />
+                    <EthBalance />
+                  </Identity>
+                  <WalletDropdownDisconnect />
+                </WalletDropdown>
+              </>
+            ) : farcasterContext ? (
+              <Button
+                onClick={() => connectAsync({ connector: farcasterFrame() })}
+                size="md"
+                className="cursor-pointer ock-bg-primary active:bg-[var(--ock-bg-primary-active)] active:shadow-inner ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]"
+              >
+                Connect Farcaster
+              </Button>
+            ) : (
+              // if not connected, show our own connect button
+              <Button
+                onClick={() => setIsWalletModalOpen(!isWalletModalOpen)}
+                size="md"
+                className={`cursor-pointer ock-bg-primary active:bg-[var(--ock-bg-primary-active)] active:shadow-inner ock-border-radius ock-font-family font-semibold ock-text-inverse inline-flex items-center justify-center px-4 py-3 min-w-[153px]`}
+              >
+                Connect
+              </Button>
+            )}
           </Wallet>
         </div>
       </header>
@@ -397,9 +488,9 @@ export default function ConversationScreen({
             const isMe = m.senderInboxId === myInboxId;
             const time = m.sentAtNs
               ? new Date(Number(m.sentAtNs / BigInt(1e6))).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
+                hour: "2-digit",
+                minute: "2-digit",
+              })
               : "";
             const isAtt =
               typeof m.content !== "string" && (m.content as any).data;
@@ -408,9 +499,8 @@ export default function ConversationScreen({
             return (
               <div
                 key={i}
-                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${
-                  isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
-                }`}
+                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
+                  }`}
                 style={{ hyphens: "auto" }}
               >
                 {att ? (
@@ -473,6 +563,12 @@ export default function ConversationScreen({
           </pre>
         </div>
       )}
+      <WalletModal
+        isOpen={isWalletModalOpen}
+        onClose={() => {
+          setIsWalletModalOpen(false);
+        }}
+      />
     </div>
   );
 }
