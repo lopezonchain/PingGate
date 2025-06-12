@@ -373,7 +373,7 @@ export default function ConversationScreen({
           </div>
         </header>
         <div className="flex justify-center items-center h-full px-4 py-2">
-          <span className="text-gray-400">Loading chat… Connect a wallet if you didn't yet</span>
+          <span className="text-gray-400">Loading chat… Connect a wallet if you didn&apos;t yet</span>
         </div>
         <WalletModal
         isOpen={isWalletModalOpen}
