@@ -22,6 +22,7 @@ import ServiceCard from "./ServiceCard";
 import BottomMenu from "./BottomMenu";
 import { WarpView } from "../page-client";
 import { base } from "viem/chains";
+import { badWords } from "./PingGateHome";
 
 interface SellerProfile {
   name: string;
@@ -50,17 +51,28 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [successPeer, setSuccessPeer] = useState<string>("");
 
-  // 1) Load all data on mount
+  // Load all data on mount
   useEffect(() => {
     const warp = new WarpcastService();
     (async () => {
       try {
+        // Cargamos todos los servicios
         const list = await getActiveServices();
-        setServices(list);
-        setDisplayed(list);
 
-        // load profiles
-        const sellers = Array.from(new Set(list.map((s) => s.seller.toLowerCase())));
+        // Filtramos los que contienen malas palabras en el title o seller
+        const filtered = list.filter((svc) => {
+          const text = `${svc.title} ${svc.seller}`.toLowerCase();
+          return !badWords.some((w) => text.includes(w));
+        });
+
+        // Guardamos los filtrados
+        setServices(filtered);
+        setDisplayed(filtered);
+
+        // Load profiles usando `filtered`
+        const sellers = Array.from(
+          new Set(filtered.map((s) => s.seller.toLowerCase()))
+        );
         const ids = sellers.map((a) => `farcaster,${a}`);
         let bios: Web3BioProfile[] = [];
         try {
@@ -89,17 +101,22 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
         );
         setProfiles(Object.fromEntries(profEntries));
 
-        // load ratings
+        // Load ratings usando `filtered`
         const ratingEntries = await Promise.all(
-          list.map(async (svc) => [svc.id.toString(), await getAverageRating(svc.id)] as [string, number])
+          filtered.map(async (svc) => [
+            svc.id.toString(),
+            await getAverageRating(svc.id),
+          ] as [string, number])
         );
         setRatings(Object.fromEntries(ratingEntries));
 
-        // load reviews
+        // Load reviews usando `filtered`
         const reviewEntries = await Promise.all(
-          list.map(async (svc) => {
+          filtered.map(async (svc) => {
             const sales = await getSalesBy(svc.seller);
-            const buyers = sales.filter((r) => r.serviceId === svc.id).map((r) => r.buyer);
+            const buyers = sales
+              .filter((r) => r.serviceId === svc.id)
+              .map((r) => r.buyer);
             const revs = await Promise.all(
               buyers.map(async (b) => {
                 const r = await getReview(svc.id, b);

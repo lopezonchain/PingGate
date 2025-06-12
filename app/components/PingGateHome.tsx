@@ -48,16 +48,14 @@ const SLIDE_VARIANTS = {
   }),
 };
 
+export const badWords = ["dick", "fuck", "shit", "bitch"];
+
 const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
   const [services, setServices] = useState<Service[]>([]);
   const [profiles, setProfiles] = useState<Record<string, Web3BioProfile>>({});
   const [[currentIdx, direction], setIndex] = useState<[number, number]>([0, 0]);
   const [ready, setReady] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const badWords = useMemo(
-    () => ["dick", "fuck", "shit", "bitch"],
-    []
-  );
 
   const [showAlert, setShowAlert] = useState(false);
 
@@ -77,13 +75,21 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
     };
   }, []);
 
-  // Fetch profiles
+  const filteredServices = useMemo(() => {
+    return services.filter((svc) => {
+      const text = `${svc.title} ${svc.seller}`.toLowerCase();
+      return !badWords.some((word) => text.includes(word));
+    });
+  }, [services, badWords]);
+
   useEffect(() => {
-    if (!services.length) return;
-    const uniq = Array.from(
-      new Set(services.map((s) => s.seller.toLowerCase()))
+    if (!filteredServices.length) return;
+
+    const uniqAddrs = Array.from(
+      new Set(filteredServices.map((s) => s.seller.toLowerCase()))
     );
-    const ids = uniq.map((a) => `farcaster,${a}`);
+    const ids = uniqAddrs.map((addr) => `farcaster,${addr}`);
+
     new WarpcastService()
       .getWeb3BioProfiles(ids)
       .then((bios) => {
@@ -91,21 +97,15 @@ const PingGateHome: React.FC<PingGateHomeProps> = ({ onAction }) => {
         bios.forEach((p) =>
           p.aliases?.forEach((alias) => {
             const [pl, addr] = alias.split(",");
-            if (pl === "farcaster") map[addr.toLowerCase()] = p;
+            if (pl === "farcaster") {
+              map[addr.toLowerCase()] = p;
+            }
           })
         );
         setProfiles(map);
       })
       .catch(console.error);
-  }, [services]);
-
-  const filteredServices = useMemo(() => {
-    return services.filter((svc) => {
-      const text = `${svc.title} ${svc.seller}`.toLowerCase();
-      // Si alguna palabra prohibida está contenida, lo excluimos
-      return !badWords.some((word) => text.includes(word));
-    });
-  }, [services, badWords]);
+  }, [filteredServices]);
 
   // Shuffle once
   const shuffled = useMemo(() => {
