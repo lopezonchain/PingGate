@@ -44,6 +44,7 @@ import FaqList from "./FAQList";
 import BottomMenu from "./BottomMenu";
 import { WarpView } from "../page-client";
 import toast from "react-hot-toast";
+import LoadingOverlay from "./LoadingOverlay";
 
 interface InboxScreenProps {
   onAction: (view: WarpView) => void;
@@ -151,6 +152,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   const [showShareOptions, setShowShareOptions] = useState(false);
   const conversationUrl = `https://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/conversation/${myAddr}`;
   const conversationWebUrl = `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`;
+  const [loadingConversation, setLoadingConversation] = useState(false);
 
   // Obtener mi inboxId para saber mis mensajes no leídos
   const [myInboxId, setMyInboxId] = useState<string>("");
@@ -588,6 +590,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
     let active = true;
 
     (async () => {
+      setLoadingConversation(true);
       // Instancia previa
       const convo = await xmtpClient.conversations.getConversationById(expanded);
       // Sincronizas con la red los mensajes históricos
@@ -604,6 +607,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         [expanded]: initial !== undefined ? initial.slice().reverse() : [],
       }));
 
+      setLoadingConversation(false);
       // Stream para nuevos mensajes
       const streamSingle = await convo?.stream();
       for await (const msg of streamSingle as AsyncStream<DecodedMessage>) {
@@ -1080,7 +1084,23 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
                               </div>
                             ) : isString ? (
                               <div className="max-w-[100%] p-1 break-words">
-                                {content}
+                                {content
+                                  .split(/(https?:\/\/[^\s]+)/g)
+                                  .map((part, i) =>
+                                    /^https?:\/\//.test(part) ? (
+                                      <a
+                                        key={i}
+                                        href={part}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="underline"
+                                      >
+                                        {part}
+                                      </a>
+                                    ) : (
+                                      part
+                                    )
+                                  )}
                               </div>
                             ) : (
                               <div className="text-xs text-gray-400 italic pr-2">
@@ -1216,6 +1236,9 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
             </div>
           </div>
         )}
+        {loadingConversation && (
+        <LoadingOverlay />
+      )}
       </div>
       <div>
         <BottomMenu onAction={onAction} />
@@ -1243,6 +1266,8 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
           </pre>
         </div>
       )}
+
+      
     </div>
   );
 }

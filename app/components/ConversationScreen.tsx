@@ -24,6 +24,7 @@ import { ConnectWallet, Wallet, WalletDropdown, WalletDropdownDisconnect, Wallet
 import { Avatar, Name, Identity, Address, EthBalance } from "@coinbase/onchainkit/identity";
 import farcasterFrame from "@farcaster/frame-wagmi-connector";
 import { Button } from "../page-client";
+import LoadingOverlay from "./LoadingOverlay";
 
 interface ConversationScreenProps {
   peerAddress: string;
@@ -62,6 +63,8 @@ export default function ConversationScreen({
   const [fullFileText, setFullFileText] = useState<string | null>(null);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [farcasterContext, setFarcasterContext] = useState<any>(null);
+
+  const [loadingConversation, setLoadingConversation] = useState(false);
 
   const { setFrameReady, isFrameReady } = useMiniKit();
 
@@ -216,44 +219,49 @@ export default function ConversationScreen({
     let stream: AsyncStream<DecodedMessage> | undefined;
 
     (async () => {
-      // 1) Verificar si el peer es mensageable
-      const canPeer = await xmtpClient.canMessage([
-        { identifier: peerAddress, identifierKind: "Ethereum" },
-      ]);
-      if (!canPeer) {
-        console.warn("Peer no está en XMTP; no hay conversación posible");
-        return;
+      setLoadingConversation(true);
+      let convo = null;
+      try {
+        // 1) Verificar peer y syncAll…
+        const canPeer = await xmtpClient.canMessage([/*…*/]);
+        if (!canPeer) {
+          console.warn("No XMTP inbox for this user");
+          return;
+        }
+        await xmtpClient.conversations.syncAll();
+        const peerIdentifier = {
+          identifier: peerAddress,
+          identifierKind: "Ethereum" as IdentifierKind,
+        };
+        convo = await xmtpClient.conversations.newDmWithIdentifier(
+          peerIdentifier
+        );
+        await convo.sync();
+
+        const initial = await convo.messages({
+          limit: undefined,
+          direction: SortDirection.Descending,
+        });
+        if (!active) return;
+        setMessages(initial.slice().reverse());
+      } catch (err) {
+        console.error(err);
+      } finally {
+        // ocultamos overlay tan pronto como tengamos el initial
+        if (active) setLoadingConversation(false);
       }
 
-      // 2) Sincronizar todas las conversaciones (incluye Unknown)
-      await xmtpClient.conversations.syncAll();
-
-      // 3) Obtener instancia DM y forzar sync
-      const peerIdentifier = {
-        identifier: peerAddress,
-        identifierKind: "Ethereum" as IdentifierKind,
-      };
-      const convo = await xmtpClient.conversations.newDmWithIdentifier(
-        peerIdentifier
-      );
-      await convo.sync();
-
-      // 4) Cargar últimos 50 mensajes
-      const initial = await convo.messages({
-        limit: BigInt(50),
-        direction: SortDirection.Descending,
-      });
-      if (!active) return;
-      setMessages(initial.slice().reverse());
-
-      // 5) Stream de nuevos mensajes
-      stream = await convo.stream();
-      for await (const msg of stream as unknown as AsyncIterable<DecodedMessage>) {
-        if (!active) break;
-        setMessages((prev) => [...prev, msg]);
+      // 5) Stream en background, sin bloquear el overlay
+      try {
+        stream = await convo?.stream();
+        for await (const msg of stream as any) {
+          if (!active) break;
+          setMessages((prev) => [...prev, msg]);
+        }
+      } catch (err) {
+        console.error(err);
       }
-    })().catch(console.error);
-
+    })();
     return () => {
       active = false;
       if (stream && typeof (stream as any).return === "function") {
@@ -547,7 +555,24 @@ export default function ConversationScreen({
                     </div>
                   ) : typeof m.content === "string" ? (
                     <div className="max-w-[100%] p-1 break-words">
-                      {m.content}
+                      {typeof m.content === "string" &&
+                        m.content
+                          .split(/(https?:\/\/[^\s]+)/g)
+                          .map((part, idx) =>
+                            /^https?:\/\//.test(part) ? (
+                              <a
+                                key={idx}
+                                href={part}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline"
+                              >
+                                {part}
+                              </a>
+                            ) : (
+                              part
+                            )
+                          )}
                     </div>
                   ) : (
                     <div className="text-xs text-gray-400 italic pr-2">
@@ -590,6 +615,9 @@ export default function ConversationScreen({
             {fullFileText}
           </pre>
         </div>
+      )}
+      {loadingConversation && (
+        <LoadingOverlay />
       )}
       <WalletModal
         isOpen={isWalletModalOpen}
