@@ -1,7 +1,7 @@
 // src/screens/MyServicesScreen.tsx
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useAccount, useWalletClient } from "wagmi";
 import {
   FiEdit2,
@@ -35,6 +35,7 @@ import SuccessServiceCreationModal from "../components/SuccessServiceCreationMod
 import LoadingOverlay from "../components/LoadingOverlay";
 import { WarpView } from "../page-client";
 import BottomMenu from "./BottomMenu";
+import { WarpcastService, Web3BioProfile } from "../services/warpcastService";
 
 interface MyServicesScreenProps {
   onAction: (view: WarpView) => void;
@@ -60,6 +61,8 @@ const formatEtherTrimmed = (wei: bigint): string => {
 };
 
 export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
+  const warpcast = useMemo(() => new WarpcastService(), []);
+  
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
   const sellerAddress = address as `0x${string}`;
@@ -105,6 +108,8 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
 
   const TITLE_MAX_BYTES = 100;
   const DESC_MAX_BYTES = 1000;
+
+  const [buyerProfiles, setBuyerProfiles] = useState<Record<string, Web3BioProfile>>({});
 
   const isMounted = useRef(true);
   useEffect(() => {
@@ -167,6 +172,18 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
           setSales(salesRecs);
           setRatings(ratingsObj);
           setReviews(reviewsObj);
+          const allBuyers = Object.values(reviewsObj).flat().map(r => r.buyer.toLowerCase());
+          const uniqueBuyers = Array.from(new Set(allBuyers));
+          const ids = uniqueBuyers.map(addr => `farcaster,${addr}`);
+          const bios = await warpcast.getWeb3BioProfiles(ids);
+          const map: Record<string, Web3BioProfile> = {};
+          bios.forEach((p: Web3BioProfile) =>
+             p.aliases?.forEach(a => {
+              const [, addr] = a.split(",");
+              map[addr.toLowerCase()] = p;
+            })
+          );
+          setBuyerProfiles(map);
         }
       } catch (e: any) {
         console.error(e);
@@ -519,26 +536,45 @@ export default function MyServicesScreen({ onAction }: MyServicesScreenProps) {
                         Average Rating: {avg.toFixed(1)} / 5.0
                       </p>
                       {valid.length > 0 ? (
-                        valid.map((r, i) => (
-                          <div key={i} className="bg-[#2a2438] p-3 rounded-lg">
-                            <p className="text-sm">
-                              ⭐ Quality: {r.quality.toFixed(1)} <br /> 💬 Communication:{" "}
-                              {r.communication.toFixed(1)} <br /> ⏱️ Timeliness:{" "}
-                              {r.timeliness.toFixed(1)}
-                            </p>
-                            <p className="mt-1 text-xs text-gray-400">{r.comment}</p>
-                            <p className="mt-1 text-xs text-gray-500 italic">
-                              {new Date(
-                                Number(r.timestamp) * 1000
-                              ).toLocaleString()}
-                            </p>
-                          </div>
-                        ))
+                        valid.map((r, i) => {
+                          const addr = r.buyer.toLowerCase();
+                          const prof = buyerProfiles[addr];
+                          const displayName = prof?.displayName || `${addr.slice(0,6)}…${addr.slice(-4)}`;
+                          return (
+                            <div key={i} className="bg-[#2a2438] p-3 rounded-lg space-y-2">
+                              {/* Avatar + Nombre */}
+                              <div className="flex items-center space-x-2">
+                                {prof?.avatar ? (
+                                  <img src={prof.avatar} alt={displayName}
+                                    className="w-6 h-6 rounded-full object-cover"/>
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full bg-gray-600"/>
+                                )}
+                                <span className="text-sm font-medium text-white">
+                                  {displayName}
+                                </span>
+                              </div>
+                              {/* Scores */}
+                              <p className="text-sm text-gray-200">
+                                ⭐ Quality: {r.quality.toFixed(1)} <br />
+                                💬 Communication: {r.communication.toFixed(1)} <br />
+                                ⏱️ Timeliness: {r.timeliness.toFixed(1)}
+                              </p>
+                              {/* Comentario */}
+                              <p className="mt-1 text-xs text-gray-400 italic">“{r.comment}”</p>
+                              {/* Fecha */}
+                              <p className="mt-1 text-xs text-gray-500">
+                                {new Date(Number(r.timestamp) * 1000).toLocaleString()}
+                              </p>
+                            </div>
+                          );
+                        })
                       ) : (
                         <p className="text-gray-500 text-sm">No reviews yet</p>
                       )}
                     </div>
                   )}
+
                 </div>
               );
             })}
