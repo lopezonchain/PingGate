@@ -1,7 +1,7 @@
 // src/screens/ExploreScreen.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useWalletClient, useAccount } from "wagmi";
 import { FiRefreshCw } from "react-icons/fi";
 import toast from "react-hot-toast";
@@ -43,6 +43,8 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 export default function ExploreScreen({ onAction }: ExploreScreenProps) {
+  const warpcast = useMemo(() => new WarpcastService(), []);
+
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
 
@@ -73,7 +75,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
           const text = `${svc.title} ${svc.seller}`.toLowerCase();
           return !badWords.some((w) => text.includes(w));
         });
-        
+
         const shuffled = shuffleArray(filtered);
 
         // Guardamos los filtrados
@@ -88,7 +90,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
         let bios: Web3BioProfile[] = [];
         try {
           bios = await warp.getWeb3BioProfiles(ids);
-        } catch {}
+        } catch { }
         const bioMap: Record<string, Web3BioProfile> = {};
         bios.forEach((p) =>
           p.aliases?.forEach((alias) => {
@@ -104,7 +106,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
             if (!name) {
               try {
                 name = await resolveEnsName(addr);
-              } catch {}
+              } catch { }
             }
             if (!name) name = `${addr.slice(0, 6)}…${addr.slice(-4)}`;
             return [addr, { name, avatarUrl }] as const;
@@ -180,7 +182,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
     setDisplayed(arr);
   };
 
-  // 2) Ensure the user is on Base network before a tx
+  // Ensure the user is on Base network before a tx
   async function ensureBaseNetwork(): Promise<boolean> {
     if (!walletClient) {
       toast.error("Connect your wallet first");
@@ -200,7 +202,7 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
     return true;
   }
 
-  // 3) Buy flow
+  // Buy flow
   const onBuy = async (id: bigint, price: bigint, sellerAddress: string) => {
     setProcessingId(id);
     try {
@@ -209,17 +211,38 @@ export default function ExploreScreen({ onAction }: ExploreScreenProps) {
         setProcessingId(null);
         return;
       }
+
       const hash = await purchaseService(walletClient!, id, price);
       await publicClient.waitForTransactionReceipt({ hash });
       setSuccessPeer(sellerAddress);
       setShowSuccess(true);
+
+      let fid = 0;
+      // Intentamos con Web3BioProfiles
+      try {
+        const profiles = await warpcast.getWeb3BioProfiles([`farcaster,${sellerAddress}`]);
+        const p = profiles[0];
+        if (p?.social?.uid) {
+          fid = p.social.uid;
+        }
+      } catch {
+        // swallow
+      }
+
+      // Si conseguimos fid, enviamos la notificación
+      if (fid !== 0) {
+        const title = `Congrats! you just sold a service on PingGate`;
+        const bodyText = `Your new client is: ${address}`;
+        await warpcast.notify(fid, title, bodyText, sellerAddress);
+      }
     } catch (e: any) {
       console.error(e);
-      toast.error(e.message || "Purchase failed");
+      toast.error(e.message || "Error");
     } finally {
       setProcessingId(null);
     }
   };
+
 
   if (loading) {
     return (

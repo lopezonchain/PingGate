@@ -180,7 +180,7 @@ export class WarpcastService {
     // 2) URL-encode de la cadena JSON
     const encoded = encodeURIComponent(json);
     // 3) Úsalo como único segment en el path
-    const url = `${this.web3BioBase}/ns/batch/${encoded}`;
+    const url = `${this.web3BioBase}/profile/batch/${encoded}`;
 
     const res = await fetch(url);
     if (!res.ok) {
@@ -188,5 +188,38 @@ export class WarpcastService {
     }
     return res.json() as Promise<Web3BioProfile[]>;
   }
+
+  /**
+   * Envía una notificación a través de tu API /api/notify
+   *
+   * @param fid        El Farcaster ID del destinatario
+   * @param title      Título de la notificación
+   * @param bodyText   Cuerpo de la notificación
+   * @param myAddr     Tu dirección Ethereum (se usa para construir el targetUrl)
+   */
+  async notify(
+    fid: number,
+    title: string,
+    bodyText: string,
+    myAddr: string
+  ): Promise<void> {
+    try {
+      const res = await fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fid,
+          notification: { title, body: bodyText },
+          targetUrl: `https://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/conversation/${myAddr}`,
+        }),
+      });
+      if (!res.ok) {
+        console.error(`Notify failed: ${res.status} ${res.statusText}`);
+      }
+    } catch (error) {
+      console.error("Notify error:", error);
+    }
+  }
+
 
 }

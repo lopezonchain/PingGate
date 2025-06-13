@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount, useWalletClient } from "wagmi";
 import {
@@ -49,6 +49,9 @@ interface ClientUserProps {
 
 export default function ClientUser({ peerAddress }: ClientUserProps) {
     const router = useRouter();
+    
+    const warpcast = useMemo(() => new WarpcastService(), []);
+
     const { data: walletClient } = useWalletClient();
     const { address, isConnected, chainId } = useAccount();
     const peer = peerAddress.toLowerCase();
@@ -223,6 +226,24 @@ export default function ClientUser({ peerAddress }: ClientUserProps) {
             const hash = await purchaseService(walletClient, id, price);
             await publicClient.waitForTransactionReceipt({ hash });
             setShowSuccess(true);
+            let fid = 0;
+            // Intentamos con Web3BioProfiles
+            try {
+                const profiles = await warpcast.getWeb3BioProfiles([`farcaster,${peerAddress}`]);
+                const p = profiles[0];
+                if (p?.social?.uid) {
+                fid = p.social.uid;
+                }
+            } catch {
+                // swallow
+            }
+
+            // Si conseguimos fid, enviamos la notificación
+            if (fid !== 0) {
+                const title = `Congrats! you just sold a service on PingGate`;
+                const bodyText = `Your new client is: ${address}`;
+                await warpcast.notify(fid, title, bodyText, peerAddress);
+            } 
         } catch (e: any) {
             console.error(e);
             toast.error(e.message || "Purchase failed");

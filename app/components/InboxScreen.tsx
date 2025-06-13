@@ -65,15 +65,18 @@ function abbreviateAddress(addr: string) {
   return addr.slice(0, 7) + "…" + addr.slice(-5);
 }
 
+const THIRTY_MIN = 30 * 60 * 1000;
+
 export default function InboxScreen({ onAction }: InboxScreenProps) {
   const router = useRouter();
+
+  // Instanciar WarpcastService
+  const warpcast = useMemo(() => new WarpcastService(), []);
+
   const { context } = useMiniKit();
   const { data: walletClient } = useWalletClient();
   const { xmtpClient, error: xmtpError } = useXmtpClient();
   const myAddr = walletClient?.account.address || "";
-
-  // Instanciar WarpcastService
-  const warpcast = useMemo(() => new WarpcastService(), []);
 
   // Resolver mi propio nombre (Farcaster → ENS → fallback)
   const [myName, setMyName] = useState<string>("");
@@ -624,12 +627,26 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
     text: string | XMTPAttachment
   ) => {
     if (!xmtpClient || !text) return;
+
+    // Creas o recuperas la conversación
     const peerIdentifier = {
       identifier: peer,
       identifierKind: "Ethereum" as IdentifierKind,
     };
     const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
 
+    // Antes de enviar, lee los 2 últimos mensajes (el tuyo más el previo)
+    const lastTwo = await convo.messages({
+      limit: BigInt(2),
+      direction: SortDirection.Descending,
+    });
+    // raw[0] será el último que acabas de enviar luego, raw[1] es el anterior
+    const prev = lastTwo[1];
+    const prevTsMs = prev
+      ? Number(prev.sentAtNs! / BigInt(1e6))
+      : 0;       // si no hay prev, forzamos notificar
+
+    // Envías el mensaje
     if (typeof text === "string") {
       await convo.send(text);
     } else {
@@ -657,26 +674,25 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
       }
     }
 
-    if (fid !== 0) {
-      const title = `New ping from ${myName}`;
-      const bodyText = typeof text === "string" ? text : (text as XMTPAttachment).filename;
-
-      // Intenta notificar; capturamos cualquier error (404, red, etc.)
-      try {
-        const res = await fetch("/api/notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fid,
-            notification: { title, body: bodyText },
-            targetUrl: `https://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/conversation/${myAddr}`,
-          }),
-        });
-        if (!res.ok) {
-          console.error(`Notify failed: ${res.status} ${res.statusText}`);
-        }
-      } catch (e) {
-        console.error("Notify error:", e);
+    const now = Date.now();
+    if (now - prevTsMs >= THIRTY_MIN) {
+      // calculas fid, title, bodyText igual que antes…
+      let fid = 0;
+      const profile = profilesMap[peer] as Web3BioProfile | null;
+      if (profile?.social?.uid) {
+        fid = profile.social.uid;
+      } else {
+        try {
+          fid = await warpcast.getFidByName(peer);
+        } catch {}
+      }
+      if (fid !== 0) {
+        const title = `New ping from ${myName}`;
+        const bodyText =
+          typeof text === "string"
+            ? text
+            : (text as XMTPAttachment).filename;
+        await warpcast.notify(fid, title, bodyText, myAddr);
       }
     }
 
@@ -692,10 +708,10 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
       if (!xmtpClient) throw new Error("XMTP not ready")
       if (!to || !body) throw new Error("Fill all fields")
 
-      // 1) resuelvo la dirección
+      // resuelvo la dirección
       addr = await resolveRecipient(to)
 
-      // 2) compruebo gated chat como antes...
+      // compruebo gated chat como antes...
       const serviceIds = await fetchServiceIdsBySeller(addr as `0x${string}`)
       let hasActive = false
       for (const id of serviceIds) {
@@ -712,7 +728,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         return
       }
 
-      // 3) intento enviar por XMTP
+      // intento enviar por XMTP
       const peerIdentifier = {
         identifier: addr,
         identifierKind: "Ethereum" as IdentifierKind,
@@ -724,7 +740,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         await convo.send(body, ContentTypeAttachment);
       }
 
-      // 4) refresco y cierro composer
+      // refresco y cierro composer
       await loadConversations();
       if (listRef.current) {
         listRef.current.scrollTo({ top: 0, behavior: 'smooth' });
@@ -733,7 +749,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
       setTo("");
       setBody("");
       
-      // 5) notificación Warpcast (igual que antes)
+      // notificación Warpcast
       const profile = profilesMap[addr] as Web3BioProfile | null;
       let fid = 0;
       if (profile?.social?.uid) {
@@ -748,18 +764,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
       if (fid !== 0) {
         const title = `New ping from ${myName}`;
         const bodyText = typeof body === "string" ? body : (body as XMTPAttachment).filename;
-        try {
-          const res = await fetch("/api/notify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              fid,
-              notification: { title, body: bodyText },
-              targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
-            }),
-          })
-          if (!res.ok) console.error(`Notify failed: ${res.status}`);
-        } catch { /* ignore */ }
+        warpcast.notify(fid, title, bodyText, myAddr);
       }
 
     } catch (e: any) {
