@@ -1,7 +1,7 @@
 // src/components/InboxScreen.tsx
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   Client,
   Conversation,
@@ -120,6 +120,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   const [earnedFromPeer, setEarnedFromPeer] = useState<Record<string, bigint>>({});
   const [gatedPeers, setGatedPeers] = useState<Set<string>>(new Set());
   const [loadingList, setLoadingList] = useState(true);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const [profilesMap, setProfilesMap] = useState<
     Record<string, Web3BioProfile | { displayName: string; avatar: string | null }>
@@ -636,6 +637,10 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
       await convo.send(text, ContentTypeAttachment);
     }
 
+    if (listRef.current) {
+      listRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     // Luego obtenemos el fid (si existe) para la notificación
     const profile = profilesMap[peer] as Web3BioProfile | null;
     let fid = 0;
@@ -718,10 +723,13 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
 
       // 4) refresco y cierro composer
       await loadConversations();
+      if (listRef.current) {
+        listRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
       setShowComposer(false);
       setTo("");
       setBody("");
-
+      
       // 5) notificación Warpcast (igual que antes)
       const profile = profilesMap[addr] as Web3BioProfile | null;
       let fid = 0;
@@ -911,7 +919,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         </div>
         {xmtpError && <p className="text-red-500 text-center mb-2">{xmtpError}</p>}
 
-        <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500 pb-6">
+        <div ref={listRef} className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500 pb-6">
           {filtered.length === 0 && tab === "all" ? (
             <div className="flex flex-col items-center justify-center text-center mt-8 space-y-6 px-4">
               <div className="text-gray-400 text-lg font-semibold">

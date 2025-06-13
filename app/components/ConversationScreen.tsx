@@ -482,7 +482,7 @@ export default function ConversationScreen({
       <div className="flex-1 flex flex-col overflow-hidden">
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500"
+          className="flex-1 overflow-y-auto px-4 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500"
         >
           {messages.map((m, i) => {
             const isMe = m.senderInboxId === myInboxId;
@@ -522,7 +522,7 @@ export default function ConversationScreen({
                 )}
 
                 <div
-                  className={`flex flex-wrap items-end w-fit max-w-[80%] p-1 break-words py-1 px-3 rounded-lg ${isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
+                  className={`flex flex-wrap items-end w-fit max-w-[80%] p-1 mb-1 break-words py-1 px-3 rounded-lg ${isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
                     }`}
                 >
                   {att ? (
