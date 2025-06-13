@@ -353,7 +353,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
           return next;
         });
 
-        // Refetch inmediato para pillar el contenido YA indexado
+        // Refetch inmediato para pillar el content YA indexado
         try {
           await xmtpClient.conversations.syncAll();
           const rawList = await xmtpClient.conversations.list();
@@ -907,7 +907,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         </div>
         {xmtpError && <p className="text-red-500 text-center mb-2">{xmtpError}</p>}
 
-        <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500">
+        <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-track-[#1a1725] scrollbar-thumb-purple-600 hover:scrollbar-thumb-purple-500 pb-6">
           {filtered.length === 0 && tab === "all" ? (
             <div className="flex flex-col items-center justify-center text-center mt-8 space-y-6 px-4">
               <div className="text-gray-400 text-lg font-semibold">
@@ -1021,15 +1021,15 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
                       </div>
 
                       {(messages[conv.id] || []).slice(-5).map((m, i) => {
-                        const contenido = m.content;
-                        const isString = typeof contenido === "string";
+                        const content = m.content;
+                        const isString = typeof content === "string";
                         const isAttachment =
-                          !isString && (contenido as any).data !== undefined;
+                          !isString && (content as any).data !== undefined;
 
                         return (
                           <div
                             key={i}
-                            className={`flex flex-col max-w-[80%] break-words py-1 px-3 rounded-lg ${m.senderInboxId === myInboxId
+                            className={`flex flex-wrap items-end w-fit max-w-[80%] p-1 break-words py-1 px-3 rounded-lg ${m.senderInboxId === myInboxId
                               ? "bg-purple-600 ml-auto"
                               : "bg-[#2a2438]"
                               }`}
@@ -1038,29 +1038,29 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
                               <div
                                 className="flex items-center space-x-2 cursor-pointer"
                                 onClick={() =>
-                                  handleAttachmentClick(contenido as XMTPAttachment)
+                                  handleAttachmentClick(content as XMTPAttachment)
                                 }
                               >
-                                {(contenido as XMTPAttachment).mimeType.startsWith(
+                                {(content as XMTPAttachment).mimeType.startsWith(
                                   "image/"
                                 ) ? (
                                   <img
-                                    src={attachmentToUrl(contenido as XMTPAttachment)}
-                                    alt={(contenido as XMTPAttachment).filename}
+                                    src={attachmentToUrl(content as XMTPAttachment)}
+                                    alt={(content as XMTPAttachment).filename}
                                     className="max-h-40 object-contain rounded"
                                   />
                                 ) : (
                                   <>
                                     <FiFile className="w-6 h-6 text-gray-300" />
                                     <span className="truncate text-sm">
-                                      {(contenido as XMTPAttachment).filename}
+                                      {(content as XMTPAttachment).filename}
                                     </span>
                                   </>
                                 )}
                               </div>
                             ) : isString ? (
-                              <div className="text-center break-words">
-                                {contenido}
+                              <div className="max-w-[100%] p-1 break-words">
+                                {content}
                               </div>
                             ) : (
                               <div className="text-xs text-gray-400 italic">
@@ -1068,7 +1068,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
                               </div>
                             )}
 
-                            <span className="text-[10px] text-gray-300 text-right">
+                            <span className="self-end ml-auto text-[10px] text-gray-300 text-right">
                               {m.sentAtNs
                                 ? new Date(
                                   Number(m.sentAtNs / BigInt(1e6))

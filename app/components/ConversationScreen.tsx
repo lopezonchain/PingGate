@@ -376,11 +376,11 @@ export default function ConversationScreen({
           <span className="text-gray-400">Loading chat… Connect a wallet if you didn&apos;t yet</span>
         </div>
         <WalletModal
-        isOpen={isWalletModalOpen}
-        onClose={() => {
-          setIsWalletModalOpen(false);
-        }}
-      />
+          isOpen={isWalletModalOpen}
+          onClose={() => {
+            setIsWalletModalOpen(false);
+          }}
+        />
       </div>
     );
   }
@@ -499,9 +499,10 @@ export default function ConversationScreen({
             return (
               <div
                 key={i}
-                className={`flex flex-col text-sm max-w-[80%] p-2 rounded-lg break-words ${isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
+                className={`flex flex-wrap items-end w-fit max-w-[80%] p-1 break-words py-1 px-3 rounded-lg ${isMe
+                  ? "bg-purple-600 ml-auto"
+                  : "bg-[#2a2438]"
                   }`}
-                style={{ hyphens: "auto" }}
               >
                 {att ? (
                   <div
@@ -524,11 +525,11 @@ export default function ConversationScreen({
                     )}
                   </div>
                 ) : (
-                  <div className="text-center">
+                  <div className="max-w-[100%] p-1 break-words">
                     {typeof m.content === "string" ? m.content : ""}
                   </div>
                 )}
-                <span className="text-[10px] text-gray-300 text-right">
+                <span className="self-end ml-auto text-[10px] text-gray-300">
                   {time}
                 </span>
               </div>
