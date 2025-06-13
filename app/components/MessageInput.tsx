@@ -225,9 +225,9 @@ export default function MessageInput({ onSend }: MessageInputProps) {
           >
             <FiFile className="mr-2" /> File (&lt;1MB)
           </button>
-          <button className="flex items-center px-3 py-2 hover:bg-[#231c32] rounded text-white">
+         {/* <button className="flex items-center px-3 py-2 hover:bg-[#231c32] rounded text-white">
             <FiDollarSign className="mr-2" /> Crypto (soon)
-          </button>
+          </button>*/}
         </div>
       )}
 
