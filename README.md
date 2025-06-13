@@ -1,6 +1,6 @@
 # PingGate
 
-[![MIT License](https://img.shields.io/badge/license-MIT-green)](#license) [![Version](https://img.shields.io/badge/version-0.1.0-blue)](#)
+[![MIT License](https://img.shields.io/badge/license-MIT-green)](#license) [![Version](https://img.shields.io/badge/version-1.0.0-blue)](#)
 <div align="center">
   Chat privately with wallet to wallet encryption. Monetize your inbox or talk with experts<br/>Platform powered by XMTP, Farcaster & Base
 <br/><br/>
