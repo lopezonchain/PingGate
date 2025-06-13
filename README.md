@@ -16,8 +16,8 @@
 
 ## 💬 What is PingGate?
 
-**PingGate** is a decentralized chat app where users can get paid to receive messages.  
-Creators, mentors, and experts can define access tiers (plans) for DMs, consultations, or services — all managed through smart contracts on Base and powered by XMTP.
+**PingGate** is a decentralized chat app where users can get paid to receive messages by offering services.  
+Creators, mentors, and experts can define access tiers (plans) for DMs, consultations, or services, all managed through smart contracts on Base and powered by XMTP in the messaging side.
 
 ---
 
@@ -27,7 +27,7 @@ Creators, mentors, and experts can define access tiers (plans) for DMs, consulta
 - **Wallet-to-wallet communication**: Via XMTP, wallet to wallet, end2end encryption... start owning your conversations!
 - **Monetize your Inbox**: If you start offering a service, people will have to pay to contact you.
 - **Custom plans**: Experts define services (e.g., consulting, support, review) if you don't, anyone can contact you completely free. 
-- **Social integration**: Farcaster accounts, names, feed integration.
+- **Social integration**: Farcaster accounts, names, feed integration, conversation and profile links.
 - **Review system**: Buyers can rate and leave feedback.
 
 ---
