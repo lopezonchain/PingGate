@@ -630,15 +630,18 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
     };
     const convo = await xmtpClient.conversations.newDmWithIdentifier(peerIdentifier);
 
-    // Primero enviamos el texto/attachment por XMTP
     if (typeof text === "string") {
       await convo.send(text);
     } else {
       await convo.send(text, ContentTypeAttachment);
     }
 
-    if (listRef.current) {
-      listRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    // solo scroll si ese peer NO está ya en la primera posición
+    if (
+      listRef.current &&
+      conversations[0]?.peerKey !== peer
+    ) {
+      listRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     // Luego obtenemos el fid (si existe) para la notificación
