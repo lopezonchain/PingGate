@@ -54,7 +54,7 @@ export default function FaqList() {
         {
             question: "Can I offer free pings?",
             answer:
-                "By default it is completely free to chat with anyone. But when you offer a service your PingGate chat will gated",
+                "By default it is completely free to chat with anyone. But when you offer a service your PingGate chat will be gated",
         },
         {
             question: "Why Base and ETH?",

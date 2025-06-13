@@ -694,7 +694,11 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
         const svc = await fetchServiceDetails(id)
         if (svc.active) { hasActive = true; break }
       }
-      if (hasActive && !purchasedPeers.has(addr)) {
+       console.log("HEY");
+      console.log(addr);
+      console.log(purchasedPeers);
+      console.log(soldPeers);
+      if (hasActive && !purchasedPeers.has(addr.toLowerCase()) && !soldPeers.has(addr.toLowerCase())) {
         setModalPeer(addr)
         setShowGatedModal(true)
         return
@@ -1063,7 +1067,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
                                 {content}
                               </div>
                             ) : (
-                              <div className="text-xs text-gray-400 italic">
+                              <div className="text-xs text-gray-400 italic pr-2">
                                 Conversation started
                               </div>
                             )}

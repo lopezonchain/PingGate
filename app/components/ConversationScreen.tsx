@@ -524,9 +524,13 @@ export default function ConversationScreen({
                       </>
                     )}
                   </div>
-                ) : (
+                ) : typeof m.content === "string" ? (
                   <div className="max-w-[100%] p-1 break-words">
                     {typeof m.content === "string" ? m.content : ""}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-400 italic pr-2">
+                    Conversation started
                   </div>
                 )}
                 <span className="self-end ml-auto text-[10px] text-gray-300">
