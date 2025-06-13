@@ -1,8 +1,9 @@
-# PingGate
 
-[![MIT License](https://img.shields.io/badge/license-MIT-green)](#license) [![Version](https://img.shields.io/badge/version-0.1.0-blue)](#)
+![image](https://github.com/user-attachments/assets/00717282-1b5d-4621-9538-ed69ca7363e6)
+
+[![MIT License](https://img.shields.io/badge/license-MIT-green)](#license) [![Version](https://img.shields.io/badge/version-1.0.0-blue)](#)
 <div align="center">
-  Chat privately with wallet to wallet encryption. Monetize your inbox or talk with experts.- Platform powered by XMTP, Farcaster & Base
+  Chat privately with wallet to wallet encryption. Monetize your inbox or talk with experts<br/>Platform powered by XMTP, Farcaster & Base
 <br/><br/>
   <img
     src="https://pinggate.lopezonchain.xyz/PingGateLogo.png"
@@ -16,8 +17,8 @@
 
 ## 💬 What is PingGate?
 
-**PingGate** is a decentralized chat app where users can get paid to receive messages.  
-Creators, mentors, and experts can define access tiers (plans) for DMs, consultations, or services — all managed through smart contracts on Base and powered by XMTP.
+**PingGate** is a decentralized chat app where users can get paid to receive messages by offering services.  
+Creators, mentors, and experts can define access tiers (plans) for DMs, consultations, or services, all managed through smart contracts on Base and powered by XMTP in the messaging side.
 
 ---
 
@@ -27,7 +28,7 @@ Creators, mentors, and experts can define access tiers (plans) for DMs, consulta
 - **Wallet-to-wallet communication**: Via XMTP, wallet to wallet, end2end encryption... start owning your conversations!
 - **Monetize your Inbox**: If you start offering a service, people will have to pay to contact you.
 - **Custom plans**: Experts define services (e.g., consulting, support, review) if you don't, anyone can contact you completely free. 
-- **Social integration**: Farcaster accounts, names, feed integration.
+- **Social integration**: Farcaster accounts, names, feed integration, conversation and profile links.
 - **Review system**: Buyers can rate and leave feedback.
 
 ---
