@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { FiArrowLeft, FiEdit2, FiCheckCircle, FiXCircle } from "react-icons/fi";
+import { FiEdit2, FiCheckCircle, FiXCircle } from "react-icons/fi";
 import { FaStar } from "react-icons/fa";
 import { useAccount, useWalletClient } from "wagmi";
 import {
