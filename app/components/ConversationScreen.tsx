@@ -486,57 +486,80 @@ export default function ConversationScreen({
         >
           {messages.map((m, i) => {
             const isMe = m.senderInboxId === myInboxId;
+            const sentDate = m.sentAtNs
+              ? new Date(Number(m.sentAtNs / BigInt(1e6)))
+              : new Date();
+            const dayString = sentDate.toLocaleDateString(); // p.ej. "13/6/2025"
             const time = m.sentAtNs
-              ? new Date(Number(m.sentAtNs / BigInt(1e6))).toLocaleTimeString([], {
+              ? sentDate.toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
               })
               : "";
+
+            // Miramos la fecha del mensaje anterior
+            let prevDayString: string | null = null;
+            if (i > 0 && messages[i - 1].sentAtNs) {
+              const prevDate = new Date(
+                Number(messages[i - 1].sentAtNs! / BigInt(1e6))
+              );
+              prevDayString = prevDate.toLocaleDateString();
+            }
+
+            const showDateSeparator = i === 0 || dayString !== prevDayString;
             const isAtt =
               typeof m.content !== "string" && (m.content as any).data;
             const att = isAtt ? (m.content as XMTPAttachment) : null;
 
             return (
-              <div
-                key={i}
-                className={`flex flex-wrap items-end w-fit max-w-[80%] p-1 break-words py-1 px-3 rounded-lg ${isMe
-                  ? "bg-purple-600 ml-auto"
-                  : "bg-[#2a2438]"
-                  }`}
-              >
-                {att ? (
-                  <div
-                    className="flex items-center space-x-2 cursor-pointer"
-                    onClick={() => handleAttachmentClick(att)}
-                  >
-                    {att.mimeType.startsWith("image/") ? (
-                      <img
-                        src={attachmentToUrl(att)}
-                        alt={att.filename}
-                        className="max-h-40 object-contain rounded"
-                      />
-                    ) : (
-                      <>
-                        <FiFile className="w-6 h-6 text-gray-300" />
-                        <span className="truncate text-sm">
-                          {att.filename}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                ) : typeof m.content === "string" ? (
-                  <div className="max-w-[100%] p-1 break-words">
-                    {typeof m.content === "string" ? m.content : ""}
-                  </div>
-                ) : (
-                  <div className="text-xs text-gray-400 italic pr-2">
-                    Conversation started
+              <React.Fragment key={i}>
+                {showDateSeparator && (
+                  <div className="w-full flex justify-center my-2">
+                    <span className="text-gray-200 text-xs px-2 py-1 rounded">
+                      {dayString}
+                    </span>
                   </div>
                 )}
-                <span className="self-end ml-auto text-[10px] text-gray-300">
-                  {time}
-                </span>
-              </div>
+
+                <div
+                  className={`flex flex-wrap items-end w-fit max-w-[80%] p-1 break-words py-1 px-3 rounded-lg ${isMe ? "bg-purple-600 ml-auto" : "bg-[#2a2438]"
+                    }`}
+                >
+                  {att ? (
+                    <div
+                      className="flex items-center space-x-2 cursor-pointer"
+                      onClick={() => handleAttachmentClick(att)}
+                    >
+                      {att.mimeType.startsWith("image/") ? (
+                        <img
+                          src={attachmentToUrl(att)}
+                          alt={att.filename}
+                          className="max-h-40 object-contain rounded"
+                        />
+                      ) : (
+                        <>
+                          <FiFile className="w-6 h-6 text-gray-300" />
+                          <span className="truncate text-sm">
+                            {att.filename}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  ) : typeof m.content === "string" ? (
+                    <div className="max-w-[100%] p-1 break-words">
+                      {m.content}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-400 italic pr-2">
+                      Conversation started
+                    </div>
+                  )}
+
+                  <span className="self-end ml-auto text-[10px] text-gray-300">
+                    {time}
+                  </span>
+                </div>
+              </React.Fragment>
             );
           })}
         </div>
