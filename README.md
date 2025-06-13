@@ -1,4 +1,4 @@
-# PingGate
+![image](https://github.com/user-attachments/assets/fe63f038-a959-45e1-8f2a-7515bb405dd0)
 
 [![MIT License](https://img.shields.io/badge/license-MIT-green)](#license) [![Version](https://img.shields.io/badge/version-1.0.0-blue)](#)
 <div align="center">
