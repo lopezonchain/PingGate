@@ -180,7 +180,7 @@ export class WarpcastService {
     // 2) URL-encode de la cadena JSON
     const encoded = encodeURIComponent(json);
     // 3) Úsalo como único segment en el path
-    const url = `${this.web3BioBase}/profile/batch/${encoded}`;
+    const url = `${this.web3BioBase}/ns/batch/${encoded}`;
 
     const res = await fetch(url);
     if (!res.ok) {
