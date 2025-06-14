@@ -295,7 +295,25 @@ export default function ConversationScreen({
     } else {
       await convo.send(text, ContentTypeAttachment);
     }
-    // notificación (igual que antes)...
+    // notificación
+    let fid = 0;
+    // Intentamos con Web3BioProfiles
+    try {
+      const profiles = await warpcast.getWeb3BioProfiles([`farcaster,${peerAddress}`]);
+      const p = profiles[0];
+      if (p?.social?.uid) {
+        fid = p.social.uid;
+      }
+    } catch {
+      // swallow
+    }
+
+    // Si conseguimos fid, enviamos la notificación
+    if (fid !== 0) {
+      const title = `Congrats! you just sold a service on PingGate`;
+      const bodyText = `Your new client is: ${myAddress}`;
+      await warpcast.notify(fid, title, bodyText, peerAddress);
+    }
   };
 
   // Helpers attachments

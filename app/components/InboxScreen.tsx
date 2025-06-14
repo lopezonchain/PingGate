@@ -584,7 +584,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
   }, [xmtpClient, myInboxId]);
 
 
-  // Cargar mensajes de la conversación “expanded” (igual que antes, usando peerInboxId para crear el DM)
+  // Cargar mensajes de la conversación “expanded” 
   useEffect(() => {
     if (!xmtpClient || !expanded) return;
     let active = true;
@@ -667,7 +667,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
 
     const now = Date.now();
     if (now - prevTsMs >= THIRTY_MIN) {
-      // calculas fid, title, bodyText igual que antes…
+      // calculas fid, title, bodyText
       let fid = 0;
       const profile = profilesMap[peer] as Web3BioProfile | null;
       if (profile?.social?.uid) {
@@ -702,7 +702,7 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
       // resuelvo la dirección
       addr = await resolveRecipient(to)
 
-      // compruebo gated chat como antes...
+      // compruebo gated chat
       const serviceIds = await fetchServiceIdsBySeller(addr as `0x${string}`)
       let hasActive = false
       for (const id of serviceIds) {
