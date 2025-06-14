@@ -58,8 +58,8 @@ export async function POST(request: Request) {
     fid,
     title: notification.title,
     body: notification.body,
-    notificationId: notificationId ?? undefined,
     targetUrl: targetUrl ?? undefined,
+    notificationId: notificationId ?? undefined,
     tokens,
   };
 
