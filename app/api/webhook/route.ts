@@ -90,6 +90,7 @@ export async function POST(request: Request) {
           fid,
           title: `Welcome to ${appName}`,
           body: `Privately chat with wallet to wallet encryption. Find experts. Start offering a chat service and monetize your inbox. Wallet to wallet messages with Farcaster notifications`,
+          targetUrl: `https://pinggate.lopezonchain.xyz`
         });
       } else {
         await deleteUserNotificationDetails(fid);
@@ -103,6 +104,7 @@ export async function POST(request: Request) {
         fid,
         title: `Miniapp removed`,
         body: `You removed ${appName} successfully. Please tell me how I can improve your experience. @lopezonchain.xyz`,
+        targetUrl: `https://pinggate.lopezonchain.xyz`
       });
       await deleteUserNotificationDetails(fid);
       break;
@@ -114,6 +116,7 @@ export async function POST(request: Request) {
         fid,
         title: `Notifications enabled!`,
         body: `Thank you for enabling ${appName} notifications`,
+        targetUrl: `https://pinggate.lopezonchain.xyz`
       });
 
       break;
@@ -125,6 +128,7 @@ export async function POST(request: Request) {
         fid,
         title: `Notifications disabled successfully on ${appName}`,
         body: `Please tell me how I can improve your experience. @lopezonchain.xyz`,
+        targetUrl: `https://pinggate.lopezonchain.xyz`
       });
       await deleteUserNotificationDetails(fid);
 
