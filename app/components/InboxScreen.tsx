@@ -665,19 +665,6 @@ export default function InboxScreen({ onAction }: InboxScreenProps) {
       listRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    // Luego obtenemos el fid (si existe) para la notificación
-    const profile = profilesMap[peer] as Web3BioProfile | null;
-    let fid = 0;
-    if (profile?.social?.uid) {
-      fid = profile.social.uid;
-    } else {
-      try {
-        fid = await warpcast.getFidByName(peer);
-      } catch {
-        //ignore
-      }
-    }
-
     const now = Date.now();
     if (now - prevTsMs >= THIRTY_MIN) {
       // calculas fid, title, bodyText igual que antes…

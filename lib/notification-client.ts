@@ -5,6 +5,8 @@ import {
 } from "@farcaster/frame-sdk";
 import { getUserNotificationDetails } from "@/lib/notification";
 
+const appUrl = process.env.NEXT_PUBLIC_URL || "";
+
 type SendFrameNotificationResult =
   | {
       state: "error";
@@ -18,11 +20,13 @@ export async function sendFrameNotification({
   fid,
   title,
   body,
+  targetUrl,
   notificationDetails,
 }: {
   fid: number;
   title: string;
   body: string;
+  targetUrl: string;
   notificationDetails?: FrameNotificationDetails | null;
 }): Promise<SendFrameNotificationResult> {
   if (!notificationDetails) {
@@ -31,6 +35,8 @@ export async function sendFrameNotification({
   if (!notificationDetails) {
     return { state: "no_token" };
   }
+
+  console.log(notificationDetails.url);
 
   const response = await fetch(notificationDetails.url, {
     method: "POST",
@@ -41,7 +47,7 @@ export async function sendFrameNotification({
       notificationId: crypto.randomUUID(),
       title,
       body,
-      targetUrl: notificationDetails.url,
+      targetUrl: targetUrl,
       tokens: [notificationDetails.token],
     } satisfies SendNotificationRequest),
   });

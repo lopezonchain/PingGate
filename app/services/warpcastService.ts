@@ -210,7 +210,7 @@ export class WarpcastService {
         body: JSON.stringify({
           fid,
           notification: { title, body: bodyText },
-          targetUrl: `https://farcaster.xyz/miniapps/EeMMAjeUSYta/pinggate/conversation/${myAddr}`,
+          targetUrl: `https://pinggate.lopezonchain.xyz/conversation/${myAddr}`,
         }),
       });
       if (!res.ok) {
