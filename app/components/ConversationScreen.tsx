@@ -310,9 +310,12 @@ export default function ConversationScreen({
 
     // Si conseguimos fid, enviamos la notificación
     if (fid !== 0) {
-      const title = `Congrats! you just sold a service on PingGate`;
-      const bodyText = `Your new client is: ${myAddress}`;
-      await warpcast.notify(fid, title, bodyText, peerAddress);
+      const title = `New ping from ${myName}`;
+        const bodyText =
+          typeof text === "string"
+            ? text
+            : (text as XMTPAttachment).filename;
+        await warpcast.notify(fid, title, bodyText, myAddress);
     }
   };
 
